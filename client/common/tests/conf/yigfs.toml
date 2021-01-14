@@ -1,0 +1,12 @@
+[mount_config]
+mnt = "/mnt/yigfs"
+
+[s3_config]
+region = "cn"
+server = "http://127.0.0.1"
+bucket = "mybucket"
+ak = "ak"
+sk = "sk"
+
+[metaserver_config]
+meta_server = "http//127.0.0.1"
