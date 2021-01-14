@@ -5,6 +5,8 @@ members = [
     "io_engine",
     "filesystem_mgr",
     "metaservice_mgr",
+    "segment_mgr",
+    "common",
 ]
 
 

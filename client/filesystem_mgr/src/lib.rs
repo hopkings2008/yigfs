@@ -18,7 +18,8 @@ impl FilesystemMgr{
     }
 
     pub fn mount(&self, mountOptions : MountOptions) {
-        fuse::mount(yigfs::Yigfs, &mountOptions.mnt, &[]).unwrap();
+        let yfs = yigfs::Yigfs{};
+        fuse::mount(yfs, &mountOptions.mnt, &[]).unwrap();
     }
 }
 

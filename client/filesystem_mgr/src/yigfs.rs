@@ -46,10 +46,12 @@ const HELLO_TXT_ATTR: FileAttr = FileAttr {
     rdev: 0,
     flags: 0,
 };
-pub struct Yigfs;
+pub struct Yigfs{  
+}
 
 impl Filesystem for Yigfs {
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
+        println!("lookup: parent: {}, name: {}", parent, String::from(name.to_str().unwrap()));
         if parent == 1 && name.to_str() == Some("hello.txt") {
             reply.entry(&TTL, &HELLO_TXT_ATTR, 0);
         } else {
@@ -74,6 +76,7 @@ impl Filesystem for Yigfs {
     }
 
     fn readdir(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, mut reply: ReplyDirectory) {
+        println!("readdir: ino: {}, offset: {}", ino, offset);
         if ino == 1 {
             if offset == 0 {
                 reply.add(1, 0, FileType::Directory, ".");

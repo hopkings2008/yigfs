@@ -8,5 +8,7 @@ edition = "2018"
 
 [dependencies]
 clap = "2"
+futures = "0.3"
 filesystem_mgr = { path = "../filesystem_mgr" }
 metaservice_mgr = { path = "../metaservice_mgr" }
+common = { path = "../common" }
