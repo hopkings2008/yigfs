@@ -1,5 +1,7 @@
 pub mod config;
 
+pub mod http_client;
+
 pub fn parse_config(path: String)->Result<config::Config, Box<dyn std::error::Error>>{
     let results = std::fs::read_to_string(path);
     match results {

@@ -1,3 +1,4 @@
+pub mod types;
 pub mod mgr;
 mod mgr_impl;
 

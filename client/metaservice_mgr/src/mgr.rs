@@ -1,3 +1,6 @@
+#[path = "./types.rs"] 
+pub mod types;
+
 pub trait MetaServiceMgr {
-    fn initInode(&self);
+    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<types::DirEntry>, Box<dyn std::error::Error>>;
 }
