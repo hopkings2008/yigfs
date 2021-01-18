@@ -3,8 +3,7 @@ extern crate hyper;
 use std::collections::HashMap;
 use std::io::Read;
 use hyper::Client;
-use hyper::body::HttpBody as _;
-use bytes::{Buf as _, Bytes};
+use bytes::Buf as _;
 use tokio::runtime::Runtime;
 
 #[derive (Debug, Default)]
@@ -43,7 +42,7 @@ impl HttpClient{
                         body(hyper::Body::from(body.clone()));
             match req {
                 Ok(req) => {
-                    let mut result = Runtime::new()
+                    let result = Runtime::new()
                     .expect("Failed to create Tokio runtime").block_on(self.send(req));
                     match result {
                         Ok(mut result) => {
@@ -72,7 +71,7 @@ impl HttpClient{
                             }
                         }
                         Err(error) => {
-                            return Err(format!("failed to send request to url: {}, err: {}", url.clone(), error));
+                            println!("failed to send request to url: {}, err: {} in {} time", url.clone(), error, count+1);
                         }
                     }
                 }
@@ -87,7 +86,7 @@ impl HttpClient{
     }
 
     
-    async fn send(&self, mut req: hyper::Request<hyper::Body>) -> Result<Resp, String>{
+    async fn send(&self, req: hyper::Request<hyper::Body>) -> Result<Resp, String>{
         // use the http2
         //*req.version_mut() = hyper::Version::HTTP_2;
         let resp = self.http_client.request(req).await;
