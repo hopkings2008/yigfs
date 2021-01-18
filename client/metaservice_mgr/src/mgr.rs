@@ -2,5 +2,5 @@
 pub mod types;
 
 pub trait MetaServiceMgr {
-    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<types::DirEntry>, Box<dyn std::error::Error>>;
+    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<types::DirEntry>, String>;
 }

@@ -4,14 +4,14 @@ mod mgr_impl;
 
 use common;
 
-pub fn create_metaserver_mgr(cfg: common::config::MetaServerConfig) -> Result<Box<dyn mgr::MetaServiceMgr>, Box<dyn std::error::Error>>{
-    let meta_service = Box::new(mgr_impl::MetaServiceMgrImpl{});
-    Ok(meta_service)
-}
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+pub fn create_metaserver_mgr(cfg: common::config::Config) -> Result<Box<dyn mgr::MetaServiceMgr>, String>{
+    let ret = mgr_impl::MetaServiceMgrImpl::new(cfg);
+    match ret {
+        Ok(ret) => {
+            return Ok(Box::new(ret));
+        }
+        Err(error) => {
+            return Err(format!("failed to new MetaServiceMgrImpl, err: {}", error));
+        }
     }
 }
