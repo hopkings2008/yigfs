@@ -7,116 +7,174 @@ import (
         "time"
 
         "github.com/hopkings2008/yigfs/server/types"
+	    . "github.com/hopkings2008/yigfs/server/error"
 )
 
 
-func (t *TidbClient) ListDirFiles(ctx context.Context, files *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFilesResp, err error) {
-        var ino, generation uint64
+func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
         var maxNum = 1000
-
         args := make([]interface{}, 0)
-        sqltext := "select ino, generation, file_name, type from dir where region=? and bucket_name=? and (ino + generation) > ? order by (ino + generation) limit ?;"
-        args = append(args, files.Region, files.BucketName, files.Offset, maxNum)
+        sqltext := "select ino, file_name, type from dir where region=? and bucket_name=? and ino >= ? order by ino limit ?;"
+        args = append(args, dir.Region, dir.BucketName, dir.Offset, maxNum)
 
         rows, err := t.Client.Query(sqltext, args...)
         if err == sql.ErrNoRows {
-                err = nil
+                err = ErrYigFsNotFindTargetDirFiles
                 return
         } else if err != nil {
-                log.Fatal("Failed to list dir files, err:", err)
+		err = ErrYIgFsInternalErr
                 return
         }
         defer rows.Close()
 
         for rows.Next() {
-                var tmp types.GetDirFilesResp
+                var tmp types.GetDirFileInfo
                 err = rows.Scan(
-                        &ino,
-                        &generation,
+                        &tmp.Ino,
                         &tmp.FileName,
                         &tmp.Type)
                 if err != nil {
-			log.Fatal("Form dirFilesResp from tidb failed, err:", err)
+			log.Printf("Failed to list dir files in row, err: %v", err)
+			err = ErrYIgFsInternalErr
                         return
                 }
-
-                if generation > 0 {
-                        tmp.Ino = ino + generation
-                } else {
-                        tmp.Ino = ino
-                }
-
                 dirFilesResp = append(dirFilesResp, &tmp)
-
         }
         err = rows.Err()
         if err != nil {
+		log.Printf("Failed to list dir files in rows, err: %v", err)
+		err = ErrYIgFsInternalErr
                 return
         }
+
+        offset = uint64(len(dirFilesResp)) + dir.Offset //nextStartIno
         log.Println("succeed to list dir files, sqltext:", sqltext)
         return
 }
 
-func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateDirFileReq) (resp *types.CreateDirFileResp, err error) {
-        createDirFileResp := &types.CreateDirFileResp{}
-        now := time.Now().UTC()
-
-        ino, generation, err := getMaxInoAndGeneration(t)
-        if err != nil {
-                return
-        }
-
-        if ino == types.MAXMUM_INO_VALUE {
-                generation += 1
-                sqltext := "insert into dir values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
-                args := []interface{}{ino, generation, file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
-                        file.Type, file.Owner, now, now, file.Atime, file.Perm, file.Nlink, file.Uid, file.Gid}
-                _, err = t.Client.Exec(sqltext, args...)
-                if err != nil {
-                        log.Fatal("Failed to create file into tidb where ino is maximum, err:", err)
-                        return
-                }
-                createDirFileResp.Ino = ino + generation
-                return
-        }
-
-        sqltext := "insert into dir values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
-        args := []interface{}{generation, file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
-                file.Type, file.Owner, now, now, file.Atime, file.Perm, file.Nlink, file.Uid, file.Gid}
-        _, err = t.Client.Exec(sqltext, args...)
-        if err != nil {
-                log.Fatal("Failed to create file to tidb, err:", err)
-                return
-        }
-        createDirFileResp.Ino = ino + 1
-        log.Fatal("succeed to create or update image styles, sqltext:", sqltext)
-        return createDirFileResp, nil
-}
-
-func getMaxInoAndGeneration(t *TidbClient) (ino uint64, generation uint64, err error) {
-        sqltext := "select ino, generation from dir order by (ino + generation) desc limit 1"
-        row := t.Client.QueryRow(sqltext)
-        err = row.Scan(
-                &ino,
-                &generation,
-        )
-        if err == sql.ErrNoRows {
-                err = nil
-                return
-        } else if err != nil {
-                log.Fatal("Failed to get the maximum generation, err:", err)
-                return
-        }
-        return ino, generation, nil
-}
-
-func (t *TidbClient) CreateAndUpdateRootDir(ctx context.Context, rootDir *types.CreateDirFileReq) (err error) {
-        sql := "insert into dir (ino, file_name) values(?,?) on duplicate key update file_name=values(file_name)"
-        args := []interface{}{rootDir.Ino, rootDir.FileName}
+func (t *TidbClient) CreateAndUpdateRootDir(ctx context.Context, rootDir *types.FileInfo) (err error) {
+        sql := "insert into dir (ino, file_name, type) values(?,?,?) on duplicate key update file_name=values(file_name)"
+        args := []interface{}{rootDir.Ino, rootDir.FileName, rootDir.Type}
         _, err = t.Client.Exec(sql, args...)
         if err != nil {
-                log.Fatal("Failed to CreateAndUpdateRootDir, err:", err)
-                return err
+		log.Printf("Failed to create and update root dir, err: %v", err)
+               	err = ErrYIgFsInternalErr
+                return
         }
-        return nil
+        return
+}
+
+func (t *TidbClient) CreateFile(ctx context.Context, file *types.FileInfo) (err error) {
+        now := time.Now().UTC()
+
+        sqltext := "insert into dir(region, bucket_name, parent_ino, file_name, size, type, owner, ctime, mtime, atime, perm," +
+            " nlink, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+        args := []interface{}{file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
+                file.Type, file.Owner, now, now, now, file.Perm, file.Nlink, file.Uid, file.Gid}
+        _, err = t.Client.Exec(sqltext, args...)
+        if err != nil {
+                log.Printf("Failed to create file to tidb, err: %v", err)
+                err = ErrYIgFsInternalErr
+                return
+        }
+        log.Printf("Succeed to create file, sqltext: %v", sqltext)
+        return
+}
+
+
+func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {
+        resp = &types.FileInfo{}
+        var ctime, mtime, atime string
+        sqltext := "select ino, generation, size, type, owner, ctime, mtime, atime, perm, nlink, uid, gid from dir where region=? and bucket_name=? and parent_ino=? and file_name=?"
+        row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.ParentIno, file.FileName)
+        err = row.Scan(
+                &resp.Ino,
+                &resp.Generation,
+                &resp.Size,
+                &resp.Type,
+                &resp.Owner,
+                &ctime,
+                &mtime,
+                &atime,
+                &resp.Perm,
+                &resp.Nlink,
+                &resp.Uid,
+                &resp.Gid,
+        )
+
+        if err == sql.ErrNoRows {
+                err = ErrYigFsNoSuchFile
+                return
+        } else if err != nil {
+                log.Printf("Failed to get the dir file info, err: %v", err)
+                err = ErrYIgFsInternalErr
+                return
+        }
+
+        resp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, ctime)
+        if err != nil {
+                return
+        }
+        resp.Mtime, err = time.Parse(types.TIME_LAYOUT_TIDB, mtime)
+        if err != nil {
+                return
+        }
+        resp.Atime, err = time.Parse(types.TIME_LAYOUT_TIDB, atime)
+        if err != nil {
+                return
+        }
+        resp.Region = file.Region
+        resp.BucketName = file.BucketName
+        resp.ParentIno = file.ParentIno
+        resp.FileName = file.FileName
+        return
+}
+
+func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
+        resp = &types.FileInfo{}
+        var ctime, mtime, atime string
+        sqltext := "select generation, region, bucket_name, parent_ino, file_name, size, type, owner, ctime, mtime, atime, perm, nlink, uid, gid from dir where ino = ?"
+        row := t.Client.QueryRow(sqltext, file.Ino)
+        err = row.Scan(
+                &resp.Generation,
+                &resp.Region,
+                &resp.BucketName,
+                &resp.ParentIno,
+                &resp.FileName,
+                &resp.Size,
+                &resp.Type,
+                &resp.Owner,
+                &ctime,
+                &mtime,
+                &atime,
+                &resp.Perm,
+                &resp.Nlink,
+                &resp.Uid,
+                &resp.Gid,
+        )
+
+        if err == sql.ErrNoRows {
+                err = ErrYigFsNoSuchFile
+                return
+        } else if err != nil {
+                log.Printf("Failed to get the file info, err: %v", err)
+                err = ErrYIgFsInternalErr
+                return
+        }
+
+        resp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, ctime)
+        if err != nil {
+                return
+        }
+        resp.Mtime, err = time.Parse(types.TIME_LAYOUT_TIDB, mtime)
+        if err != nil {
+                return
+        }
+        resp.Atime, err = time.Parse(types.TIME_LAYOUT_TIDB, atime)
+        if err != nil {
+                return
+        }
+        resp.Ino = file.Ino
+
+        return
 }

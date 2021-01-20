@@ -8,3 +8,7 @@ import (
 type ServerConfig struct {
 	YigFsLayer *storage.YigFsStorage
 }
+
+type MetaAPIHandlers struct {
+	YigFsAPI YigFsLayer
+}
