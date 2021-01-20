@@ -4,7 +4,7 @@ fn test_http_client_get()->Result<(), String> {
     let url = String::from("http://www.baidu.com");
     let retry_times = 3;
     let client = http_client::HttpClient::new(retry_times);
-    let resp = client.get(url, String::new())?;
+    let resp = client.get(&url, String::new())?;
     if resp.status >= 300 {
         return Err(format!("got invalid status {}", resp.status));
     }

@@ -1,6 +1,5 @@
-#[path = "./types.rs"] 
-pub mod types;
+use crate::types::DirEntry;
 
 pub trait MetaServiceMgr {
-    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<types::DirEntry>, String>;
+    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<DirEntry>, String>;
 }

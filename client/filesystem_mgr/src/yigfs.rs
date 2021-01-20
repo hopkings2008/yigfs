@@ -6,6 +6,7 @@ use std::ffi::OsStr;
 use libc::ENOENT;
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory};
+use metaservice_mgr::mgr::MetaServiceMgr;
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -46,10 +47,11 @@ const HELLO_TXT_ATTR: FileAttr = FileAttr {
     rdev: 0,
     flags: 0,
 };
-pub struct Yigfs{  
+pub struct Yigfs<'a>{
+    pub meta_service_mgr: &'a Box<dyn MetaServiceMgr>,
 }
 
-impl Filesystem for Yigfs {
+impl<'a> Filesystem for Yigfs<'a> {
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         println!("lookup: parent: {}, name: {}", parent, String::from(name.to_str().unwrap()));
         if parent == 1 && name.to_str() == Some("hello.txt") {
@@ -76,6 +78,7 @@ impl Filesystem for Yigfs {
     }
 
     fn readdir(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, mut reply: ReplyDirectory) {
+        // must authorize the request here by checking _req.
         println!("readdir: ino: {}, offset: {}", ino, offset);
         if ino == 1 {
             if offset == 0 {

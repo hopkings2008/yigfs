@@ -1,5 +1,6 @@
 mod yigfs;
-use metaservice_mgr;
+use yigfs::Yigfs;
+use metaservice_mgr::mgr::MetaServiceMgr;
 
 pub struct MountOptions{
     // mount point
@@ -7,28 +8,20 @@ pub struct MountOptions{
 }
 
 pub struct FilesystemMgr {
-    metaServiceMgr: Box<dyn metaservice_mgr::mgr::MetaServiceMgr>,
+   meta_service_mgr: Box<dyn MetaServiceMgr>,
 }
 
 impl FilesystemMgr{
-    pub fn create(metaServiceMgr: Box<dyn metaservice_mgr::mgr::MetaServiceMgr>)->FilesystemMgr{
+    pub fn create(meta_service_mgr: Box<dyn MetaServiceMgr>)->FilesystemMgr{
         FilesystemMgr{
-            metaServiceMgr: metaServiceMgr,
+            meta_service_mgr: meta_service_mgr,
         }
     }
 
-    pub fn mount(&self, mountOptions : MountOptions) {
-        let yfs = yigfs::Yigfs{};
-        fuse::mount(yfs, &mountOptions.mnt, &[]).unwrap();
-    }
-}
-
-
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    pub fn mount(&self, mount_options : MountOptions) {
+        let yfs = Yigfs{
+            meta_service_mgr: &self.meta_service_mgr,
+        };
+        fuse::mount(yfs, &mount_options.mnt, &[]).unwrap();
     }
 }
