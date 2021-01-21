@@ -1,7 +1,7 @@
 package types
 
 const (
-	MAX_MetaService_REQ_BODY_SIZE = int64(2 << 20)
+	TIME_LAYOUT_TIDB = "2006-01-02 15:04:05"
 )
 
 const (
@@ -12,6 +12,17 @@ const (
 	CTX_REQ_ID = "ctx_req_id"
 )
 
-const(
+const (
 	MAXMUM_INO_VALUE = uint64(1 << 64 -1)
+)
+
+const (
+	COMMON_FILE = iota + 1
+	DIR_FILE
+)
+
+const (
+	Read = iota + 1
+	ReadAndWrite
+	ReadWriteAndExec
 )

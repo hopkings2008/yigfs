@@ -1,11 +1,9 @@
 package main
 
 import (
-	"net/http"
-	"os"
 	"log"
 
-	"golang.org/x/net/http2"
+	"github.com/kataras/iris"
 	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/api"
 	"github.com/hopkings2008/yigfs/server/storage"
@@ -13,16 +11,10 @@ import (
 )
 
 
-func checkErr(err error, msg string) {
-	if err == nil {
-		log.Println(msg)
-		return
-	}
-	log.Fatal("ListenAndServeTLS failed, err:", err)
-	os.Exit(1)
-}
-
 func main() {
+	// New ris
+	app := iris.New()
+
 	// Setup config
 	helper.SetupConfig()
 
@@ -38,27 +30,28 @@ func main() {
 	}
 
 	// Add root dir
-	rootDir := &types.CreateDirFileReq{
+	rootDir := &types.FileInfo{
 		Ino: 1,
 		FileName: ".",
+		Type: types.DIR_FILE,
 	}
 	err := yigFsStorage.MetaStorage.Client.CreateAndUpdateRootDir(nil, rootDir)
 	if err != nil {
 		log.Fatal("init dir to tidb failed, err:", err)
+		return
 	}
 
-	mux := api.NewMultiplexer()
-	mux.HandleFunc("/v1/dir/files", apiHandlers.GetDirFilesHandler)
+	// ListDirFiles
+	app.Post("/v1/dir/files", apiHandlers.GetDirFilesHandler)
+	// CreateFile
+	app.Post("/v1/dir/file/create", apiHandlers.CreateFileHandler)
+	//GetDirFileAttr
+	app.Post("/v1/dir/file/attr", apiHandlers.GetDirFileAttrHandler)
+	//GetFileAttr
+	app.Post("/v1/file/attr", apiHandlers.GetFileAttrHandler)
 
-	httpServer := &http.Server{
-		Addr:    ":" + helper.CONFIG.MetaServiceConfig.Port,
-		Handler: mux.Handler,
-	}
-
-	http2Server := &http2.Server{}
-	_ = http2.ConfigureServer(httpServer, http2Server)
-
-	checkErr(httpServer.ListenAndServeTLS(helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile), "http2 listening")
+	port := ":" + helper.CONFIG.MetaServiceConfig.Port
+	log.Fatal(app.Run(iris.Addr(port)))
 }
 
 
