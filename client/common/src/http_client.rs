@@ -32,7 +32,7 @@ impl HttpClient{
         }
     }
 
-    pub fn get(&self, url: &String, body: String) -> Result<RespText, String>{
+    pub fn get(&self, url: &String, body: &String) -> Result<RespText, String>{
         let mut count = self.retry_times;
         while count > 0 {
             count -= 1;
