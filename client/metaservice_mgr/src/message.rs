@@ -36,7 +36,9 @@ pub struct RespReadDir{
 pub struct ReqDirFileAttr {
     pub region: String,
     pub bucket: String,
+    #[serde(rename(serialize = "parent_ino", deserialize = "parent_ino"))]
     pub ino: u64,
+    #[serde(rename(serialize = "file_name", deserialize = "file_name"))]
     pub name: String,
 }
 
