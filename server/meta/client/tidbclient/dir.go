@@ -22,6 +22,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
                 err = ErrYigFsNotFindTargetDirFiles
                 return
         } else if err != nil {
+		log.Printf("Failed to query dir files, err: %v", err)
 		err = ErrYIgFsInternalErr
                 return
         }
@@ -48,7 +49,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
         }
 
         offset = uint64(len(dirFilesResp)) + dir.Offset //nextStartIno
-        log.Println("succeed to list dir files, sqltext:", sqltext)
+        log.Printf("succeed to list dir files, sqltext: %v", sqltext)
         return
 }
 
@@ -67,10 +68,10 @@ func (t *TidbClient) CreateAndUpdateRootDir(ctx context.Context, rootDir *types.
 func (t *TidbClient) CreateFile(ctx context.Context, file *types.FileInfo) (err error) {
         now := time.Now().UTC()
 
-        sqltext := "insert into dir(region, bucket_name, parent_ino, file_name, size, type, owner, ctime, mtime, atime, perm," +
-            " nlink, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+        sqltext := "insert into dir(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
+            " nlink, uid, gid, blocks) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
         args := []interface{}{file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
-                file.Type, file.Owner, now, now, now, file.Perm, file.Nlink, file.Uid, file.Gid}
+                file.Type, now, now, now, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
         _, err = t.Client.Exec(sqltext, args...)
         if err != nil {
                 log.Printf("Failed to create file to tidb, err: %v", err)
@@ -85,14 +86,13 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.FileInfo) (err 
 func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
-        sqltext := "select ino, generation, size, type, owner, ctime, mtime, atime, perm, nlink, uid, gid from dir where region=? and bucket_name=? and parent_ino=? and file_name=?"
+        sqltext := "select ino, generation, size, type, ctime, mtime, atime, perm, nlink, uid, gid, blocks from dir where region=? and bucket_name=? and parent_ino=? and file_name=?"
         row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.ParentIno, file.FileName)
         err = row.Scan(
                 &resp.Ino,
                 &resp.Generation,
                 &resp.Size,
                 &resp.Type,
-                &resp.Owner,
                 &ctime,
                 &mtime,
                 &atime,
@@ -100,6 +100,7 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
                 &resp.Nlink,
                 &resp.Uid,
                 &resp.Gid,
+		&resp.Blocks,
         )
 
         if err == sql.ErrNoRows {
@@ -127,13 +128,15 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
         resp.BucketName = file.BucketName
         resp.ParentIno = file.ParentIno
         resp.FileName = file.FileName
+
+	log.Printf("succeed to get dir file info, sqltext: %v", sqltext)
         return
 }
 
 func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
-        sqltext := "select generation, region, bucket_name, parent_ino, file_name, size, type, owner, ctime, mtime, atime, perm, nlink, uid, gid from dir where ino = ?"
+        sqltext := "select generation, region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink, uid, gid, blocks from dir where ino = ?"
         row := t.Client.QueryRow(sqltext, file.Ino)
         err = row.Scan(
                 &resp.Generation,
@@ -143,7 +146,6 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
                 &resp.FileName,
                 &resp.Size,
                 &resp.Type,
-                &resp.Owner,
                 &ctime,
                 &mtime,
                 &atime,
@@ -151,6 +153,7 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
                 &resp.Nlink,
                 &resp.Uid,
                 &resp.Gid,
+		&resp.Blocks,
         )
 
         if err == sql.ErrNoRows {
@@ -176,5 +179,6 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
         }
         resp.Ino = file.Ino
 
+	log.Printf("succeed to get file info, sqltext: %v", sqltext)
         return
 }

@@ -1,14 +1,12 @@
 package types
 
+
 const (
 	TIME_LAYOUT_TIDB = "2006-01-02 15:04:05"
 )
 
 const (
 	HDR_CONTENT_LEN = "Content-Length"
-)
-
-const (
 	CTX_REQ_ID = "ctx_req_id"
 )
 

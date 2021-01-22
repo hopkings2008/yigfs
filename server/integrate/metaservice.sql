@@ -10,7 +10,6 @@ CREATE TABLE `dir` (
   `file_name` varchar(255) DEFAULT NULL,
   `size` bigint(20) UNSIGNED DEFAULT 0,
   `type` int(11) UNSIGNED DEFAULT 1,
-  `owner` varchar(255) DEFAULT "root",
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `atime` datetime DEFAULT NULL,
@@ -18,6 +17,7 @@ CREATE TABLE `dir` (
   `nlink` int(11) UNSIGNED DEFAULT 0,
   `uid` int(11) UNSIGNED DEFAULT 0,
   `gid` int(11) UNSIGNED DEFAULT 0,
+  `blocks` int(11) UNSIGNED DEFAULT 0,
    PRIMARY KEY (`ino`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

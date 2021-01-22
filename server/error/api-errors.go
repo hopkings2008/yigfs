@@ -103,7 +103,7 @@ func GetErrInfo(err error) (resp types.YigFsMetaError) {
 		}
 	} else {
 		resp = types.YigFsMetaError {
-			ErrCode: 40001,
+			ErrCode: 40000,
 			ErrMsg:  fmt.Sprintf("We encountered an internal error, please try again."),
 		}
 	}
