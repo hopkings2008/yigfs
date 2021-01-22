@@ -1,6 +1,7 @@
 pub mod config;
 pub mod json;
 pub mod http_client;
+pub mod time;
 
 pub fn parse_config(path: String)->Result<config::Config, Box<dyn std::error::Error>>{
     let results = std::fs::read_to_string(path);
@@ -14,13 +15,5 @@ pub fn parse_config(path: String)->Result<config::Config, Box<dyn std::error::Er
             println!("failed to parse, err: {:?}", error);
             return Err(Box::new(error));
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }

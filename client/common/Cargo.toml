@@ -13,5 +13,6 @@ serde = "1.0"
 serde_json = "1.0"
 futures = "0.3"
 bytes = "1"
+time = "0.1"
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }

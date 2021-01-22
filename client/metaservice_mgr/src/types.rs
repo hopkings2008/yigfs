@@ -43,11 +43,11 @@ pub struct FileAttr {
     /// Size in blocks
     pub blocks: u64,
     /// Time of last access
-    pub atime: u64,
+    pub atime: i64,
     /// Time of last modification
-    pub mtime: u64,
+    pub mtime: i64,
     /// Time of last change
-    pub ctime: u64,
+    pub ctime: i64,
     /// Kind of file (directory, file, pipe, etc)
     pub kind: FileType,
     /// Permissions

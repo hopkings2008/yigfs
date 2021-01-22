@@ -19,7 +19,7 @@ pub struct MetaServiceMgrImpl{
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
     fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<DirEntry>, String>{
         let mut entrys = Vec::new();
-        let ret = self.read_dir_meta(ino, offset);
+        let ret = self.read_dir_files(ino, offset);
         match ret {
             Ok(dirs) => {
                 if dirs.result.err_code != 0 {
@@ -42,16 +42,28 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
     }
 
-    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<Vec<FileAttr>, String>{
-        let ret = self.read_dir_file_attr(ino, name);
-        let mut v = Vec::new();
+    fn read_file_attr(&self, ino: u64) -> Result<FileAttr, String>{
+        let attr : MsgFileAttr;
+        let ret = self.read_file_attr(ino);
         match ret {
             Ok(ret) => {
-                for attr in ret {
-                    let file_attr = self.to_file_attr(&attr);
-                    v.push(file_attr);
-                }
-                return Ok(v);
+                attr = ret;
+            }
+            Err(error) => {
+                return Err(error);
+            }
+        }
+
+        let file_attr = self.to_file_attr(&attr);
+        Ok(file_attr)
+    }
+
+    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<FileAttr, String>{
+        let ret = self.read_dir_file_attr(ino, name);
+        match ret {
+            Ok(ret) => {
+                let file_attr = self.to_file_attr(&ret);
+                return Ok(file_attr);
             }
             Err(error) => {
                 return Err(error);
@@ -139,7 +151,7 @@ impl MetaServiceMgrImpl {
         return Ok(resp_attr.attr);
     }
 
-    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<Vec<MsgFileAttr>, String>{
+    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<MsgFileAttr, String>{
         let req_dir_file_attr = ReqDirFileAttr{
             region: self.region.clone(),
             bucket: self.bucket.clone(),
@@ -170,24 +182,24 @@ impl MetaServiceMgrImpl {
         if resp_text.status >= 300 {
             return Err(format!("failed to get child file attr from url {}, err: {}", url, resp_text.body));
         }
-        let attrs : RespDirFileAttr;
+        let resp_attr : RespDirFileAttr;
         let ret = json::decode_from_str::<RespDirFileAttr>(&resp_text.body);
         match ret {
             Ok(attr) => {
-                attrs = attr;
+                resp_attr = attr;
             }
             Err(error) => {
                 return Err(error);
             }
         }
-        if attrs.result.err_code != 0 {
+        if resp_attr.result.err_code != 0 {
             return Err(format!("failed to get child file attrs for ino: {}, name: {}, err: {}", 
-            ino, name, attrs.result.err_msg));
+            ino, name, resp_attr.result.err_msg));
         }
-        return Ok(attrs.attrs);
+        return Ok(resp_attr.attr);
     }
 
-    fn read_dir_meta(&self, ino: u64, offset: i64) -> Result<Box<RespReadDir>, String>{
+    fn read_dir_files(&self, ino: u64, offset: i64) -> Result<Box<RespReadDir>, String>{
         let req_read_dir = ReqReadDir{
             region: self.region.clone(),
             bucket:self.bucket.clone(),

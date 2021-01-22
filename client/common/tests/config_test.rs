@@ -9,7 +9,7 @@ fn test_parse_config()->Result<(), String>{
             return Err(format!("failed to get current dir, err: {}", error));
         }
     }
-    let mut dir = String::new();
+    let dir : String;
     match pathb.as_os_str().to_str(){
         Some(p) => {dir = String::from(p);}
         None => {
