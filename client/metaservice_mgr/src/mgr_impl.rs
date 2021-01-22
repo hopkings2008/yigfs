@@ -3,11 +3,12 @@ mod message;
 
 use crate::mgr;
 use crate::types::DirEntry;
+use crate::types::FileAttr;
 use common::http_client;
 use common::http_client::RespText;
 use common::config;
 use common::json;
-use message::{MsgFileAttr, ReqChildFileAttr, ReqReadDir, RespChildFileAttr, RespReadDir};
+use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqReadDir, RespDirFileAttr, RespFileAttr, RespReadDir};
 pub struct MetaServiceMgrImpl{
     http_client: Box<http_client::HttpClient>,
     meta_server_url: String,
@@ -40,6 +41,23 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             }
         }
     }
+
+    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<Vec<FileAttr>, String>{
+        let ret = self.read_dir_file_attr(ino, name);
+        let mut v = Vec::new();
+        match ret {
+            Ok(ret) => {
+                for attr in ret {
+                    let file_attr = self.to_file_attr(&attr);
+                    v.push(file_attr);
+                }
+                return Ok(v);
+            }
+            Err(error) => {
+                return Err(error);
+            }
+        }
+    }
 }
 
 impl MetaServiceMgrImpl {
@@ -53,15 +71,83 @@ impl MetaServiceMgrImpl {
         })
     }
 
-    fn read_child_file_attr(&self, ino: u64, name: String) -> Result<Vec<MsgFileAttr>, String>{
-        let req_child_file_attr = ReqChildFileAttr{
+    fn to_file_attr(&self, msg_attr: &MsgFileAttr) -> FileAttr {
+        FileAttr {
+            ino: msg_attr.ino,
+            generation: msg_attr.generation,
+            size: msg_attr.size,
+            blocks: msg_attr.blocks,
+            atime: msg_attr.atime,
+            mtime: msg_attr.mtime,
+            ctime: msg_attr.ctime,
+            kind: msg_attr.kind.into(),
+            perm: msg_attr.perm,
+            nlink: msg_attr.nlink,
+            uid: msg_attr.uid,
+            gid: msg_attr.gid,
+            rdev: msg_attr.rdev,
+            flags: msg_attr.flags,
+        }
+    }
+
+    fn read_file_attr(&self, ino: u64) -> Result<MsgFileAttr, String> {
+        let req_file_attr = ReqFileAttr{
             region: self.region.clone(),
             bucket: self.bucket.clone(),
             ino: ino,
-            name: name.clone(),
         };
-        let ret = json::encode_to_str(&req_child_file_attr);
-        let mut req_child_file_attr_json: String;
+        let ret = json::encode_to_str::<ReqFileAttr>(&req_file_attr);
+        let req_body : String;
+        match ret {
+            Ok(body) => {
+                req_body = body;
+            }
+            Err(error) => {
+                return Err(format!("failed to encode req_file_attr: {:?}, err: {}", req_file_attr, error));
+            }
+        }
+        let resp : RespText;
+        let url = format!("{}/v1/file/attr", self.meta_server_url);
+        let ret = self.http_client.get(&url, &req_body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(error) => {
+                return Err(error);
+            }
+        }
+        if resp.status >= 300 {
+            return Err(format!("failed to read_file_attr from {}, for ino: {}, err: {}",
+        url, ino, resp.body));
+        }
+        let resp_attr: RespFileAttr;
+        let ret = json::decode_from_str::<RespFileAttr>(&resp.body);
+        match ret {
+            Ok(ret) => {
+                resp_attr = ret;
+            }
+            Err(error) => {
+                return Err(error);
+            }
+        }
+        if resp_attr.result.err_code != 0 {
+            return Err(format!("failed to read_file_attr for ino: {}, err: {}",
+        ino, resp_attr.result.err_msg));
+        }
+
+        return Ok(resp_attr.attr);
+    }
+
+    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<Vec<MsgFileAttr>, String>{
+        let req_dir_file_attr = ReqDirFileAttr{
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            ino: ino,
+            name: String::from(name),
+        };
+        let ret = json::encode_to_str::<ReqDirFileAttr>(&req_dir_file_attr);
+        let req_child_file_attr_json: String;
         match ret {
             Ok(body) => {
                 req_child_file_attr_json = body;
@@ -70,7 +156,6 @@ impl MetaServiceMgrImpl {
                 return Err(error);
             }
         }
-        let mut resp_body : String;
         let resp_text : RespText;
         let url = format!("{}/v1/dir/file/attr", self.meta_server_url);
         let ret = self.http_client.get(&url, &req_child_file_attr_json);
@@ -85,8 +170,8 @@ impl MetaServiceMgrImpl {
         if resp_text.status >= 300 {
             return Err(format!("failed to get child file attr from url {}, err: {}", url, resp_text.body));
         }
-        let attrs : RespChildFileAttr;
-        let ret = json::decode_from_str::<RespChildFileAttr>(&resp_text.body);
+        let attrs : RespDirFileAttr;
+        let ret = json::decode_from_str::<RespDirFileAttr>(&resp_text.body);
         match ret {
             Ok(attr) => {
                 attrs = attr;
@@ -110,7 +195,7 @@ impl MetaServiceMgrImpl {
             offset: offset,
         };
         let ret = serde_json::to_string(&req_read_dir);
-        let mut req_read_dir_json: String;
+        let req_read_dir_json: String;
         match ret {
             Ok(ret) => {
                 //send the req to meta server
@@ -121,7 +206,7 @@ impl MetaServiceMgrImpl {
             }
         }
 
-        let mut resp_body :String;
+        let resp_body :String;
         let url = format!("{}/v1/dir/files", self.meta_server_url);
         let ret = self.http_client.get(&url, &req_read_dir_json);
         match ret {

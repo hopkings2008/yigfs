@@ -33,7 +33,7 @@ pub struct RespReadDir{
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct ReqChildFileAttr {
+pub struct ReqDirFileAttr {
     pub region: String,
     pub bucket: String,
     pub ino: u64,
@@ -57,7 +57,7 @@ pub struct MsgFileAttr {
     /// Time of last change
     pub ctime: u64,
     /// Kind of file (directory, file, pipe, etc)
-    pub kine: u8,
+    pub kind: u8,
     /// Permissions
     pub perm: u16,
     /// Number of hard links
@@ -73,7 +73,20 @@ pub struct MsgFileAttr {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct RespChildFileAttr{
+pub struct RespDirFileAttr{
     pub result: RespResult,
     pub attrs: Vec<MsgFileAttr>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqFileAttr{
+    pub region: String,
+    pub bucket: String,
+    pub ino: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespFileAttr {
+    pub result: RespResult,
+    pub attr: MsgFileAttr,
 }
