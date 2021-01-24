@@ -67,11 +67,24 @@ func (t *TidbClient) CreateAndUpdateRootDir(ctx context.Context, rootDir *types.
 
 func (t *TidbClient) CreateFile(ctx context.Context, file *types.FileInfo) (err error) {
         now := time.Now().UTC()
+	
+	ctime := now
+	if file.Ctime != 0 {
+		ctime = time.Unix(0, file.Ctime).UTC()
+	}
+	mtime := now
+	if file.Mtime != 0 {
+		mtime = time.Unix(0, file.Mtime).UTC()
+	}
+	atime := now
+	if file.Atime != 0 {
+		atime = time.Unix(0, file.Atime).UTC()
+	}
 
         sqltext := "insert into dir(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
             " nlink, uid, gid, blocks) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
         args := []interface{}{file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
-                file.Type, now, now, now, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
+                file.Type, ctime, mtime, atime, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
         _, err = t.Client.Exec(sqltext, args...)
         if err != nil {
                 log.Printf("Failed to create file to tidb, err: %v", err)
@@ -112,18 +125,22 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
                 return
         }
 
-        resp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, ctime)
+	cTime, err := time.Parse(types.TIME_LAYOUT_TIDB, ctime)
         if err != nil {
                 return
         }
-        resp.Mtime, err = time.Parse(types.TIME_LAYOUT_TIDB, mtime)
+        mTime, err := time.Parse(types.TIME_LAYOUT_TIDB, mtime)
         if err != nil {
                 return
         }
-        resp.Atime, err = time.Parse(types.TIME_LAYOUT_TIDB, atime)
+        aTime, err := time.Parse(types.TIME_LAYOUT_TIDB, atime)
         if err != nil {
                 return
         }
+
+	resp.Ctime = cTime.UnixNano()
+	resp.Mtime = mTime.UnixNano()
+	resp.Atime = aTime.UnixNano()
         resp.Region = file.Region
         resp.BucketName = file.BucketName
         resp.ParentIno = file.ParentIno
@@ -165,18 +182,22 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
                 return
         }
 
-        resp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, ctime)
+	cTime, err := time.Parse(types.TIME_LAYOUT_TIDB, ctime)
         if err != nil {
                 return
         }
-        resp.Mtime, err = time.Parse(types.TIME_LAYOUT_TIDB, mtime)
+        mTime, err := time.Parse(types.TIME_LAYOUT_TIDB, mtime)
         if err != nil {
                 return
         }
-        resp.Atime, err = time.Parse(types.TIME_LAYOUT_TIDB, atime)
+        aTime, err := time.Parse(types.TIME_LAYOUT_TIDB, atime)
         if err != nil {
                 return
         }
+
+        resp.Ctime = cTime.UnixNano()
+        resp.Mtime = mTime.UnixNano()
+        resp.Atime = aTime.UnixNano()
         resp.Ino = file.Ino
 
 	log.Printf("succeed to get file info, sqltext: %v", sqltext)
