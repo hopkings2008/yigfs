@@ -135,6 +135,7 @@ impl<'a> Filesystem for Yigfs<'a> {
             reply.add(entry.ino, distance + offset, self.ft_to_fuse_ft(&entry.file_type), entry.name);
             distance += 1;
         }
+        reply.ok();
         /*if ino == 1 {
             if offset == 0 {
                 reply.add(1, 0, FileType::Directory, ".");
