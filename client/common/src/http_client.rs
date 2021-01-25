@@ -6,6 +6,12 @@ use hyper::{Client, Request, Body};
 use bytes::Buf as _;
 use tokio::runtime::Runtime;
 
+pub enum HttpMethod{
+    Get,
+    Put,
+    Post,
+    Delete,
+}
 #[derive (Debug, Default)]
 pub struct RespText{
     pub status: u16,
@@ -32,13 +38,13 @@ impl HttpClient{
         }
     }
 
-    pub fn get(&self, url: &String, body: &String) -> Result<RespText, String>{
+    pub fn request(&self, url: &String, body: &String, method: &HttpMethod) -> Result<RespText, String>{
         let mut count = self.retry_times;
         while count > 0 {
             count -= 1;
             let req : Request<Body>;
             let ret = hyper::Request::builder().
-                        method(hyper::Method::GET).
+                        method(self.get_http_method(method)).
                         header("Content-Type", "application/json").
                         uri(url.clone()).
                         body(hyper::Body::from(body.clone()));
@@ -88,9 +94,24 @@ impl HttpClient{
         }
 
         return Err(format!("failed to send request to url {} with body {} in {} times", url.clone(), body.clone(), self.retry_times));
-        
     }
 
+    fn get_http_method(&self, m: &HttpMethod) -> hyper::Method {
+        match m {
+            HttpMethod::Put => {
+                hyper::Method::PUT
+            }
+            HttpMethod::Post => {
+                hyper::Method::POST
+            }
+            HttpMethod::Delete => {
+                hyper::Method::DELETE
+            }
+            _ => {
+                hyper::Method::GET
+            }
+        }
+    }
     
     async fn send(&self, req: hyper::Request<hyper::Body>) -> Result<Resp, String>{
         // use the http2

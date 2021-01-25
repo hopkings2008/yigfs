@@ -3,7 +3,7 @@ extern crate libc;
 extern crate time;
 
 use std::ffi::OsStr;
-use libc::ENOENT;
+use libc::{c_int, ENOENT};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory};
 use metaservice_mgr::mgr::MetaServiceMgr;
@@ -54,6 +54,19 @@ pub struct Yigfs<'a>{
 }
 
 impl<'a> Filesystem for Yigfs<'a> {
+    fn init(&mut self, _req: &Request) -> Result<(), c_int> {
+        let ret = self.meta_service_mgr.mount();
+        match ret {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err(error) => {
+                println!("failed to mount with err: {}",
+                error);
+                return Err(ENOENT);
+            }
+        }
+    }
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name_str: String;
         let ret = name.to_str();

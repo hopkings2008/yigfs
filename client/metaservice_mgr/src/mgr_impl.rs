@@ -8,7 +8,8 @@ use common::http_client;
 use common::http_client::RespText;
 use common::config;
 use common::json;
-use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqReadDir, RespDirFileAttr, RespFileAttr, RespReadDir};
+use common::http_client::HttpMethod;
+use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespReadDir};
 pub struct MetaServiceMgrImpl{
     http_client: Box<http_client::HttpClient>,
     meta_server_url: String,
@@ -17,6 +18,41 @@ pub struct MetaServiceMgrImpl{
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
+    fn mount(&self) -> Result<(), String>{
+        let req = ReqMount{
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+        };
+
+        let req_json: String;
+        let ret = common::json::encode_to_str::<ReqMount>(&req);
+        match ret {
+            Ok(ret) => {
+                req_json = ret;
+            }
+            Err(error) => {
+                return Err(format!("failed to encode {:?}, err: {}", req, error));
+            }
+        }
+
+        let url = format!("{}/v1/dir", self.meta_server_url);
+        let resp : RespText;
+        let ret = self.http_client.request(&url, &req_json, &HttpMethod::Get);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(error) => {
+                return Err(format!("failed to mount region: {}, bucket: {}, err: {}",
+                self.region, self.bucket, error));
+            }
+        }
+        if resp.status >= 300 {
+            return Err(format!("failed to mount region: {}, bucket: {}, got status: {}, body: {}",
+            self.region, self.bucket, resp.status, resp.body));
+        }
+        Ok(())
+    }
     fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<DirEntry>, String>{
         let mut entrys = Vec::new();
         let ret = self.read_dir_files(ino, offset);
@@ -120,7 +156,7 @@ impl MetaServiceMgrImpl {
         }
         let resp : RespText;
         let url = format!("{}/v1/file/attr", self.meta_server_url);
-        let ret = self.http_client.get(&url, &req_body);
+        let ret = self.http_client.request(&url, &req_body, &HttpMethod::Get);
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -170,7 +206,7 @@ impl MetaServiceMgrImpl {
         }
         let resp_text : RespText;
         let url = format!("{}/v1/dir/file/attr", self.meta_server_url);
-        let ret = self.http_client.get(&url, &req_child_file_attr_json);
+        let ret = self.http_client.request(&url, &req_child_file_attr_json, &HttpMethod::Get);
         match ret {
             Ok(resp) => {
                 resp_text = resp;
@@ -220,7 +256,7 @@ impl MetaServiceMgrImpl {
 
         let resp_body :String;
         let url = format!("{}/v1/dir/files", self.meta_server_url);
-        let ret = self.http_client.get(&url, &req_read_dir_json);
+        let ret = self.http_client.request(&url, &req_read_dir_json, &HttpMethod::Get);
         match ret {
             Ok(text) => {
                 if text.status >= 300 {

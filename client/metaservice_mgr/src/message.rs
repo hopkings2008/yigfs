@@ -77,6 +77,7 @@ pub struct MsgFileAttr {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct RespDirFileAttr{
     pub result: RespResult,
+    #[serde(rename(serialize = "file", deserialize = "file"))]
     pub attr: MsgFileAttr,
 }
 
@@ -90,5 +91,17 @@ pub struct ReqFileAttr{
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct RespFileAttr {
     pub result: RespResult,
+    #[serde(rename(serialize = "file", deserialize = "file"))]
     pub attr: MsgFileAttr,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqMount{
+    pub region: String,
+    pub bucket: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespMount{
+    pub result: RespResult,
 }
