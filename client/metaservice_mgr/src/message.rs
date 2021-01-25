@@ -59,6 +59,7 @@ pub struct MsgFileAttr {
     /// Time of last change
     pub ctime: i64,
     /// Kind of file (directory, file, pipe, etc)
+    #[serde(rename(serialize = "type", deserialize = "type"))]
     pub kind: u8,
     /// Permissions
     pub perm: u16,
