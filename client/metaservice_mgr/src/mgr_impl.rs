@@ -184,8 +184,8 @@ impl MetaServiceMgrImpl {
             }
         }
         if resp_attr.result.err_code != 0 {
-            return Err(format!("failed to read_file_attr for ino: {}, err: {}",
-        ino, resp_attr.result.err_msg));
+            return Err(format!("failed to read_file_attr for ino: {}, err_code: {}, err_msg: {}",
+        ino, resp_attr.result.err_code, resp_attr.result.err_msg));
         }
 
         return Ok(resp_attr.attr);
