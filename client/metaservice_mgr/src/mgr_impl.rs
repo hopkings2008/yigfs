@@ -59,6 +59,10 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         match ret {
             Ok(dirs) => {
                 if dirs.result.err_code != 0 {
+                    if dirs.result.err_code == 40003 {
+                        println!("no files found in bucket {} with ino: {}, offset: {}", self.bucket, ino, offset);
+                        return Ok(entrys);
+                    }
                     return Err(dirs.result.err_msg);
                 }
                 for i in dirs.files {
