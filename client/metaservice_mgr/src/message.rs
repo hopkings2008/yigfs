@@ -70,8 +70,10 @@ pub struct MsgFileAttr {
     /// Group id
     pub gid: u32,
     /// Rdev
+    #[serde(default)]
     pub rdev: u32,
     /// Flags (macOS only, see chflags(2))
+    #[serde(default)]
     pub flags: u32,
 }
 
