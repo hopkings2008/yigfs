@@ -95,7 +95,7 @@ func (e ApiErrorCode) Error() string {
 func (e ApiErrorCode) HttpStatusCode() int {
 	awsError, ok := ErrorCodeResponse[e]
 	if !ok {
-		return 40001
+		return 40000
 	}
 	return awsError.HttpStatusCode
 }
