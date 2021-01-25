@@ -12,8 +12,10 @@ type Client interface {
 	ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error)
         // Create file
 	CreateFile(ctx context.Context, file *types.FileInfo) (err error)
-        // Create and update root dir
-	CreateAndUpdateRootDir(ctx context.Context, rootDir *types.FileInfo) (err error)
+        // Init root dir
+	InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error)
+	//Init root parent dir
+	InitParentDir(ctx context.Context, rootDir *types.InitDirReq) (err error)
 	// Get file attr from parent ino
 	GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error)
 	// Get file info from ino

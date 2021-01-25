@@ -76,3 +76,12 @@ type GetFileInfoReq struct {
         Ino uint64 `json:"ino"`
 }
 
+type InitDirReq struct {
+	Ctx context.Context `json:"-"`
+	Region string `json:"region"`
+	BucketName string `json:"bucket"`
+}
+
+type InitDirResp struct {
+	Result YigFsMetaError `json:"result"`
+}

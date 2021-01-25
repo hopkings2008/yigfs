@@ -50,3 +50,39 @@ func(yigFs *YigFsStorage) GetFileAttr(ctx context.Context, file *types.GetFileIn
 	}
 	return
 }
+
+func(yigFs *YigFsStorage) InitDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+	file := &types.GetDirFileInfoReq {
+		Region: rootDir.Region,
+		BucketName: rootDir.BucketName,
+		ParentIno: 1,
+		FileName: ".",
+	}
+	_, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, file)
+        if err != nil && err != ErrYigFsNoSuchFile {
+        	log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+		return
+	} else if err == ErrYigFsNoSuchFile {
+		err = yigFs.MetaStorage.Client.InitRootDir(ctx, rootDir)
+		if err != nil {
+			log.Printf("Failed to init root dir, region: %s, bucket: %s, err: %v", rootDir.Region, rootDir.BucketName, err)
+			return		
+		}
+	}
+
+	file.FileName = ".."
+	_, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, file)
+        if err != nil && err != ErrYigFsNoSuchFile {
+                log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+                return
+        } else if err == ErrYigFsNoSuchFile {
+                err = yigFs.MetaStorage.Client.InitParentDir(ctx, rootDir)
+                if err != nil {
+                        log.Printf("Failed to init parent dir, region: %s, bucket: %s, err: %v", rootDir.Region, rootDir.BucketName, err)
+                        return
+                }
+        }
+
+        return
+}
+

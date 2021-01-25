@@ -7,7 +7,6 @@ import (
 	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/api"
 	"github.com/hopkings2008/yigfs/server/storage"
-	"github.com/hopkings2008/yigfs/server/types"
 )
 
 
@@ -29,26 +28,16 @@ func main() {
 		YigFsAPI: apiServerConfig.YigFsLayer,
 	}
 
-	// Add root dir
-	rootDir := &types.FileInfo{
-		Ino: 1,
-		FileName: ".",
-		Type: types.DIR_FILE,
-	}
-	err := yigFsStorage.MetaStorage.Client.CreateAndUpdateRootDir(nil, rootDir)
-	if err != nil {
-		log.Fatal("init dir to tidb failed, err:", err)
-		return
-	}
-
 	// ListDirFiles
-	app.Post("/v1/dir/files", apiHandlers.GetDirFilesHandler)
+	app.Get("/v1/dir/files", apiHandlers.GetDirFilesHandler)
 	// CreateFile
 	app.Post("/v1/dir/file/create", apiHandlers.CreateFileHandler)
 	//GetDirFileAttr
-	app.Post("/v1/dir/file/attr", apiHandlers.GetDirFileAttrHandler)
+	app.Get("/v1/dir/file/attr", apiHandlers.GetDirFileAttrHandler)
 	//GetFileAttr
-	app.Post("/v1/file/attr", apiHandlers.GetFileAttrHandler)
+	app.Get("/v1/file/attr", apiHandlers.GetFileAttrHandler)
+	//InitDir
+	app.Put("/v1/dir", apiHandlers.InitDirHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	log.Fatal(app.Run(iris.Addr(port)))

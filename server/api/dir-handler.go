@@ -13,6 +13,7 @@ import (
 
 func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 	resp := &types.GetDirFilesResp {
+		Files: []*types.GetDirFileInfo{},
         	Result: types.YigFsMetaError {},
 	}
 	defer GetSpendTime("GetDirFiles")()
@@ -28,8 +29,8 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 
 	// check request params
 	if dirReq.BucketName == "" {
-		log.Printf("Some GetDirFiles required parameters are missing.")
-		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
+		log.Printf("GetDirFiles required bucket name is missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingBucketname)
 		ctx.JSON(resp)
 		return
 	}
@@ -45,7 +46,7 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 
 	// get dir files from tidb
 	if dirReq.Offset <= 1 {
-		dirReq.Offset = 2
+		dirReq.Offset = 1
 	}
 
 	getDirFilesResp, offset, err := yigFs.YigFsAPI.ListDirFiles(reqContext, dirReq)
@@ -56,12 +57,9 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 	}
 
 	resp.Files = getDirFilesResp
-	resp.Result = types.YigFsMetaError {
-		ErrCode: 200,
-		ErrMsg: "ok",
-        }
+	resp.Result = GetErrInfo(NoYigFsErr)
 	resp.Offset = offset
-	
+
 	ctx.JSON(resp)
 	return
 }
@@ -102,10 +100,7 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 		return
 	}
 
-	resp.Result = types.YigFsMetaError {
-		ErrCode: 200,
-		ErrMsg: "ok",
-	}
+	resp.Result = GetErrInfo(NoYigFsErr)
 	
 	ctx.JSON(resp)
 	return
@@ -151,10 +146,7 @@ func(yigFs MetaAPIHandlers) GetDirFileAttrHandler(ctx iris.Context) {
 		return
 	}
 
-	resp.Result = types.YigFsMetaError {
-		ErrCode: 200,
-		ErrMsg: "ok",
-	}
+	resp.Result = GetErrInfo(NoYigFsErr)
 	resp.File = getDirFileResp
 
 	ctx.JSON(resp)
@@ -176,14 +168,6 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 		return
 	}
 
-	// check request params
-	if fileReq.Ino < 2 {
-		log.Printf("Ino value is invalid, ino: %d", fileReq.Ino)
-		resp.Result = GetErrInfo(ErrYigFsInvalidIno)
-		ctx.JSON(resp)
-		return
-	}
-
 	r := ctx.Request()
 	reqContext := r.Context()
 	uuidStr := uuid.New()
@@ -197,10 +181,7 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 		return
 	}
 
-	resp.Result = types.YigFsMetaError {
-		ErrCode: 200,
-		ErrMsg: "ok",
-	}
+	resp.Result = GetErrInfo(NoYigFsErr)
 	resp.File = getFileAttrResp
 
 	ctx.JSON(resp)
@@ -226,3 +207,48 @@ func chechAndAssignmentFileInfo(file *types.FileInfo) (err error) {
 	return nil
 }
 
+func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
+	resp := &types.InitDirResp {
+		Result: types.YigFsMetaError{},
+	}
+	defer GetSpendTime("InitDirHandler")()
+
+	// get req
+	dirReq := &types.InitDirReq{}
+	if err := ctx.ReadJSON(&dirReq); err != nil {
+		log.Printf("Failed to read InitDirReq from body, err: %v", err)
+		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	// check request params
+	if dirReq.BucketName == "" {
+		log.Printf("InitDirHandler required parameter bucketname is missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingBucketname)
+		ctx.JSON(resp)
+		return
+	}
+
+	if dirReq.Region == "" {
+		dirReq.Region = "cn-bj-1"
+	}
+
+	r := ctx.Request()
+	reqContext := r.Context()
+	uuidStr := uuid.New()
+	dirReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// init dir
+	err := yigFs.YigFsAPI.InitDir(reqContext, dirReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	resp.Result = GetErrInfo(NoYigFsErr)
+
+	ctx.JSON(resp)
+	return
+}
