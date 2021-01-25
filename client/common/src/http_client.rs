@@ -2,7 +2,7 @@ extern crate hyper;
 
 use std::collections::HashMap;
 use std::io::Read;
-use hyper::Client;
+use hyper::{Client, Request, Body};
 use bytes::Buf as _;
 use tokio::runtime::Runtime;
 
@@ -36,47 +36,53 @@ impl HttpClient{
         let mut count = self.retry_times;
         while count > 0 {
             count -= 1;
-            let req = hyper::Request::builder().
+            let req : Request<Body>;
+            let ret = hyper::Request::builder().
                         method(hyper::Method::GET).
+                        header("Content-Type", "application/json").
                         uri(url.clone()).
                         body(hyper::Body::from(body.clone()));
-            match req {
-                Ok(req) => {
-                    let result = Runtime::new()
-                    .expect("Failed to create Tokio runtime").block_on(self.send(req));
-                    match result {
-                        Ok(mut result) => {
-                            let mut buf: Vec<u8> = vec![];
-                            let n = std::io::copy(result.body.as_mut(), &mut buf);
-                            match n {
-                                Ok(_n) => {
-                                    let bstr = String::from_utf8(buf);
-                                    match bstr {
-                                        Ok(bstr) => {
-                                            let rtext = RespText{
-                                                status: result.status,
-                                                headers: result.headers,
-                                                body: bstr,
-                                            };
-                                            return Ok(rtext);
-                                        }
-                                        Err(error) => {
-                                            return Err(format!("got invalid body with error: {}", error));
-                                        }
-                                    }
-                                }
-                                Err(error) => {
-                                    return Err(format!("failed to read body from {}, err: {}", url.clone(), error));
-                                }
-                            }
-                        }
-                        Err(error) => {
-                            println!("failed to send request to url: {}, err: {} in {} time", url.clone(), error, count+1);
-                        }
-                    }
+            match ret {
+                Ok(ret) => {
+                    req = ret;
                 }
                 Err(error) => {
-                    return Err(format!("failed to create request from url: {}, body: {}, err: {}", url.clone(), body.clone(), error));
+                    return Err(format!("failed to create request from url: {}, body: {}, err: {}", url.clone(), body.clone(), error)); 
+                }
+            }
+            let mut resp : Resp;
+            let result = Runtime::new()
+                    .expect("Failed to create Tokio runtime").block_on(self.send(req));
+            match result {
+                Ok(result) => {
+                    resp = result;
+                }
+                Err(error) => {
+                    println!("failed to send request to url: {}, err: {} in {} time", url.clone(), error, count+1); 
+                    continue;
+                }
+            }
+            let mut buf = Vec::<u8>::new();
+            let ret = std::io::copy(resp.body.as_mut(), &mut buf);
+            match ret {
+                Ok(_n) => {
+                    let bstr = String::from_utf8(buf);
+                    match bstr {
+                        Ok(bstr) => {
+                            let rtext = RespText{
+                                status: resp.status,
+                                headers: resp.headers,
+                                body: bstr,
+                            };
+                            return Ok(rtext);
+                        }
+                        Err(error) => {
+                            return Err(format!("got invalid body with error: {}", error));
+                        }
+                    } 
+                }
+                Err(error) => {
+                    return Err(format!("failed to read body from {}, err: {}", url.clone(), error)); 
                 }
             }
         }
