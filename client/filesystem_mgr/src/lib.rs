@@ -22,6 +22,13 @@ impl FilesystemMgr{
         let yfs = Yigfs{
             meta_service_mgr: &self.meta_service_mgr,
         };
-        fuse::mount(yfs, &mount_options.mnt, &[]).unwrap();
+        let ret = fuse::mount(yfs, &mount_options.mnt, &[]);
+        match ret {
+            Ok(_) => {
+            }
+            Err(error) => {
+                println!("failed to perform mount with error: {}", error);
+            }
+        }
     }
 }
