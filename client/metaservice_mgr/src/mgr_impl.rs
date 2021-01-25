@@ -37,7 +37,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/dir", self.meta_server_url);
         let resp : RespText;
-        let ret = self.http_client.request(&url, &req_json, &HttpMethod::Get);
+        let ret = self.http_client.request(&url, &req_json, &HttpMethod::Put);
         match ret {
             Ok(ret) => {
                 resp = ret;
