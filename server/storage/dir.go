@@ -45,24 +45,23 @@ func(yigFs *YigFsStorage) GetDirFileAttr(ctx context.Context, file *types.GetDir
 func(yigFs *YigFsStorage) GetFileAttr(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
 	resp, err = yigFs.MetaStorage.Client.GetFileInfo(ctx, file)
 	if err != nil {
-		log.Printf("Failed to get file attr, ino: %d, err: %v", file.Ino, err)
+		log.Printf("Failed to get file attr, region: %s, bucket: %s, ino: %d, err: %v", file.Region, file.BucketName, file.Ino, err)
 		return
 	}
 	return
 }
 
 func(yigFs *YigFsStorage) InitDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
-	file := &types.GetDirFileInfoReq {
+	file := &types.GetFileInfoReq {
 		Region: rootDir.Region,
 		BucketName: rootDir.BucketName,
-		ParentIno: 1,
-		FileName: ".",
+		Ino: types.RootDirIno,
 	}
-	_, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, file)
+	_, err = yigFs.MetaStorage.Client.GetFileInfo(ctx, file)
         if err != nil && err != ErrYigFsNoSuchFile {
-        	log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
-		return
-	} else if err == ErrYigFsNoSuchFile {
+                log.Printf("Failed to get file attr, region: %s, bucket: %s, ino: %d, err: %v", file.Region, file.BucketName, file.Ino, err)
+                return
+        } else if err == ErrYigFsNoSuchFile {
 		err = yigFs.MetaStorage.Client.InitRootDir(ctx, rootDir)
 		if err != nil {
 			log.Printf("Failed to init root dir, region: %s, bucket: %s, err: %v", rootDir.Region, rootDir.BucketName, err)
@@ -70,10 +69,10 @@ func(yigFs *YigFsStorage) InitDir(ctx context.Context, rootDir *types.InitDirReq
 		}
 	}
 
-	file.FileName = ".."
-	_, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, file)
+	file.Ino = types.RootParentDirIno
+	_, err = yigFs.MetaStorage.Client.GetFileInfo(ctx, file)
         if err != nil && err != ErrYigFsNoSuchFile {
-                log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+		log.Printf("Failed to get file attr, region: %s, bucket: %s, ino: %d, err: %v", file.Region, file.BucketName, file.Ino, err)
                 return
         } else if err == ErrYigFsNoSuchFile {
                 err = yigFs.MetaStorage.Client.InitParentDir(ctx, rootDir)
