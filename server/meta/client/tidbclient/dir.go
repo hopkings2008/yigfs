@@ -48,20 +48,11 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
                 return
         }
 
-        offset = uint64(len(dirFilesResp)) + dir.Offset //nextStartIno
-        log.Printf("succeed to list dir files, sqltext: %v", sqltext)
-        return
-}
-
-func (t *TidbClient) CreateAndUpdateRootDir(ctx context.Context, rootDir *types.FileInfo) (err error) {
-        sql := "insert into dir (ino, file_name, type) values(?,?,?) on duplicate key update file_name=values(file_name)"
-        args := []interface{}{rootDir.Ino, rootDir.FileName, rootDir.Type}
-        _, err = t.Client.Exec(sql, args...)
-        if err != nil {
-		log.Printf("Failed to create and update root dir, err: %v", err)
-               	err = ErrYIgFsInternalErr
-                return
-        }
+	dirLength := len(dirFilesResp)
+        if dirLength > 0 {
+		offset = dirFilesResp[dirLength - 1].Ino + 1   //nextStartIno
+	}
+        log.Printf("succeed to list dir files, sqltext: %v, offset: %v", sqltext, offset)
         return
 }
 
@@ -203,3 +194,36 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 	log.Printf("succeed to get file info, sqltext: %v", sqltext)
         return
 }
+
+func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+        now := time.Now().UTC()
+
+        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime) values(?,?,?,?,?,?,?,?)"
+        args := []interface{}{types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, now, now, now}
+        _, err = t.Client.Exec(sqltext, args...)
+        if err != nil {
+		log.Printf("Failed to init root dir ., err: %v", err)
+               	err = ErrYIgFsInternalErr
+                return
+        }
+
+	log.Printf("succeed to init root dir")
+	return
+}
+
+func (t *TidbClient) InitParentDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+        now := time.Now().UTC()
+
+        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime) values(?,?,?,?,?,?,?,?)"
+        args := []interface{}{types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, now, now, now}
+        _, err = t.Client.Exec(sqltext, args...)
+        if err != nil {
+                log.Printf("Failed to init root parent dir .., err: %v", err)
+                err = ErrYIgFsInternalErr
+                return
+        }
+
+        log.Printf("succeed to init root parent dir")
+        return
+}
+

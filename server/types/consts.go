@@ -24,3 +24,8 @@ const (
 	ReadAndWrite
 	ReadWriteAndExec
 )
+
+const (
+	RootDirIno = iota + 1
+	RootParentDirIno
+)

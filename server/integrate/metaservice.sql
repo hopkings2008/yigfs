@@ -18,6 +18,6 @@ CREATE TABLE `dir` (
   `uid` int(11) UNSIGNED DEFAULT 0,
   `gid` int(11) UNSIGNED DEFAULT 0,
   `blocks` int(11) UNSIGNED DEFAULT 0,
-   PRIMARY KEY (`ino`)
+   UNIQUE KEY `rowkey` (`ino`, `generation`, `region`, `bucket_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

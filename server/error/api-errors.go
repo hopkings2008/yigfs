@@ -25,15 +25,21 @@ type ApiErrorCode int
 
 // Error codes, non exhaustive list
 const (
-	ErrYIgFsInternalErr ApiErrorCode = iota
+	NoYigFsErr ApiErrorCode = iota
+	ErrYIgFsInternalErr
 	ErrYigFsInvaildParams
 	ErrYigFsNoSuchFile
 	ErrYigFsNotFindTargetDirFiles
-	ErrYigFsInvalidIno
 	ErrYigFsMissingRequiredParams
+	ErrYigFsMissingBucketname
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
+	NoYigFsErr: {
+		AwsErrorCode:   "NoYigFsErr",
+                Description:    "ok.",
+                HttpStatusCode: 0,
+	},
 	ErrYIgFsInternalErr: {
 		AwsErrorCode:   "ErrYIgFsInternalErr",
 		Description:    "We encountered an internal error, please try again.",
@@ -54,15 +60,15 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		Description:    "Not find files in the target dir, please check parameters and offset.",
 		HttpStatusCode: 40003,
 	},
-	ErrYigFsInvalidIno: {
-		AwsErrorCode:   "ErrYigFsInvalidIno",
-		Description:    "File ino should be greater than 2.",
-		HttpStatusCode: 40004,
-	},
 	ErrYigFsMissingRequiredParams: {
 		AwsErrorCode:	"ErrYigFsMissingRequiredParams",
 		Description:	"Missing some required params.",
-		HttpStatusCode: 40005,
+		HttpStatusCode: 40004,
+	},
+	ErrYigFsMissingBucketname: {
+		AwsErrorCode:   "ErrYigFsMissingRequiredParams",
+                Description:    "Missing necessary parameter bucketname.",
+                HttpStatusCode: 40005,
 	},
 }
 
@@ -89,7 +95,7 @@ func (e ApiErrorCode) Error() string {
 func (e ApiErrorCode) HttpStatusCode() int {
 	awsError, ok := ErrorCodeResponse[e]
 	if !ok {
-		return 40001
+		return 40000
 	}
 	return awsError.HttpStatusCode
 }

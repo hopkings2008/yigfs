@@ -11,10 +11,6 @@ func (m *Meta) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dir
         return m.Client.ListDirFiles(ctx, dir)
 }
 
-func(m *Meta) CreateAndUpdateRootDir(ctx context.Context, rootDir *types.FileInfo) (err error) {
-        return m.Client.CreateAndUpdateRootDir(ctx, rootDir)
-}
-
 func (m *Meta) CreateFile(ctx context.Context, file *types.FileInfo) (err error) {
         return m.Client.CreateFile(ctx, file)
 }
@@ -26,3 +22,11 @@ func(m *Meta) GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq)
 func(m *Meta) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
         return m.Client.GetFileInfo(ctx, file)
 }
+
+func(m *Meta) InitParentDir(ctx context.Context, parentDir *types.InitDirReq) (err error) {
+        return m.Client.InitParentDir(ctx, parentDir)
+} 
+
+func(m *Meta) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+        return m.Client.InitRootDir(ctx, rootDir)
+} 
