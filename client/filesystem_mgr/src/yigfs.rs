@@ -133,10 +133,9 @@ impl<'a> Filesystem for Yigfs<'a> {
             reply.error(ENOENT);
             return;
         }
-        let mut distance: i64 = 0;
+        
         for entry in entrys {
-            reply.add(entry.ino, distance + offset, self.ft_to_fuse_ft(&entry.file_type), entry.name);
-            distance += 1;
+            reply.add(entry.ino, entry.ino as i64, self.ft_to_fuse_ft(&entry.file_type), entry.name);
         }
         reply.ok();
     }
