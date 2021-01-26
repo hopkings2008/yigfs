@@ -45,8 +45,8 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 	dirReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// get dir files from tidb
-	if dirReq.Offset <= 1 {
-		dirReq.Offset = 1
+	if dirReq.Offset <= 0 {
+		dirReq.Offset = 0
 	}
 
 	getDirFilesResp, offset, err := yigFs.YigFsAPI.ListDirFiles(reqContext, dirReq)
@@ -79,16 +79,17 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 		return
 	}
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// check request params
-	err := chechAndAssignmentFileInfo(fileReq)
+	err := CheckAndAssignmentFileInfo(reqContext, fileReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
 		return
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
 	uuidStr := uuid.New()
 	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
@@ -115,7 +116,7 @@ func(yigFs MetaAPIHandlers) GetDirFileAttrHandler(ctx iris.Context) {
 	// get req
 	fileReq := &types.GetDirFileInfoReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-		log.Printf("Failed to read GetDirFileAttrInfo from body, err: %v", err)
+		log.Printf("Failed to read GetDirFileInfoReq from body, err: %v", err)
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -162,10 +163,22 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 	// get req
 	fileReq := &types.GetFileInfoReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-		log.Printf("Failed to read GetFileAttrInfo from body, err: %v", err)
+		log.Printf("Failed to read GetFileInfoReq from body, err: %v", err)
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
+	}
+
+	// check request params
+	if fileReq.BucketName == "" || fileReq.Ino == 0 {
+		log.Printf("Some GetFileAttr required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	if fileReq.Region == "" {
+		fileReq.Region = "cn-bj-1"
 	}
 
 	r := ctx.Request()
@@ -186,25 +199,6 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 
 	ctx.JSON(resp)
 	return
-}
-
-func chechAndAssignmentFileInfo(file *types.FileInfo) (err error) {
-	if file.BucketName == "" || file.FileName == "" || file.Size == 0 || file.ParentIno == 0 {
-		log.Printf("Some createFile required parameters are missing.")
-		err = ErrYigFsMissingRequiredParams
-		return
-	}
-
-	if file.Type == 0 {
-		file.Type = types.COMMON_FILE
-	}
-	if file.Region == "" {
-		file.Region = "cn-bj-1"
-	}
-	if file.Perm == 0 {
-		file.Perm = types.Read
-	}
-	return nil
 }
 
 func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {

@@ -32,6 +32,7 @@ const (
 	ErrYigFsNotFindTargetDirFiles
 	ErrYigFsMissingRequiredParams
 	ErrYigFsMissingBucketname
+	ErrYigFsInvalidType
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -69,6 +70,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsMissingRequiredParams",
                 Description:    "Missing necessary parameter bucketname.",
                 HttpStatusCode: 40005,
+	},
+	ErrYigFsInvalidType: {
+		AwsErrorCode:   "ErrYigFsInvalidType",
+                Description:    "The type is invalid, please check it.",
+                HttpStatusCode: 40006,
 	},
 }
 

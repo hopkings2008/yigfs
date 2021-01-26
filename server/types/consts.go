@@ -20,9 +20,8 @@ const (
 )
 
 const (
-	Read = iota + 1
-	ReadAndWrite
-	ReadWriteAndExec
+	FILE_PERM = 644
+	DIR_PERM = 755
 )
 
 const (

@@ -13,7 +13,7 @@ CREATE TABLE `dir` (
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `atime` datetime DEFAULT NULL,
-  `perm` int(11) UNSIGNED DEFAULT 1,
+  `perm` int(11) UNSIGNED DEFAULT 644,
   `nlink` int(11) UNSIGNED DEFAULT 0,
   `uid` int(11) UNSIGNED DEFAULT 0,
   `gid` int(11) UNSIGNED DEFAULT 0,
