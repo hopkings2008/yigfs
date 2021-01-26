@@ -8,6 +8,7 @@ use common::http_client;
 use common::http_client::RespText;
 use common::config;
 use common::json;
+use common::error::Errno;
 use common::http_client::HttpMethod;
 use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespReadDir};
 pub struct MetaServiceMgrImpl{
@@ -18,7 +19,7 @@ pub struct MetaServiceMgrImpl{
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
-    fn mount(&self) -> Result<(), String>{
+    fn mount(&self) -> Result<(), Errno>{
         let req = ReqMount{
             region: self.region.clone(),
             bucket: self.bucket.clone(),
@@ -31,7 +32,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 req_json = ret;
             }
             Err(error) => {
-                return Err(format!("failed to encode {:?}, err: {}", req, error));
+                println!("failed to encode {:?}, err: {}", req, error);
+                return Err(Errno::Eintr);
             }
         }
 
@@ -43,17 +45,19 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(error) => {
-                return Err(format!("failed to mount region: {}, bucket: {}, err: {}",
-                self.region, self.bucket, error));
+                println!("failed to mount region: {}, bucket: {}, err: {}",
+                self.region, self.bucket, error);
+                return Err(Errno::Eintr);
             }
         }
         if resp.status >= 300 {
-            return Err(format!("failed to mount region: {}, bucket: {}, got status: {}, body: {}",
-            self.region, self.bucket, resp.status, resp.body));
+            println!("failed to mount region: {}, bucket: {}, got status: {}, body: {}",
+            self.region, self.bucket, resp.status, resp.body);
+            return Err(Errno::Eintr);
         }
         Ok(())
     }
-    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<DirEntry>, String>{
+    fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<DirEntry>, Errno>{
         let mut entrys = Vec::new();
         let ret = self.read_dir_files(ino, offset);
         match ret {
@@ -61,9 +65,11 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 if dirs.result.err_code != 0 {
                     if dirs.result.err_code == 40003 {
                         println!("no files found in bucket {} with ino: {}, offset: {}", self.bucket, ino, offset);
-                        return Ok(entrys);
+                        return Err(Errno::Enoent);
                     }
-                    return Err(dirs.result.err_msg);
+                    println!("got error when read_dir_files for ino: {}, offset: {}, err: {}",
+                    ino, offset, dirs.result.err_msg);
+                    return Err(Errno::Eintr);
                 }
                 for i in dirs.files {
                     let entry = DirEntry{
@@ -76,13 +82,14 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 return Ok(entrys);
             }
             Err(error) => {
-                return Err(format!("failed to read meta for ino: {}, offset: {}, err: {}",
-            ino, offset, error));
+                println!("failed to read meta for ino: {}, offset: {}, err: {}",
+                ino, offset, error);
+                return Err(Errno::Eintr);
             }
         }
     }
 
-    fn read_file_attr(&self, ino: u64) -> Result<FileAttr, String>{
+    fn read_file_attr(&self, ino: u64) -> Result<FileAttr, Errno>{
         let attr : MsgFileAttr;
         let ret = self.read_file_attr(ino);
         match ret {
@@ -90,7 +97,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 attr = ret;
             }
             Err(error) => {
-                return Err(error);
+                println!("failed to read_file_attr for ino: {}, err: {}", ino, error);
+                return Err(Errno::Eintr);
             }
         }
 
@@ -98,7 +106,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         Ok(file_attr)
     }
 
-    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<FileAttr, String>{
+    fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<FileAttr, Errno>{
         let ret = self.read_dir_file_attr(ino, name);
         match ret {
             Ok(ret) => {
@@ -106,7 +114,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 return Ok(file_attr);
             }
             Err(error) => {
-                return Err(error);
+                println!("failed to read_dir_file_attr for ino: {}, name: {}, err: {}", ino, name, error);
+                return Err(Errno::Eintr);
             }
         }
     }

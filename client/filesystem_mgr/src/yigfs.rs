@@ -7,7 +7,6 @@ use libc::{c_int, ENOENT};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory};
 use metaservice_mgr::mgr::MetaServiceMgr;
-use common;
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -61,8 +60,7 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return Ok(());
             }
             Err(error) => {
-                println!("failed to mount with err: {}",
-                error);
+                println!("failed to mount with err: {:?}", error);
                 return Err(ENOENT);
             }
         }
@@ -87,7 +85,7 @@ impl<'a> Filesystem for Yigfs<'a> {
                 reply.entry(&TTL, &file_attr, ret.generation);
             }
             Err(error) => {
-                println!("failed to lookup for parent: {}, name: {}, err: {}", parent, name_str, error);
+                println!("failed to lookup for parent: {}, name: {}, err: {:?}", parent, name_str, error);
                 reply.error(ENOENT);
             }
         }
@@ -101,7 +99,7 @@ impl<'a> Filesystem for Yigfs<'a> {
                 reply.attr(&TTL, &attr);
             }
             Err(error) => {
-                println!("failed to getattr for ino: {}, err: {}", ino, error);
+                println!("failed to getattr for ino: {}, err: {:?}", ino, error);
                 reply.error(ENOENT);
             }
         }
@@ -125,10 +123,15 @@ impl<'a> Filesystem for Yigfs<'a> {
                 entrys = ret;
             }
             Err(error) => {
-                println!("failed to readdir for ino: {}, offset: {}, err: {}", ino, offset, error);
+                println!("failed to readdir for ino: {}, offset: {}, err: {:?}", ino, offset, error);
                 reply.error(ENOENT);
                 return;
             }
+        }
+        // chech whether entrys is empty.
+        if entrys.is_empty(){
+            reply.error(ENOENT);
+            return;
         }
         let mut distance: i64 = 0;
         for entry in entrys {
@@ -136,16 +139,6 @@ impl<'a> Filesystem for Yigfs<'a> {
             distance += 1;
         }
         reply.ok();
-        /*if ino == 1 {
-            if offset == 0 {
-                reply.add(1, 0, FileType::Directory, ".");
-                reply.add(1, 1, FileType::Directory, "..");
-                reply.add(2, 2, FileType::RegularFile, "hello.txt");
-            }
-            reply.ok();
-        } else {
-            reply.error(ENOENT);
-        }*/
     }
 }
 
