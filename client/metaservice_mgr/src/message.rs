@@ -110,3 +110,25 @@ pub struct ReqMount{
 pub struct RespMount{
     pub result: RespResult,
 }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqFileLeader {
+    pub region: String,
+    pub bucket: String,
+    pub zone: String,
+    pub machine: String,
+    pub ino: u64,
+    pub flag: u8,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgLeaderInfo {
+    pub zone: String,
+    pub leader: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespFileLeader {
+    pub result: RespResult,
+    pub leader_info: MsgLeaderInfo,
+}

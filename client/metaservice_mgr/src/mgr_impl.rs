@@ -1,7 +1,7 @@
 #[path = "./message.rs"]
 mod message;
 
-use crate::mgr;
+use crate::{mgr, types::FileLeader};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
 use common::http_client;
@@ -10,7 +10,7 @@ use common::config;
 use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
-use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespReadDir};
+use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileLeader, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespFileLeader, RespReadDir};
 pub struct MetaServiceMgrImpl{
     http_client: Box<http_client::HttpClient>,
     meta_server_url: String,
@@ -122,6 +122,65 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 return Err(Errno::Eintr);
             }
         }
+    }
+
+    fn get_file_leader(&self, ino: u64, flag: u8) -> Result<FileLeader, Errno>{
+        let req_file_leader = ReqFileLeader{
+            region: self.region.clone(),
+            bucket: self.region.clone(),
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
+            ino: ino,
+            flag: flag,
+        };
+        let body: String;
+        let ret = json::encode_to_str::<ReqFileLeader>(&req_file_leader);
+        match ret {
+            Ok(ret) => {
+                body = ret;
+            }
+            Err(error) => {
+                println!("failed to encode req_file_leader: {:?}, err: {}", req_file_leader, error);
+                return Err(Errno::Eintr);
+            }
+        }
+        let url = format!("{}/v1/file/leader", self.meta_server_url);
+        let resp : RespText;
+        let ret = self.http_client.request(&url, &body,&HttpMethod::Get);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(error) => {
+                println!("failed to get file_leader, req: {}, err: {}", body, error);
+                return Err(Errno::Eintr);
+            }
+        }
+        if resp.status >= 300 {
+            println!("got status {} for file_leader, req: {}, resp: {}", resp.status, body, resp.body);
+            return Err(Errno::Eintr);
+        }
+        let resp_leader : RespFileLeader;
+        let ret = json::decode_from_str::<RespFileLeader>(&resp.body);
+        match ret {
+            Ok(ret) => {
+                resp_leader = ret;
+            }
+            Err(error) => {
+                println!("failed to decode file_leader from {}, err: {}", resp.body, error);
+                return Err(Errno::Eintr);
+            }
+        }
+        if resp_leader.result.err_code != 0 {
+            println!("failed to get file_leader for {}, err_code: {}, err_msg: {}", 
+            body, resp_leader.result.err_code, resp_leader.result.err_msg);
+            return Err(Errno::Eintr);
+        }
+        Ok(FileLeader{
+            zone: resp_leader.leader_info.zone,
+            leader: resp_leader.leader_info.leader,
+            ino: ino,
+        })
     }
 }
 

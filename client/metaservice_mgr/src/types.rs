@@ -63,3 +63,10 @@ pub struct FileAttr {
     /// Flags (macOS only, see chflags(2))
     pub flags: u32,
 }
+
+#[derive(Debug)]
+pub struct FileLeader {
+    pub zone: String,
+    pub leader: String,
+    pub ino: u64,
+}
