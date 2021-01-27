@@ -104,6 +104,8 @@ pub struct ReqMount{
     pub bucket: String,
     pub zone: String,
     pub machine: String,
+    pub uid: u32,
+    pub gid: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -131,4 +133,27 @@ pub struct MsgLeaderInfo {
 pub struct RespFileLeader {
     pub result: RespResult,
     pub leader_info: MsgLeaderInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqFileCreate {
+    pub zone: String,
+    pub machine: String,
+    pub region: String,
+    pub bucket: String,
+    #[serde(rename(serialize = "parent_ino", deserialize = "parent_ino"))]
+    pub ino: u64,
+    #[serde(rename(serialize = "file_name", deserialize = "file_name"))]
+    pub name: String,
+    pub uid: u32,
+    pub gid: u32, 
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespFileCreate {
+    pub result: RespResult,
+    pub leader_info: MsgLeaderInfo,
+    #[serde(rename(serialize = "file", deserialize = "file"))]
+    pub file_info: MsgFileAttr,
 }

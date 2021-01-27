@@ -1,7 +1,7 @@
 #[path = "./message.rs"]
 mod message;
 
-use crate::{mgr, types::FileLeader};
+use crate::{mgr, types::{FileLeader, NewFileInfo}};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
 use common::http_client;
@@ -10,7 +10,7 @@ use common::config;
 use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
-use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileLeader, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespFileLeader, RespReadDir};
+use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespReadDir};
 pub struct MetaServiceMgrImpl{
     http_client: Box<http_client::HttpClient>,
     meta_server_url: String,
@@ -180,6 +180,71 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             zone: resp_leader.leader_info.zone,
             leader: resp_leader.leader_info.leader,
             ino: ino,
+        })
+    }
+
+    fn new_ino_leader(&self, parent: u64, name: &String, uid: u32, gid: u32) -> Result<NewFileInfo, Errno> {
+        let req_file_create = ReqFileCreate{
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            ino: parent,
+            name: name.clone(),
+            uid: uid,
+            gid: gid,
+        };
+        let body : String;
+        let ret = json::encode_to_str::<ReqFileCreate>(&req_file_create);
+        match ret {
+            Ok(ret) => {
+                body = ret;
+            }
+            Err(error) => {
+                println!("failed to encode req_file_create: {:?}, err: {}", req_file_create, error);
+                return Err(Errno::Eintr);
+            }
+        }
+        let url = format!("{}/v1/dir/file", self.meta_server_url);
+        let resp: RespText;
+        let ret = self.http_client.request(&url, &body, &HttpMethod::Put);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(error) => {
+                println!("failed to new_ino_leader for {}, err: {}", body, error);
+                return Err(Errno::Eintr);
+            }
+        }
+        if resp.status >= 300 {
+            println!("got status {} for new_ino_leader {}, resp: {}", resp.status, body, resp.body);
+            return Err(Errno::Eintr);
+        }
+        let resp_file_created: RespFileCreate;
+        let ret = json::decode_from_str::<RespFileCreate>(&resp.body);
+        match ret {
+            Ok(ret) => {
+                resp_file_created = ret;
+            }
+            Err(error) => {
+                println!("failed to decode {} for new_ino_leader: {}, err: {}", resp.body, body, error);
+                return Err(Errno::Eintr);
+            }
+        }
+        if resp_file_created.result.err_code != 0 {
+            println!("failed to new_io_leader for {}, err_code: {}, err_msg: {}", 
+            body, resp_file_created.result.err_code, resp_file_created.result.err_msg);
+            return Err(Errno::Eintr);
+        }
+
+        Ok(NewFileInfo{
+            leader_info: FileLeader{
+                zone: resp_file_created.leader_info.zone,
+                leader: resp_file_created.leader_info.leader,
+                ino: resp_file_created.file_info.ino,
+            },
+            attr: self.to_file_attr(&resp_file_created.file_info),
         })
     }
 }

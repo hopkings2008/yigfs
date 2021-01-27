@@ -70,3 +70,8 @@ pub struct FileLeader {
     pub leader: String,
     pub ino: u64,
 }
+#[derive(Debug)]
+pub struct NewFileInfo {
+    pub leader_info: FileLeader,
+    pub attr: FileAttr,
+}

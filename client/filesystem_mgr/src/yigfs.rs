@@ -2,11 +2,13 @@ extern crate fuse;
 extern crate libc;
 extern crate time;
 
+use core::num::dec2flt::parse::parse_decimal;
 use std::ffi::OsStr;
 use libc::{c_int, ENOENT};
 use time::Timespec;
-use fuse::{FileType, FileAttr, Filesystem, Request, ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory};
-use metaservice_mgr::mgr::MetaServiceMgr;
+use fuse::{FileType, FileAttr, Filesystem, Request, 
+    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate};
+use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo}};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -138,6 +140,25 @@ impl<'a> Filesystem for Yigfs<'a> {
             reply.add(entry.ino, entry.ino as i64, self.ft_to_fuse_ft(&entry.file_type), entry.name);
         }
         reply.ok();
+    }
+
+    fn create(&mut self, req: &Request, parent: u64, name: &OsStr, mode: u32, flags: u32, reply: ReplyCreate){
+        let name = String::from(name.to_str());
+        println!("create: uid: {}, gid: {}, parent: {}, name: {}, mod: {}, flags: {}",
+        req.uid(), req.gid(), parent, name, mode, flags);
+        let file_info: NewFileInfo;
+        let ret = self.meta_service_mgr.new_ino_leader(parent, &name, uid, gid);
+        match ret {
+            Ok(ret ) => {
+                file_info = ret;
+            }
+            Err(err) => {
+                println!("failed to new_ino_leader: parent: {}, name: {}, err: {}",
+                parent, name, err);
+                reply.error(libc::EBADRPC);
+            }
+        }
+        reply.created(TTL, self.to_usefs_attr(&file_info.attr), file_info.attr.generation, fh, flags);
     }
 }
 
