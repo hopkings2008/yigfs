@@ -102,6 +102,8 @@ pub struct RespFileAttr {
 pub struct ReqMount{
     pub region: String,
     pub bucket: String,
+    pub zone: String,
+    pub machine: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

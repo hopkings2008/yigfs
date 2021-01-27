@@ -4,7 +4,7 @@ mod mgr_impl;
 
 use common;
 
-pub fn create_metaserver_mgr(cfg: common::config::Config) -> Result<Box<dyn mgr::MetaServiceMgr>, String>{
+pub fn create_metaserver_mgr(cfg: &common::config::Config) -> Result<Box<dyn mgr::MetaServiceMgr>, String>{
     let ret = mgr_impl::MetaServiceMgrImpl::new(cfg);
     match ret {
         Ok(ret) => {

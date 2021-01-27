@@ -10,3 +10,7 @@ sk = "sk"
 
 [metaserver_config]
 meta_server = "http//127.0.0.1"
+
+[zone_config]
+zone = "A9DADA1C-6F50-4602-94C6-D5F7FBCFF1EF"
+machine = "172.20.13.166"

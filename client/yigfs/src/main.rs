@@ -11,7 +11,7 @@ fn main() {
     let parse_result = parse_config(opts.config_file_path);
     match parse_result {
         Ok(cfg) => {
-            let metaservice = metaservice_mgr::create_metaserver_mgr(cfg.clone()).unwrap();
+            let metaservice = metaservice_mgr::create_metaserver_mgr(&cfg).unwrap();
             let filesystem = FilesystemMgr::create(metaservice);
             let mount_options = MountOptions{
                 mnt: cfg.mount_config.mnt,

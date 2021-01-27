@@ -16,6 +16,8 @@ pub struct MetaServiceMgrImpl{
     meta_server_url: String,
     region: String,
     bucket: String,
+    zone: String,
+    machine: String,
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
@@ -23,6 +25,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         let req = ReqMount{
             region: self.region.clone(),
             bucket: self.bucket.clone(),
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
         };
 
         let req_json: String;
@@ -122,13 +126,15 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 }
 
 impl MetaServiceMgrImpl {
-    pub fn new(meta_cfg: config::Config) -> Result<MetaServiceMgrImpl, String> {
+    pub fn new(meta_cfg: &config::Config) -> Result<MetaServiceMgrImpl, String> {
         let http_client = Box::new(http_client::HttpClient::new(3));
         Ok(MetaServiceMgrImpl{
             http_client: http_client,
-            meta_server_url: meta_cfg.metaserver_config.meta_server,
-            region: meta_cfg.s3_config.region,
-            bucket: meta_cfg.s3_config.bucket,
+            meta_server_url: meta_cfg.metaserver_config.meta_server.clone(),
+            region: meta_cfg.s3_config.region.clone(),
+            bucket: meta_cfg.s3_config.bucket.clone(),
+            zone: meta_cfg.zone_config.zone.clone(),
+            machine: meta_cfg.zone_config.machine.clone(),
         })
     }
 

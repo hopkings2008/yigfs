@@ -5,6 +5,7 @@ pub struct Config{
     pub mount_config: MountConfig,
     pub s3_config: S3Config,
     pub metaserver_config: MetaServerConfig,
+    pub zone_config: ZoneConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -22,4 +23,10 @@ pub struct S3Config {
 #[derive(Deserialize, Debug, Clone)]
 pub struct MetaServerConfig {
     pub meta_server: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ZoneConfig {
+    pub zone: String,
+    pub machine: String,
 }
