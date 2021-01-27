@@ -14,7 +14,7 @@ import (
 func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
         var maxNum = 1000
         args := make([]interface{}, 0)
-        sqltext := "select ino, file_name, type from dir where region=? and bucket_name=? and ino >= ? order by ino limit ?;"
+        sqltext := "select ino, file_name, type from dir where region=? and bucket_name=? and ino > ? order by ino limit ?;"
         args = append(args, dir.Region, dir.BucketName, dir.Offset, maxNum)
 
         rows, err := t.Client.Query(sqltext, args...)
@@ -52,7 +52,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
         if dirLength > 0 {
 		offset = dirFilesResp[dirLength - 1].Ino + 1   //nextStartIno
 	}
-        log.Printf("succeed to list dir files, sqltext: %v, offset: %v", sqltext, offset)
+        log.Printf("succeed to list dir files, sqltext: %v, req offset: %v, resp offset: %v", sqltext, dir.Offset, offset)
         return
 }
 
@@ -144,12 +144,10 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
-        sqltext := "select generation, region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink, uid, gid, blocks from dir where ino = ?"
-        row := t.Client.QueryRow(sqltext, file.Ino)
+        sqltext := "select generation, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink, uid, gid, blocks from dir where region=? and bucket_name=? and ino=?"
+        row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino)
         err = row.Scan(
                 &resp.Generation,
-                &resp.Region,
-                &resp.BucketName,
                 &resp.ParentIno,
                 &resp.FileName,
                 &resp.Size,
@@ -190,6 +188,8 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
         resp.Mtime = mTime.UnixNano()
         resp.Atime = aTime.UnixNano()
         resp.Ino = file.Ino
+	resp.Region = file.Region
+	resp.BucketName = file.BucketName
 
 	log.Printf("succeed to get file info, sqltext: %v", sqltext)
         return
@@ -198,8 +198,8 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         now := time.Now().UTC()
 
-        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime) values(?,?,?,?,?,?,?,?)"
-        args := []interface{}{types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, now, now, now}
+        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+        args := []interface{}{types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
         _, err = t.Client.Exec(sqltext, args...)
         if err != nil {
 		log.Printf("Failed to init root dir ., err: %v", err)
@@ -214,8 +214,8 @@ func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq)
 func (t *TidbClient) InitParentDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         now := time.Now().UTC()
 
-        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime) values(?,?,?,?,?,?,?,?)"
-        args := []interface{}{types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, now, now, now}
+	sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+        args := []interface{}{types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
         _, err = t.Client.Exec(sqltext, args...)
         if err != nil {
                 log.Printf("Failed to init root parent dir .., err: %v", err)
