@@ -29,4 +29,4 @@ func(m *Meta) InitParentDir(ctx context.Context, parentDir *types.InitDirReq) (e
 
 func(m *Meta) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         return m.Client.InitRootDir(ctx, rootDir)
-} 
+}

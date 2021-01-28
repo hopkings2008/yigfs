@@ -12,5 +12,7 @@ type YigFsLayer interface {
 	CreateFile(ctx context.Context, file *types.FileInfo) (err error)
 	GetDirFileAttr(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error)
 	GetFileAttr(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error)
-	InitDir(ctx context.Context, rootDir *types.InitDirReq) (err error)
+	InitDirAndZone(ctx context.Context, rootDir *types.InitDirReq) (err error)
+	GetLeader(ctx context.Context, leader *types.GetLeaderReq) (resp *types.GetLeaderResp, err error)
+	CreateOrUpdateLeader(ctx context.Context, leader *types.GetLeaderReq) (resp *types.GetLeaderResp, err error)
 }
