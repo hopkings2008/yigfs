@@ -24,13 +24,84 @@ func(yigFs *YigFsStorage) ListDirFiles(ctx context.Context, dir *types.GetDirFil
 	return
 }
 
-func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.FileInfo) (err error) {
-	err = yigFs.MetaStorage.Client.CreateFile(ctx, file)
-	if err != nil {
-		log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFileReq) (resp *types.CreateFileResp, err error) {
+	// check file exist or not
+	getFileReq := &types.GetDirFileInfoReq {
+		Region: file.Region,
+		BucketName: file.BucketName,
+		ParentIno: file.ParentIno,
+		FileName: file.FileName,
+	}
+
+	// get file
+	var dirFileInfoResp = &types.FileInfo{}
+	dirFileInfoResp, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, getFileReq)
+
+	switch err {
+	case ErrYigFsNoSuchFile:
+		// if file not exist, create it.
+		err = yigFs.MetaStorage.Client.CreateFile(ctx, file)
+		if err != nil {
+			log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+			return
+		}
+
+		// get file info
+		dirFileInfoResp, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, getFileReq)
+		if err != nil {
+			return
+		}
+
+		resp = &types.CreateFileResp {
+			File: dirFileInfoResp,
+		}
+
+		// create or update leader and zone
+		leader := &types.GetLeaderReq {
+			ZoneId: file.ZoneId,
+			Region:file.Region,
+			BucketName: file.BucketName,
+			Ino: dirFileInfoResp.Ino,
+			Machine: file.Machine,
+		}
+
+		err = UpdateLeaderAndZone(ctx, leader, yigFs)
+		if err != nil {
+			return
+		}
+
+		resp.LeaderInfo = &types.LeaderInfo {
+			ZoneId: leader.ZoneId,
+			Leader: leader.Machine,
+		}
+		return
+	case nil:
+		// if file exist, get it leader.
+                resp = &types.CreateFileResp {
+                        File: dirFileInfoResp,
+                }
+
+		leader := &types.GetLeaderReq {
+			ZoneId: file.ZoneId,
+			Region:file.Region,
+			BucketName: file.BucketName,
+			Ino: dirFileInfoResp.Ino,
+			Machine: file.Machine,
+		}
+
+		var getLeaderResp = &types.GetLeaderResp{}
+		getLeaderResp, err = GetUpLeader(ctx, leader, yigFs)
+		if err != nil {
+			return
+		}
+
+		resp.LeaderInfo = getLeaderResp.LeaderInfo
+		return
+	default:
+		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
+			getFileReq.Region, getFileReq.BucketName, getFileReq.ParentIno, getFileReq.FileName, err)
 		return
 	}
-	return
 }
 
 func(yigFs *YigFsStorage) GetDirFileAttr(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {

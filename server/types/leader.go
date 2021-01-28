@@ -6,7 +6,7 @@ import (
 
 type GetLeaderReq struct {
 	Ctx context.Context `json:"-"`
-	ZoneId string `json:"zone_id"`
+	ZoneId string `json:"zone"`
 	Region string `json:"region"`
 	BucketName string `json:"bucket"`
 	Ino uint64 `json:"ino"`
@@ -20,6 +20,6 @@ type GetLeaderResp struct {
 }
 
 type LeaderInfo struct {
-	ZoneId string `json:"zone_id"`
+	ZoneId string `json:"zone"`
 	Leader string `json:"leader"`
 }
