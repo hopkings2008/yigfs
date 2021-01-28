@@ -21,12 +21,14 @@ pub struct MetaServiceMgrImpl{
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
-    fn mount(&self) -> Result<(), Errno>{
+    fn mount(&self, uid: u32, gid: u32) -> Result<(), Errno>{
         let req = ReqMount{
             region: self.region.clone(),
             bucket: self.bucket.clone(),
             zone: self.zone.clone(),
             machine: self.machine.clone(),
+            uid: uid,
+            gid: gid,
         };
 
         let req_json: String;

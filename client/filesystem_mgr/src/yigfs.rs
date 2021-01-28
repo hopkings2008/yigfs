@@ -2,7 +2,6 @@ extern crate fuse;
 extern crate libc;
 extern crate time;
 
-use core::num::dec2flt::parse::parse_decimal;
 use std::ffi::OsStr;
 use libc::{c_int, ENOENT};
 use time::Timespec;
@@ -11,8 +10,6 @@ use fuse::{FileType, FileAttr, Filesystem, Request,
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo}};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
-
-const CREATE_TIME: Timespec = Timespec { sec: 1381237736, nsec: 0 };    // 2013-10-08 08:56
 
 /*const HELLO_DIR_ATTR: FileAttr = FileAttr {
     ino: 1,
@@ -55,8 +52,8 @@ pub struct Yigfs<'a>{
 }
 
 impl<'a> Filesystem for Yigfs<'a> {
-    fn init(&mut self, _req: &Request) -> Result<(), c_int> {
-        let ret = self.meta_service_mgr.mount();
+    fn init(&mut self, req: &Request) -> Result<(), c_int> {
+        let ret = self.meta_service_mgr.mount(req.uid(), req.gid());
         match ret {
             Ok(_) => {
                 return Ok(());
@@ -143,22 +140,37 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
 
     fn create(&mut self, req: &Request, parent: u64, name: &OsStr, mode: u32, flags: u32, reply: ReplyCreate){
-        let name = String::from(name.to_str());
+        let str = name.to_str();
+        let string : String;
+        match str {
+            Some(str) => {
+                string = String::from(str);
+            }
+            None => {
+                println!("create: got invalid name: {:?}", name);
+                reply.error(libc::EBADMSG);
+                return;
+            }
+        }
+
+        let name = string;
+
         println!("create: uid: {}, gid: {}, parent: {}, name: {}, mod: {}, flags: {}",
         req.uid(), req.gid(), parent, name, mode, flags);
         let file_info: NewFileInfo;
-        let ret = self.meta_service_mgr.new_ino_leader(parent, &name, uid, gid);
+        let ret = self.meta_service_mgr.new_ino_leader(parent, &name, req.uid(), req.gid());
         match ret {
             Ok(ret ) => {
                 file_info = ret;
             }
             Err(err) => {
-                println!("failed to new_ino_leader: parent: {}, name: {}, err: {}",
+                println!("failed to new_ino_leader: parent: {}, name: {}, err: {:?}",
                 parent, name, err);
                 reply.error(libc::EBADRPC);
+                return;
             }
         }
-        reply.created(TTL, self.to_usefs_attr(&file_info.attr), file_info.attr.generation, fh, flags);
+        reply.created(&TTL, &self.to_usefs_attr(&file_info.attr), file_info.attr.generation, file_info.attr.ino, flags);
     }
 }
 
