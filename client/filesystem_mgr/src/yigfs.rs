@@ -158,7 +158,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         println!("create: uid: {}, gid: {}, parent: {}, name: {}, mod: {}, flags: {}",
         req.uid(), req.gid(), parent, name, mode, flags);
         let file_info: NewFileInfo;
-        let ret = self.meta_service_mgr.new_ino_leader(parent, &name, req.uid(), req.gid());
+        let ret = self.meta_service_mgr.new_ino_leader(parent, &name, req.uid(), req.gid(), mode);
         match ret {
             Ok(ret ) => {
                 file_info = ret;

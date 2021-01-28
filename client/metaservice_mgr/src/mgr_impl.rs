@@ -185,7 +185,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         })
     }
 
-    fn new_ino_leader(&self, parent: u64, name: &String, uid: u32, gid: u32) -> Result<NewFileInfo, Errno> {
+    fn new_ino_leader(&self, parent: u64, name: &String, uid: u32, gid: u32, perm: u32) -> Result<NewFileInfo, Errno> {
         let req_file_create = ReqFileCreate{
             zone: self.zone.clone(),
             machine: self.machine.clone(),
@@ -195,6 +195,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             name: name.clone(),
             uid: uid,
             gid: gid,
+            perm: perm,
         };
         let body : String;
         let ret = json::encode_to_str::<ReqFileCreate>(&req_file_create);

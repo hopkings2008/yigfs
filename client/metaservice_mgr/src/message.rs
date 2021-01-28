@@ -147,6 +147,7 @@ pub struct ReqFileCreate {
     pub name: String,
     pub uid: u32,
     pub gid: u32, 
+    pub perm: u32,
 }
 
 
