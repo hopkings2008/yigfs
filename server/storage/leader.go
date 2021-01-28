@@ -41,7 +41,7 @@ func GetUpLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *YigFsSt
 	resp, err = yigFs.MetaStorage.Client.GetLeaderInfo(ctx, leader)
 	switch err {
 	case ErrYigFsNoSuchLeader:
-		// if leader is non, get a up machine from zone and update leader info
+		// if leader does not exist, get a up machine from zone and update leader info
 		getMachineResp, err := GetMachineAndUpdateLeader(ctx, leader, yigFs)
 		if err != nil {
 			return resp, err

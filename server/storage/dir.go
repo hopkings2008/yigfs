@@ -39,7 +39,7 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 
 	switch err {
 	case ErrYigFsNoSuchFile:
-		// if file not exist, create it.
+		// if file does not exist, create it.
 		err = yigFs.MetaStorage.Client.CreateFile(ctx, file)
 		if err != nil {
 			log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
