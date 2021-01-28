@@ -51,7 +51,8 @@ func(yigFs *YigFsStorage) GetFileAttr(ctx context.Context, file *types.GetFileIn
 	return
 }
 
-func(yigFs *YigFsStorage) InitDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+func(yigFs *YigFsStorage) InitDirAndZone(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+	// init dir
 	file := &types.GetFileInfoReq {
 		Region: rootDir.Region,
 		BucketName: rootDir.BucketName,
@@ -82,6 +83,12 @@ func(yigFs *YigFsStorage) InitDir(ctx context.Context, rootDir *types.InitDirReq
                 }
         }
 
-        return
+	// init zone
+	err = yigFs.MetaStorage.Client.CreateOrUpdateZone(ctx, rootDir)
+	if err != nil {
+		log.Printf("Failed to init zone, region: %s, bucket: %s, zone_id: %s, machine: %s, err: %v", rootDir.Region, rootDir.BucketName, rootDir.ZoneId, rootDir.Machine, err)
+		return
+	}
+	return nil
 }
 

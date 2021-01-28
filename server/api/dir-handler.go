@@ -217,9 +217,9 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 	}
 
 	// check request params
-	if dirReq.BucketName == "" {
-		log.Printf("InitDirHandler required parameter bucketname is missing.")
-		resp.Result = GetErrInfo(ErrYigFsMissingBucketname)
+	if dirReq.BucketName == "" || dirReq.Machine == "" || dirReq.ZoneId =="" {
+		log.Printf("Some InitDirHandler required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
 	}
@@ -233,8 +233,8 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 	uuidStr := uuid.New()
 	dirReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
-	// init dir
-	err := yigFs.YigFsAPI.InitDir(reqContext, dirReq)
+	// init dir and zone
+	err := yigFs.YigFsAPI.InitDirAndZone(reqContext, dirReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)

@@ -28,3 +28,13 @@ const (
 	RootDirIno = iota + 1
 	RootParentDirIno
 )
+
+const (
+	MachineDown = iota
+	MachineUp
+)
+
+const (
+	NotDeleted = iota
+	Deleted
+)

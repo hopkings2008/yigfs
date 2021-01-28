@@ -33,6 +33,9 @@ const (
 	ErrYigFsMissingRequiredParams
 	ErrYigFsMissingBucketname
 	ErrYigFsInvalidType
+	ErrYigFsInvalidFlag
+	ErrYigFsNoSuchLeader
+	ErrYigFsNoSuchMachine
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -68,13 +71,28 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 	},
 	ErrYigFsMissingBucketname: {
 		AwsErrorCode:   "ErrYigFsMissingRequiredParams",
-                Description:    "Missing necessary parameter bucketname.",
-                HttpStatusCode: 40005,
+		Description:    "Missing necessary parameter bucketname.",
+		HttpStatusCode: 40005,
 	},
 	ErrYigFsInvalidType: {
 		AwsErrorCode:   "ErrYigFsInvalidType",
-                Description:    "The type is invalid, please check it.",
-                HttpStatusCode: 40006,
+		Description:    "The type is invalid, please check it.",
+		HttpStatusCode: 40006,
+	},
+	ErrYigFsInvalidFlag: {
+		AwsErrorCode:   "ErrYigFsInvalidFlag",
+		Description:    "The get leader flag is invalid, please check it.",
+		HttpStatusCode: 40007,
+	},
+	ErrYigFsNoSuchLeader: {
+		AwsErrorCode:   "ErrYigFsNoSuchLeader",
+		Description:    "The specified leader does not exist.",
+		HttpStatusCode: 40008,
+	},
+	ErrYigFsNoSuchMachine: {
+		AwsErrorCode:   "ErrYigFsNoSuchMachine",
+		Description:    "The specified machine does not exist.",
+		HttpStatusCode: 40009,
 	},
 }
 

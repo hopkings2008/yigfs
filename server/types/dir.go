@@ -80,8 +80,10 @@ type InitDirReq struct {
 	Ctx context.Context `json:"-"`
 	Region string `json:"region"`
 	BucketName string `json:"bucket"`
+	ZoneId string `json:"zone_id"`
+	Machine string `json:"machine"`
 	Uid uint32 `json:"uid"`
-        Gid uint32 `json:"gid"`
+	Gid uint32 `json:"gid"`
 }
 
 type InitDirResp struct {
