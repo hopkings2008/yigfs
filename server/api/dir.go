@@ -9,8 +9,8 @@ import (
 )
 
 
-func CheckAndAssignmentFileInfo(ctx context.Context, file *types.FileInfo) (err error) {
-	if file.BucketName == "" || file.FileName == "" || file.Size == 0 || file.ParentIno == 0 {
+func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) (err error) {
+	if file.BucketName == "" || file.FileName == "" || file.ParentIno == 0 || file.ZoneId == "" || file.Machine == "" {
 		log.Printf("Some createFile required parameters are missing.")
 		err = ErrYigFsMissingRequiredParams
 		return

@@ -11,7 +11,7 @@ type Client interface {
         // List dir files
 	ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error)
         // Create file
-	CreateFile(ctx context.Context, file *types.FileInfo) (err error)
+	CreateFile(ctx context.Context, file *types.CreateFileReq) (err error)
         // Init root dir
 	InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error)
 	//Init root parent dir
@@ -30,5 +30,7 @@ type Client interface {
 	GetOneUpMachine(ctx context.Context, zone *types.GetLeaderReq) (leader string, err error)
 	// Get machine indo
 	GetMachineInfo(ctx context.Context, zone *types.GetLeaderReq) (resp *types.GetMachineInfoResp, err error)
+	// Update file
+	UpdateFile(ctx context.Context, file *types.CreateFileReq) (err error)
 }
 

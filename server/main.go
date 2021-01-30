@@ -30,16 +30,16 @@ func main() {
 
 	// ListDirFiles
 	app.Get("/v1/dir/files", apiHandlers.GetDirFilesHandler)
-	// CreateFile
-	app.Post("/v1/dir/file/create", apiHandlers.CreateFileHandler)
-	//GetDirFileAttr
+	// GetDirFileAttr
 	app.Get("/v1/dir/file/attr", apiHandlers.GetDirFileAttrHandler)
-	//GetFileAttr
+	// GetFileAttr
 	app.Get("/v1/file/attr", apiHandlers.GetFileAttrHandler)
-	//InitDir
+	// InitDir
 	app.Put("/v1/dir", apiHandlers.InitDirHandler)
-	//GetLeader
+	// GetLeader
 	app.Get("/v1/file/leader", apiHandlers.GetLeaderHandler)
+	// CreateFile
+	app.Put("/v1/dir/file", apiHandlers.CreateFileHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	log.Fatal(app.Run(iris.Addr(port)))

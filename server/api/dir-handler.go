@@ -71,7 +71,7 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 	defer GetSpendTime("CreateFileHandler")()
 
 	// get req
-	fileReq := &types.FileInfo{}
+	fileReq := &types.CreateFileReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
 		log.Printf("Failed to read CreateDirFileInfo from body, err: %v", err)
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
@@ -94,7 +94,7 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// create file
-	err = yigFs.YigFsAPI.CreateFile(reqContext, fileReq)
+	resp, err = yigFs.YigFsAPI.CreateFile(reqContext, fileReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
