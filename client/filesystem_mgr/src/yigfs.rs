@@ -149,7 +149,7 @@ impl<'a> Filesystem for Yigfs<'a> {
             }
             Err(err) => {
                 println!("failed to set_file_attr for {:?}, err: {:?}", set_attr, err);
-                reply.error(libc::EBADEXEC);
+                reply.error(libc::EIO);
                 return;
             }
         }
