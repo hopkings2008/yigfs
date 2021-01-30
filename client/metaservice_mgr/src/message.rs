@@ -166,24 +166,31 @@ pub struct MsgSetFileAttr {
     pub ino: u64,
     /// Size in bytes
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub size: Option<u64>,
     /// Time of last access
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub atime: Option<i64>,
     /// Time of last modification
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub mtime: Option<i64>,
     /// Time of last change
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub ctime: Option<i64>,
     /// Permissions
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub perm: Option<u16>,
     /// User id
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub uid: Option<u32>,
     /// Group id
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub gid: Option<u32>,
 }
 
