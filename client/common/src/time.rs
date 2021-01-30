@@ -10,3 +10,9 @@ pub fn nsecs_to_ts(nano: i64) -> Timespec{
         nsec: nsec,
     }
 }
+
+pub fn ts_to_nsecs(ts: &Timespec) -> i64 {
+    let sec = ts.sec * 1000000000;
+    let nsec = ts.nsec as i64;
+    sec + nsec
+}

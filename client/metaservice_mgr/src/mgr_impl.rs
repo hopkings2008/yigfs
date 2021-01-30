@@ -1,7 +1,7 @@
-#[path = "./message.rs"]
+#[path="./message.rs"]
 mod message;
 
-use crate::{mgr, types::{FileLeader, NewFileInfo}};
+use crate::{mgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
 use common::http_client;
@@ -10,7 +10,10 @@ use common::config;
 use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
-use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqMount, ReqReadDir, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespReadDir};
+use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, 
+    ReqFileLeader, ReqMount, ReqReadDir, ReqSetFileAttr, RespDirFileAttr, 
+    RespFileAttr, RespFileCreate, RespFileLeader, RespReadDir, RespSetFileAttr,
+    MsgSetFileAttr};
 pub struct MetaServiceMgrImpl{
     http_client: Box<http_client::HttpClient>,
     meta_server_url: String,
@@ -110,6 +113,73 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let file_attr = self.to_file_attr(&attr);
         Ok(file_attr)
+    }
+
+    fn set_file_attr(&self, attr: &SetFileAttr) -> Result<FileAttr, Errno> {
+        let req = ReqSetFileAttr {
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            attr: MsgSetFileAttr{
+                ino: attr.ino,
+                size: attr.size,
+                atime: attr.atime,
+                mtime: attr.mtime,
+                ctime: attr.ctime,
+                perm: attr.perm,
+                uid: attr.uid,
+                gid: attr.gid,
+            },
+        };
+        let req_str: String;
+        let ret = json::encode_to_str::<ReqSetFileAttr>(&req);
+        match ret {
+            Ok(ret) => {
+                req_str = ret;
+            }
+            Err(err) => {
+                println!("failed to encode_to_str for attr: {:?}, err: {}", req, err);
+                return Err(Errno::Eintr);
+            }
+        }
+
+        let url = format!("{}/v1/file/attr", self.meta_server_url);
+        let resp_text : RespText;
+        let ret = self.http_client.request(&url, &req_str, &HttpMethod::Put);
+        match ret {
+            Ok(ret) => {
+                resp_text = ret;
+            }
+            Err(err) => {
+                println!("failed to set_file_attr: {}, err: {}", req_str, err);
+                return Err(Errno::Eintr);
+            }
+        }
+
+        if resp_text.status >= 300 {
+            println!("failed to set_file_attr: {}, got status: {}, resp body: {}", 
+            req_str, resp_text.status, resp_text.body);
+            return Err(Errno::Eintr);
+        }
+
+        let resp : RespSetFileAttr;
+        let ret = json::decode_from_str::<RespSetFileAttr>(&resp_text.body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                println!("got invalid resp {} for set_file_attr: {}, err: {}", resp_text.body, req_str, err);
+                return Err(Errno::Eintr);
+            }
+        }
+
+        if resp.result.err_code != 0 {
+            println!("failed to set_file_attr for {}, err_code: {}, err_msg: {}",
+            req_str, resp.result.err_code, resp.result.err_msg);
+            return Err(Errno::Eintr);
+        }
+
+        Ok(self.to_file_attr(&resp.attr))
     }
 
     fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<FileAttr, Errno>{

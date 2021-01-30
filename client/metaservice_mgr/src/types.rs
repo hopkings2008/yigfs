@@ -1,4 +1,4 @@
-#[derive (Debug)]
+#[derive (Debug, Copy, Clone)]
 pub enum FileType {
     UNKNOWN = 0,
     FILE = 1,
@@ -74,4 +74,23 @@ pub struct FileLeader {
 pub struct NewFileInfo {
     pub leader_info: FileLeader,
     pub attr: FileAttr,
+}
+
+#[derive(Debug)]
+pub struct SetFileAttr {
+    pub ino: u64,
+    /// Size in bytes
+    pub size: Option<u64>,
+    /// Time of last access
+    pub atime: Option<i64>,
+    /// Time of last modification
+    pub mtime: Option<i64>,
+    /// Time of last change
+    pub ctime: Option<i64>,
+    /// Permissions
+    pub perm: Option<u16>,
+    /// User id
+    pub uid: Option<u32>,
+    /// Group id
+    pub gid: Option<u32>,
 }

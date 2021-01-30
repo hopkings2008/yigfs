@@ -7,7 +7,7 @@ use libc::{c_int, ENOENT};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
     ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate};
-use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo}};
+use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -104,6 +104,58 @@ impl<'a> Filesystem for Yigfs<'a> {
         }
     }
 
+    fn setattr(&mut self, req: &Request, ino: u64, mode: Option<u32>, uid: Option<u32>, gid: Option<u32>, size: Option<u64>, atime: Option<Timespec>, mtime: Option<Timespec>, fh: Option<u64>, _crtime: Option<Timespec>, _chgtime: Option<Timespec>, _bkuptime: Option<Timespec>, _flags: Option<u32>, reply: ReplyAttr){
+        println!("setattr: uid: {}, gid: {}, pid: {}", req.uid(), req.gid(), req.pid());
+        let mut set_attr = SetFileAttr{
+            ino: ino,
+            size: size,
+            atime: None,
+            mtime: None,
+            ctime: None,
+            perm: None,
+            uid: uid,
+            gid: gid,
+        };
+        match mode {
+            Some(m) => {
+                set_attr.perm = Some(m as u16);
+            }
+            None => {
+                set_attr.perm = None;
+            }
+        }
+        match atime {
+            Some(t) => {
+                set_attr.atime = Some(common::time::ts_to_nsecs(&t));
+            }
+            None => {
+                set_attr.atime  = None;
+            }
+        }
+        match mtime {
+            Some(t) => {
+                set_attr.mtime = Some(common::time::ts_to_nsecs(&t));
+            }
+            None => {
+                set_attr.mtime = None;
+            }
+        }
+
+        let file_attr : metaservice_mgr::types::FileAttr;
+        let ret = self.meta_service_mgr.set_file_attr(&set_attr);
+        match ret {
+            Ok(ret) => {
+                file_attr = ret;
+            }
+            Err(err) => {
+                println!("failed to set_file_attr for {:?}, err: {:?}", set_attr, err);
+                reply.error(libc::EBADEXEC);
+                return;
+            }
+        }
+        reply.attr(&TTL, &self.to_usefs_attr(&file_attr));
+    }
+
     fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, _size: u32, reply: ReplyData) {
         if ino == 2 {
             reply.data(&HELLO_TXT_CONTENT.as_bytes()[offset as usize..]);
@@ -166,7 +218,7 @@ impl<'a> Filesystem for Yigfs<'a> {
             Err(err) => {
                 println!("failed to new_ino_leader: parent: {}, name: {}, err: {:?}",
                 parent, name, err);
-                reply.error(libc::EBADRPC);
+                reply.error(libc::EIO);
                 return;
             }
         }

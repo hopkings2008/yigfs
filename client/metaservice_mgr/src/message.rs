@@ -158,3 +158,46 @@ pub struct RespFileCreate {
     #[serde(rename(serialize = "file", deserialize = "file"))]
     pub file_info: MsgFileAttr,
 }
+
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgSetFileAttr {
+    /// ino of the file.
+    pub ino: u64,
+    /// Size in bytes
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    /// Time of last access
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub atime: Option<i64>,
+    /// Time of last modification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mtime: Option<i64>,
+    /// Time of last change
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ctime: Option<i64>,
+    /// Permissions
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub perm: Option<u16>,
+    /// User id
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<u32>,
+    /// Group id
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gid: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqSetFileAttr {
+    pub region: String,
+    pub bucket: String,
+    #[serde(rename(serialize = "file", deserialize = "file"))]
+    pub attr: MsgSetFileAttr,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespSetFileAttr {
+    pub result: RespResult,
+    #[serde(rename(serialize = "file", deserialize = "file"))]
+    pub attr: MsgFileAttr,
+}
