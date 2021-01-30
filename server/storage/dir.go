@@ -42,7 +42,8 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 		// if file does not exist, create it.
 		err = yigFs.MetaStorage.Client.CreateFile(ctx, file)
 		if err != nil {
-			log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+			log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
+				file.Region, file.BucketName, file.ParentIno, file.FileName, err)
 			return
 		}
 
@@ -107,7 +108,8 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 func(yigFs *YigFsStorage) GetDirFileAttr(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {
 	resp, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, file)
 	if err != nil {
-		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
+			file.Region, file.BucketName, file.ParentIno, file.FileName, err)
 		return
 	}
 	return
@@ -163,3 +165,28 @@ func(yigFs *YigFsStorage) InitDirAndZone(ctx context.Context, rootDir *types.Ini
 	return nil
 }
 
+func(yigFs *YigFsStorage) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (resp *types.SetFileAttrResp, err error) {
+	resp = &types.SetFileAttrResp{}
+
+	err = yigFs.MetaStorage.Client.SetFileAttr(ctx, file)
+	if err != nil {
+		log.Printf("Failed to set file attr, region: %s, bucket: %s, ino: %d", file.Region, file.BucketName, file.File.Ino)
+		return resp, err
+	}
+
+	getFileInfoResp := &types.GetFileInfoReq {
+		Region: file.Region,
+		BucketName: file.BucketName,
+		Ino: file.File.Ino,
+	}
+
+	getFileInfoReq, err := yigFs.MetaStorage.Client.GetFileInfo(ctx, getFileInfoResp)
+	if err != nil {
+		log.Printf("SetFileAttr: Failed to get file info, region: %s, bucket: %s, ino: %d, err: %v",
+			getFileInfoResp.Region, getFileInfoResp.BucketName, getFileInfoResp.Ino, err)
+		return resp, err
+	}
+
+	resp.File = getFileInfoReq
+	return resp, nil
+}

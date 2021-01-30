@@ -30,7 +30,7 @@ type Client interface {
 	GetOneUpMachine(ctx context.Context, zone *types.GetLeaderReq) (leader string, err error)
 	// Get machine indo
 	GetMachineInfo(ctx context.Context, zone *types.GetLeaderReq) (resp *types.GetMachineInfoResp, err error)
-	// Update file
-	UpdateFile(ctx context.Context, file *types.CreateFileReq) (err error)
+	// Set file attr
+	SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error)
 }
 

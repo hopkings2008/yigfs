@@ -40,6 +40,8 @@ func main() {
 	app.Get("/v1/file/leader", apiHandlers.GetLeaderHandler)
 	// CreateFile
 	app.Put("/v1/dir/file", apiHandlers.CreateFileHandler)
+	// SetFileAttr
+	app.Put("/v1/file/attr", apiHandlers.SetFileAttrHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	log.Fatal(app.Run(iris.Addr(port)))

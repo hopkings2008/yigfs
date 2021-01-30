@@ -114,3 +114,26 @@ type InitDirResp struct {
 	Result YigFsMetaError `json:"result"`
 }
 
+type SetFileAttrInfo struct {
+        Ino uint64 `json:"ino"`
+        Size uint64 `json:"size"`
+        Ctime int64 `json:"ctime"`
+        Mtime int64 `json:"mtime"`
+        Atime int64 `json:"atime"`
+        Perm uint32 `json:"perm"`
+        Uid uint32 `json:"uid"`
+        Gid uint32 `json:"gid"`
+        Blocks uint32 `json:"blocks"`
+}
+
+type SetFileAttrReq struct {
+	Ctx context.Context `json:"-"`
+	Region string `json:"region"`
+	BucketName string `json:"bucket"`
+	File *SetFileAttrInfo `json:"file"`
+}
+
+type SetFileAttrResp struct {
+	Result YigFsMetaError `json:"result"`
+	File *FileInfo `json:"file"`	
+}

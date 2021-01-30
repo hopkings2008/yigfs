@@ -31,6 +31,6 @@ func(m *Meta) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err e
         return m.Client.InitRootDir(ctx, rootDir)
 }
 
-func(m *Meta)  UpdateFile(ctx context.Context, file *types.CreateFileReq) (err error) {
-        return m.Client.UpdateFile(ctx, file)
+func(m *Meta) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error) {
+        return m.Client.SetFileAttr(ctx, file)
 }

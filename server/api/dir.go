@@ -38,3 +38,18 @@ func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) 
 	}
 	return nil
 }
+
+func CheckSetFileAttrParams(ctx context.Context, file *types.SetFileAttrReq) (err error) {
+        if file.BucketName == "" || file.File.Ino == 0 {
+                log.Printf("Some SetFileAttr required parameters are missing.")
+                err = ErrYigFsMissingRequiredParams
+                return
+        }
+
+        if file.Region == "" {
+                file.Region = "cn-bj-1"
+        }
+
+        return nil
+}
+

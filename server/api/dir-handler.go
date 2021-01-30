@@ -246,3 +246,45 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 	ctx.JSON(resp)
 	return
 }
+
+func(yigFs MetaAPIHandlers) SetFileAttrHandler(ctx iris.Context) {
+	resp := &types.SetFileAttrResp {
+		Result: types.YigFsMetaError{},
+	}
+	defer GetSpendTime("SetFileAttrHandler")()
+
+	// get req
+	fileReq := &types.SetFileAttrReq{}
+	if err := ctx.ReadJSON(&fileReq); err != nil {
+                log.Printf("Failed to read SetFileAttrReq from body, err: %v", err)
+                resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+                return
+        }
+
+	r := ctx.Request()
+        reqContext := r.Context()
+
+	// check request params
+	err := CheckSetFileAttrParams(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	uuidStr := uuid.New()
+	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// set file attr
+	resp, err = yigFs.YigFsAPI.SetFileAttr(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	resp.Result = GetErrInfo(NoYigFsErr)
+
+	ctx.JSON(resp)
+	return
+}
