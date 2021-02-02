@@ -32,5 +32,9 @@ type Client interface {
 	GetMachineInfo(ctx context.Context, zone *types.GetLeaderReq) (resp *types.GetMachineInfoResp, err error)
 	// Set file attr
 	SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error)
+	// Get segment info
+	GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)
+	// Create segment
+	CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error)
 }
 

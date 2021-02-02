@@ -16,4 +16,6 @@ type YigFsLayer interface {
 	CreateOrUpdateLeader(ctx context.Context, leader *types.GetLeaderReq) (resp *types.GetLeaderResp, err error)
 	CreateFile(ctx context.Context, file *types.CreateFileReq) (resp *types.CreateFileResp, err error)
 	SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (resp *types.SetFileAttrResp, err error)
+	GetFileSegmentInfo(ctx context.Context, file *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)
+	CreateSegmentInfo(ctx context.Context, seg *types.CreateSegmentReq) (err error)
 }

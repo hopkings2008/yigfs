@@ -36,6 +36,7 @@ const (
 	ErrYigFsInvalidFlag
 	ErrYigFsNoSuchLeader
 	ErrYigFsNoSuchMachine
+	ErrYigFsNoTargetSegment
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -93,6 +94,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsNoSuchMachine",
 		Description:    "The specified machine does not exist.",
 		HttpStatusCode: 40009,
+	},
+	ErrYigFsNoTargetSegment: {
+		AwsErrorCode:   "ErrYigFsNoTargetSegment",
+		Description:    "The target segment does not exist.",
+		HttpStatusCode: 40010,
 	},
 }
 

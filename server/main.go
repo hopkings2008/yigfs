@@ -42,6 +42,10 @@ func main() {
 	app.Put("/v1/dir/file", apiHandlers.CreateFileHandler)
 	// SetFileAttr
 	app.Put("/v1/file/attr", apiHandlers.SetFileAttrHandler)
+	// GetSegment
+	app.Get("/v1/file/segments", apiHandlers.GetSegmentHandler)
+	// CreateSegment
+	app.Put("/v1/file/block", apiHandlers.CreateSegmentHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	log.Fatal(app.Run(iris.Addr(port)))

@@ -202,7 +202,7 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 }
 
 func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
-	resp := &types.InitDirResp {
+	resp := &types.NonBodyResp {
 		Result: types.YigFsMetaError{},
 	}
 	defer GetSpendTime("InitDirHandler")()
@@ -258,6 +258,7 @@ func(yigFs MetaAPIHandlers) SetFileAttrHandler(ctx iris.Context) {
 	if err := ctx.ReadJSON(&fileReq); err != nil {
                 log.Printf("Failed to read SetFileAttrReq from body, err: %v", err)
                 resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
                 return
         }
 
