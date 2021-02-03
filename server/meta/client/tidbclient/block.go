@@ -6,6 +6,7 @@ import (
 	"time"
 	"log"
 
+	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
 )
@@ -15,18 +16,15 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 	var segmentId int64
 	var blockId int64
 	var segmentMap = make(map[int64][]int64)
-	block := &types.BlockInfo{}
+	block := types.BlockInfo{}
 
 	resp = &types.GetSegmentResp {
 		Segments: []*types.SegmentInfo{},
 	}
-	segment := &types.SegmentInfo {
-		Blocks: []*types.BlockInfo{},
-	}
 
 	args := make([]interface{}, 0)
 	sqltext := "select seg_id, block_id from block where region=? and bucket_name=? and ino=? and generation=? order by offset;"
-	args = append(args, seg.Region, seg.BucketName, seg.Generation, seg.Ino)
+	args = append(args, seg.Region, seg.BucketName, seg.Ino, seg.Generation)
 
 	rows, err := t.Client.Query(sqltext, args...)
 	if err == sql.ErrNoRows {
@@ -58,11 +56,17 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 		return
 	}
 
+	log.Printf("segmentMap is %v", segmentMap)
+
 	for segmentId, blockIds := range segmentMap {
+		segment := &types.SegmentInfo {
+                        Blocks: []types.BlockInfo{},
+                }
+
 		segment.SegmentId = segmentId
 		for _, blockId := range blockIds {
 			// get block info
-			sqltext := "select size, offset, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=? and generation=? and seg_id=? and block_id;"
+			sqltext := "select size, offset, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=? and generation=? and seg_id=? and block_id=?;"
 			row := t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, segmentId, blockId)
 			err = row.Scan(
 				&block.Size,
@@ -75,17 +79,25 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 				err = ErrYIgFsInternalErr
 				return
 			}
+
+			log.Printf("Succeed to get segment info, sqltext: %v", sqltext)
 			segment.Blocks = append(segment.Blocks, block)
 		}
 		resp.Segments = append(resp.Segments, segment)
 	}
-
+	
 	return
 }
 
 func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
 	now := time.Now().UTC()
-	blockId := now.UnixNano()
+	node, err := snowflake.NewNode(seg.Segment.SegmentId%10)
+	if err != nil {
+		log.Printf("Failed to create blockId, err: %v", err)
+		err = ErrYIgFsInternalErr
+		return
+	}
+	blockId := node.Generate()
 
 	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update size=values(size), offset=values(offset), " +
 		"seg_start_addr=values(seg_start_addr), seg_end_addr=values(seg_end_addr), mtime=values(mtime)"
