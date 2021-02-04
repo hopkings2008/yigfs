@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 	"log"
+	"math/rand"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -13,9 +14,9 @@ import (
 
 
 func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
-	var segmentId int64
+	var segmentId0, segmentId1 int64
 	var blockId int64
-	var segmentMap = make(map[int64][]int64)
+	var segmentMap = make(map[interface{}][]int64)
 	block := types.BlockInfo{}
 
 	resp = &types.GetSegmentResp {
@@ -23,7 +24,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 	}
 
 	args := make([]interface{}, 0)
-	sqltext := "select seg_id, block_id from block where region=? and bucket_name=? and ino=? and generation=? order by offset;"
+	sqltext := "select seg_id0, seg_id1, block_id from block where region=? and bucket_name=? and ino=? and generation=? order by offset;"
 	args = append(args, seg.Region, seg.BucketName, seg.Ino, seg.Generation)
 
 	rows, err := t.Client.Query(sqltext, args...)
@@ -39,7 +40,8 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 
 	for rows.Next() {
 		err = rows.Scan(
-			&segmentId,
+			&segmentId0,
+			&segmentId1,
 			&blockId)
 		if err != nil {
 			log.Printf("Failed to get segment info in row, err: %v", err)
@@ -47,6 +49,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 			return
 		}
 
+		segmentId := [2]int64{segmentId0, segmentId1}
 		segmentMap[segmentId] = append(segmentMap[segmentId], blockId)
 	}
 	err = rows.Err()
@@ -60,14 +63,18 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 
 	for segmentId, blockIds := range segmentMap {
 		segment := &types.SegmentInfo {
-                        Blocks: []types.BlockInfo{},
-                }
+			Blocks: []types.BlockInfo{},
+		}
 
-		segment.SegmentId = segmentId
+		segmentIds := segmentId.([2]int64)
+		segment.SegmentId0 = segmentIds[0]
+		segment.SegmentId1 = segmentIds[1]
+
 		for _, blockId := range blockIds {
 			// get block info
-			sqltext := "select size, offset, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=? and generation=? and seg_id=? and block_id=?;"
-			row := t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, segmentId, blockId)
+			sqltext := "select size, offset, seg_start_addr, seg_end_addr from block where region=? and bucket_name=?" + 
+				" and ino=? and generation=? and seg_id0=? and seg_id1=? and block_id=?;"
+			row := t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, segment.SegmentId0, segment.SegmentId1, blockId)
 			err = row.Scan(
 				&block.Size,
 				&block.Offset,
@@ -91,7 +98,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 
 func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
 	now := time.Now().UTC()
-	node, err := snowflake.NewNode(seg.Segment.SegmentId%10)
+	node, err := snowflake.NewNode(rand.Int63n(10))
 	if err != nil {
 		log.Printf("Failed to create blockId, err: %v", err)
 		err = ErrYIgFsInternalErr
@@ -99,10 +106,10 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	}
 	blockId := node.Generate()
 
-	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update size=values(size), offset=values(offset), " +
+	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update size=values(size), offset=values(offset), " +
 		"seg_start_addr=values(seg_start_addr), seg_end_addr=values(seg_end_addr), mtime=values(mtime)"
-	args := []interface{}{seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId, blockId, seg.Segment.Block.Size,
-		seg.Segment.Block.Offset, seg.Segment.Block.SegStartAddr, seg.Segment.Block.SegEndAddr, now, now, types.NotDeleted}
+	args := []interface{}{seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId,
+		seg.Segment.Block.Size, seg.Segment.Block.Offset, seg.Segment.Block.SegStartAddr, seg.Segment.Block.SegEndAddr, now, now, types.NotDeleted}
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
 		log.Printf("Failed to create segment to tidb, err: %v", err)

@@ -1,7 +1,7 @@
-DROP TABLE IF EXISTS `dir`;
+DROP TABLE IF EXISTS `file`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `dir` (
+CREATE TABLE `file` (
   `ino` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
   `generation` bigint(20) UNSIGNED DEFAULT 0,
   `region` varchar(255) DEFAULT "cn-bj-1",
@@ -63,7 +63,8 @@ CREATE TABLE `block` (
   `bucket_name` varchar(255) DEFAULT NULL,
   `ino` bigint(20) UNSIGNED DEFAULT 0,
   `generation` bigint(20) UNSIGNED DEFAULT 0,
-  `seg_id` bigint(20) DEFAULT 0,
+  `seg_id0` bigint(20) DEFAULT 0,
+  `seg_id1` bigint(20) DEFAULT 0,
   `block_id` bigint(20) DEFAULT 0,
   `size` int(11) DEFAULT 0,
   `offset` bigint(20) DEFAULT 0,
@@ -72,6 +73,6 @@ CREATE TABLE `block` (
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT 0,
-   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id`, `block_id`)
+   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id0`, `seg_id1`, `block_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

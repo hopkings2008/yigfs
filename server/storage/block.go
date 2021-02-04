@@ -25,63 +25,41 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 		return resp, nil
 	}
 
-	if file.Offset > 0 && file.Size == 0 {
+	if file.Offset > 0 {
+		fileSize := file.Offset
+		
+		if file.Size > 0 {
+			fileSize = file.Offset + int64(file.Size)
+		}
+		
 		segments := getSegInfoResp.Segments
 		for _, seg := range segments {
 			blocks := seg.Blocks
 			for key, block := range blocks {
 				startBlockId = -1
-				if block.Offset < file.Offset && block.Offset + int64(block.Size) >= file.Offset {
+				if block.Offset < fileSize && block.Offset + int64(block.Size) >= fileSize {
 					startBlockId = key
 					break
-				} else if block.Offset >= file.Offset {
+				} else if block.Offset >= fileSize {
 					startBlockId = key
-                                        break
+					break
 				}
 			}
 
 			if startBlockId != -1 {
 				segment := &types.SegmentInfo {
-                                	Blocks: []types.BlockInfo{},
-                        	}
+					Blocks: []types.BlockInfo{},
+				}
 
-				segment.SegmentId = seg.SegmentId
+				segment.SegmentId0 = seg.SegmentId0
+				segment.SegmentId1 = seg.SegmentId1
 				segment.Blocks = blocks[startBlockId:]
 				resp.Segments = append(resp.Segments, segment)
 			}
 		}
 
 		log.Printf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
-                	file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size)
-		return resp, nil
-	}
-
-	if file.Offset > 0 && file.Size > 0 {
-		segments := getSegInfoResp.Segments
-		for _, seg := range segments {
-			blocks := seg.Blocks
-			for key, block := range blocks {
-				startBlockId = -1
-				fileAddress := file.Offset + int64(file.Size)
-				if block.Offset <= fileAddress && block.Offset + int64(block.Size) >= fileAddress {
-					startBlockId = key
-					break
-				}
-			}
-
-			if startBlockId != -1 {
-				segment := &types.SegmentInfo {
-                                	Blocks: []types.BlockInfo{},
-                        	}
-
-				segment.SegmentId = seg.SegmentId
-				segment.Blocks = append(segment.Blocks, blocks[startBlockId])
-				resp.Segments = append(resp.Segments, segment)
-			}
-		}
-
-		log.Printf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
-                	file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size)
+			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size)
 		return resp, nil
 	}
 
@@ -93,8 +71,8 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
 	err = yigFs.MetaStorage.Client.CreateFileSegment(ctx, seg)
 	if err != nil {
-		log.Printf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id: %d", 
-			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId)
+		log.Printf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
+			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1)
 		return
 	}
 	return

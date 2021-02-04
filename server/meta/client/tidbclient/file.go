@@ -14,7 +14,7 @@ import (
 func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
         var maxNum = 1000
         args := make([]interface{}, 0)
-        sqltext := "select ino, file_name, type from dir where region=? and bucket_name=? and ino > ? order by ino limit ?;"
+        sqltext := "select ino, file_name, type from file where region=? and bucket_name=? and ino > ? order by ino limit ?;"
         args = append(args, dir.Region, dir.BucketName, dir.Offset, maxNum)
 
         rows, err := t.Client.Query(sqltext, args...)
@@ -60,7 +60,7 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
         sqltext := "select ino, generation, size, type, ctime, mtime, atime, perm, nlink, uid, gid," + 
-		" blocks from dir where region=? and bucket_name=? and parent_ino=? and file_name=?"
+		" blocks from file where region=? and bucket_name=? and parent_ino=? and file_name=?"
         row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.ParentIno, file.FileName)
         err = row.Scan(
                 &resp.Ino,
@@ -115,7 +115,7 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
         sqltext := "select generation, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink," + 
-		" uid, gid, blocks from dir where region=? and bucket_name=? and ino=?"
+		" uid, gid, blocks from file where region=? and bucket_name=? and ino=?"
         row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino)
         err = row.Scan(
                 &resp.Generation,
@@ -169,7 +169,7 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         now := time.Now().UTC()
 
-        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+        sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
         args := []interface{}{types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
 		now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
         _, err = t.Client.Exec(sqltext, args...)
@@ -186,7 +186,7 @@ func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq)
 func (t *TidbClient) InitParentDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         now := time.Now().UTC()
 
-	sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+	sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
         args := []interface{}{types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
 		now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
         _, err = t.Client.Exec(sqltext, args...)
@@ -216,7 +216,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 		atime = time.Unix(0, file.Atime).UTC()
 	}
 
-	sqltext := "insert into dir(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
+	sqltext := "insert into file(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
 		" nlink, uid, gid, blocks) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
 	args := []interface{}{file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
 		file.Type, ctime, mtime, atime, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
@@ -247,7 +247,7 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 		atime = time.Unix(0, file.File.Atime).UTC()
 	}
 	
-	sqltext := "update dir set size=?, ctime=?, mtime=?, atime=?, perm=?, uid=?, gid=?, blocks=? where" + 
+	sqltext := "update file set size=?, ctime=?, mtime=?, atime=?, perm=?, uid=?, gid=?, blocks=? where" + 
 		" region=? and bucket_name=? and ino=? and generation=?"
 	args := []interface{}{file.File.Size, ctime, mtime, atime, file.File.Perm, file.File.Uid, file.File.Gid, file.File.Blocks, 
 		file.Region, file.BucketName, file.File.Ino, generation}
