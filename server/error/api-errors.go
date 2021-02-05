@@ -37,6 +37,7 @@ const (
 	ErrYigFsNoSuchLeader
 	ErrYigFsNoSuchMachine
 	ErrYigFsNoTargetSegment
+	ErrYigFsFileAlreadyExist
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -99,6 +100,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsNoTargetSegment",
 		Description:    "The target segment does not exist.",
 		HttpStatusCode: 40010,
+	},
+	ErrYigFsFileAlreadyExist: {
+		AwsErrorCode:   "ErrYigFsFileAlreadyExist",
+		Description:    "The file already exist.",
+		HttpStatusCode: 40011,
 	},
 }
 

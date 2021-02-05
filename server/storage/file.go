@@ -25,6 +25,8 @@ func(yigFs *YigFsStorage) ListDirFiles(ctx context.Context, dir *types.GetDirFil
 }
 
 func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFileReq) (resp *types.CreateFileResp, err error) {
+	resp = &types.CreateFileResp {}
+	
 	// check file exist or not
 	getFileReq := &types.GetDirFileInfoReq {
 		Region: file.Region,
@@ -53,9 +55,7 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 			return
 		}
 
-		resp = &types.CreateFileResp {
-			File: dirFileInfoResp,
-		}
+		resp.File = dirFileInfoResp
 
 		// create or update leader and zone
 		leader := &types.GetLeaderReq {
@@ -77,26 +77,8 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 		}
 		return
 	case nil:
-		// if file exist, get it leader.
-                resp = &types.CreateFileResp {
-                        File: dirFileInfoResp,
-                }
-
-		leader := &types.GetLeaderReq {
-			ZoneId: file.ZoneId,
-			Region:file.Region,
-			BucketName: file.BucketName,
-			Ino: dirFileInfoResp.Ino,
-			Machine: file.Machine,
-		}
-
-		var getLeaderResp = &types.GetLeaderResp{}
-		getLeaderResp, err = GetUpLeader(ctx, leader, yigFs)
-		if err != nil {
-			return
-		}
-
-		resp.LeaderInfo = getLeaderResp.LeaderInfo
+		// if file exist, return err.
+		err = ErrYigFsFileAlreadyExist
 		return
 	default:
 		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
