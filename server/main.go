@@ -36,8 +36,8 @@ func main() {
 	app.Get("/v1/file/attr", apiHandlers.GetFileAttrHandler)
 	// InitDir
 	app.Put("/v1/dir", apiHandlers.InitDirHandler)
-	// GetLeader
-	app.Get("/v1/file/leader", apiHandlers.GetLeaderHandler)
+	// GetFileLeader
+	app.Get("/v1/file/leader", apiHandlers.GetFileLeaderHandler)
 	// CreateFile
 	app.Put("/v1/dir/file", apiHandlers.CreateFileHandler)
 	// SetFileAttr

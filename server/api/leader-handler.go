@@ -10,7 +10,7 @@ import (
 	. "github.com/hopkings2008/yigfs/server/error"
 )
 
-func(yigFs MetaAPIHandlers) GetLeaderHandler(ctx iris.Context) {
+func(yigFs MetaAPIHandlers) GetFileLeaderHandler(ctx iris.Context) {
 	resp := &types.GetLeaderResp {
 		Result: types.YigFsMetaError{},
 	}
@@ -25,17 +25,21 @@ func(yigFs MetaAPIHandlers) GetLeaderHandler(ctx iris.Context) {
 		return
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
-
 	// check request params
-	err := CheckAndAssignmentLeaderInfo(reqContext, leaderReq)
-	if err != nil {
-		resp.Result = GetErrInfo(err)
+	if leaderReq.BucketName == "" || leaderReq.ZoneId == "" || leaderReq.Ino == 0 {
+                log.Printf("Some geFileLeader required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
-		return
-	}
+                return
+        }
 
+        if leaderReq.Region == "" {
+                leaderReq.Region = "cn-bj-1"
+        }
+
+
+	r := ctx.Request()
+        reqContext := r.Context()
 	uuidStr := uuid.New()
 	leaderReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 

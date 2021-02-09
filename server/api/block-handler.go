@@ -73,7 +73,7 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 	}
 
 	// check request params
-	if segReq.BucketName == "" || segReq.Ino == 0 {
+	if segReq.ZoneId == "" || segReq.Machine == "" || segReq.BucketName == "" || segReq.Ino == 0 {
 		log.Printf("Some CreateSegment required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)

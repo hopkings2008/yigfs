@@ -11,7 +11,6 @@ type GetLeaderReq struct {
 	BucketName string `json:"bucket"`
 	Ino uint64 `json:"ino"`
 	Machine string `json:"machine"`
-	Flag int `json:"flag"`
 }
 
 type GetLeaderResp struct {
