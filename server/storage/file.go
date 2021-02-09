@@ -26,6 +26,7 @@ func(yigFs *YigFsStorage) ListDirFiles(ctx context.Context, dir *types.GetDirFil
 
 func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFileReq) (resp *types.CreateFileResp, err error) {
 	resp = &types.CreateFileResp {}
+	var getUpFileLeaderResp = &types.GetLeaderResp{}
 	
 	// check file exist or not
 	getFileReq := &types.GetDirFileInfoReq {
@@ -57,29 +58,42 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 
 		resp.File = dirFileInfoResp
 
-		// create or update leader and zone
 		leader := &types.GetLeaderReq {
 			ZoneId: file.ZoneId,
-			Region:file.Region,
+			Region: file.Region,
 			BucketName: file.BucketName,
 			Ino: dirFileInfoResp.Ino,
-			Machine: file.Machine,
 		}
 
-		err = UpdateLeaderAndZone(ctx, leader, yigFs)
+		// get leader and update file leader
+		getUpFileLeaderResp, err = GetUpFileLeader(ctx, leader, yigFs)
 		if err != nil {
+			log.Printf("CreateFile: Failed to get leader for new file, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v",
+				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, err)
 			return
 		}
 
-		resp.LeaderInfo = &types.LeaderInfo {
-			ZoneId: leader.ZoneId,
-			Leader: leader.Machine,
-		}
+		resp.LeaderInfo = getUpFileLeaderResp.LeaderInfo
 		return
 	case nil:
-		// if file exist, return err.
-		err = ErrYigFsFileAlreadyExist
-		return
+		// if file exist, return ErrYigFsFileAlreadyExist and leader info.
+		leader := &types.GetLeaderReq {
+			ZoneId: file.ZoneId,
+			Region: file.Region,
+			BucketName: file.BucketName,
+			Ino: dirFileInfoResp.Ino,
+		}
+
+		// get leader
+		getUpFileLeaderResp, err = GetUpFileLeader(ctx, leader, yigFs)
+		if err != nil {
+			log.Printf("CreateFile: Failed to get leader for existed file, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v",
+				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, err)
+			return
+		}
+
+		resp.LeaderInfo = getUpFileLeaderResp.LeaderInfo
+		return resp, ErrYigFsFileAlreadyExist
 	default:
 		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
 			getFileReq.Region, getFileReq.BucketName, getFileReq.ParentIno, getFileReq.FileName, err)

@@ -48,7 +48,7 @@ func main() {
 	app.Put("/v1/file/block", apiHandlers.CreateSegmentHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
-	log.Fatal(app.Run(iris.Addr(port)))
+	log.Fatal(app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile)))
 }
 
 

@@ -97,11 +97,9 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 	resp, err = yigFs.YigFsAPI.CreateFile(reqContext, fileReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
-		ctx.JSON(resp)
-		return
+	} else {
+		resp.Result = GetErrInfo(NoYigFsErr)
 	}
-
-	resp.Result = GetErrInfo(NoYigFsErr)
 	
 	ctx.JSON(resp)
 	return

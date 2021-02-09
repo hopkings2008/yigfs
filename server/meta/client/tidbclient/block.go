@@ -106,8 +106,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	}
 	blockId := node.Generate()
 
-	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key update size=values(size), offset=values(offset), " +
-		"seg_start_addr=values(seg_start_addr), seg_end_addr=values(seg_end_addr), mtime=values(mtime)"
+	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 	args := []interface{}{seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId,
 		seg.Segment.Block.Size, seg.Segment.Block.Offset, seg.Segment.Block.SegStartAddr, seg.Segment.Block.SegEndAddr, now, now, types.NotDeleted}
 	_, err = t.Client.Exec(sqltext, args...)

@@ -38,3 +38,8 @@ const (
 	NotDeleted = iota
 	Deleted
 )
+
+const(
+	SegmentLeaderNotExist = iota + 1
+	SegmentLeaderExist
+)

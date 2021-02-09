@@ -10,7 +10,7 @@ import (
 
 
 func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) (err error) {
-	if file.BucketName == "" || file.FileName == "" || file.ParentIno == 0 || file.ZoneId == "" || file.Machine == "" {
+	if file.BucketName == "" || file.FileName == "" || file.ParentIno == 0 || file.ZoneId == "" {
 		log.Printf("Some createFile required parameters are missing.")
 		err = ErrYigFsMissingRequiredParams
 		return

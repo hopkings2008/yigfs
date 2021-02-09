@@ -38,10 +38,10 @@ CREATE TABLE `zone` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
-DROP TABLE IF EXISTS `leader`;
+DROP TABLE IF EXISTS `file_leader`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `leader` (
+CREATE TABLE `file_leader` (
   `zone_id` varchar(255) DEFAULT NULL,
   `region` varchar(255) DEFAULT "cn-bj-1",
   `bucket_name` varchar(255) DEFAULT NULL,
@@ -52,6 +52,23 @@ CREATE TABLE `leader` (
   `mtime` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`zone_id`, `region`, `bucket_name`, `ino`, `generation`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `segment_leader`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `segment_leader` (
+  `zone_id` varchar(255) DEFAULT NULL,
+  `region` varchar(255) DEFAULT "cn-bj-1",
+  `bucket_name` varchar(255) DEFAULT NULL,
+  `seg_id0` bigint(20) DEFAULT 0,
+  `seg_id1` bigint(20) DEFAULT 0,
+  `leader` varchar(255) DEFAULT NULL,
+  `ctime` datetime DEFAULT NULL,
+  `mtime` datetime DEFAULT NULL,
+  `is_deleted` tinyint(1) DEFAULT 0,
+   UNIQUE KEY `rowkey` (`zone_id`, `region`, `bucket_name`, `seg_id0`, `seg_id1`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

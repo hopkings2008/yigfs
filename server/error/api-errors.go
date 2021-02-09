@@ -38,6 +38,7 @@ const (
 	ErrYigFsNoSuchMachine
 	ErrYigFsNoTargetSegment
 	ErrYigFsFileAlreadyExist
+	ErrYigFsMachineNotMatchLeader
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -105,6 +106,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsFileAlreadyExist",
 		Description:    "The file already exist.",
 		HttpStatusCode: 40011,
+	},
+	ErrYigFsMachineNotMatchLeader: {
+		AwsErrorCode:   "ErrYigFsMachineNotMatchLeader",
+		Description:    "The request machine is not match segment leader.",
+		HttpStatusCode: 40012,
 	},
 }
 
