@@ -77,6 +77,8 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 		return
 	case nil:
 		// if file exist, return ErrYigFsFileAlreadyExist and leader info.
+		resp.File = dirFileInfoResp
+
 		leader := &types.GetLeaderReq {
 			ZoneId: file.ZoneId,
 			Region: file.Region,

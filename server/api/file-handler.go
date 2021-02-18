@@ -28,9 +28,9 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 	}
 
 	// check request params
-	if dirReq.BucketName == "" {
-		log.Printf("GetDirFiles required bucket name is missing.")
-		resp.Result = GetErrInfo(ErrYigFsMissingBucketname)
+	if dirReq.BucketName == "" || dirReq.ParentIno == 0 {
+		log.Printf("Some GetDirFiles required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
 	}

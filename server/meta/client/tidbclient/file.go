@@ -14,8 +14,8 @@ import (
 func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
         var maxNum = 1000
         args := make([]interface{}, 0)
-        sqltext := "select ino, file_name, type from file where region=? and bucket_name=? and ino > ? order by ino limit ?;"
-        args = append(args, dir.Region, dir.BucketName, dir.Offset, maxNum)
+        sqltext := "select ino, file_name, type from file where region=? and bucket_name=? and parent_ino=? and ino > ? order by ino limit ?;"
+        args = append(args, dir.Region, dir.BucketName, dir.ParentIno, dir.Offset, maxNum)
 
         rows, err := t.Client.Query(sqltext, args...)
         if err == sql.ErrNoRows {

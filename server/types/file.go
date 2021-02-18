@@ -14,7 +14,7 @@ type GetDirFilesReq struct {
 	Ctx context.Context `json:"-"`
 	Region string `json:"region"`
 	BucketName string `json:"bucket"`
-	Ino uint64 `json:"ino"`
+	ParentIno uint64 `json:"ino"`
 	Offset uint64 `json:"offset"`
 }
 
