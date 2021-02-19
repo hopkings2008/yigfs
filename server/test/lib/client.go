@@ -22,8 +22,8 @@ const (
 	Generation = 0
 	ZoneId = "cd77df31-08c1-407c-a561-4c0341c77fa4"
 	Machine = "172.20.13.155"
-	Ino = 1
 	ParentIno = 1
+	FileParentIno = 2
 	FileName = "test.txt"
 	Size = 128
 	Nlink = 1
@@ -31,9 +31,10 @@ const (
 	UpdatePerm = 755
 	Offset = 0
 	SegStartAddr = 0
-	SegEndAddr = 128
+	SegEndAddr = 127
 	SegmentId0 = 1
 	SegmentId1 = 1
+	BadMachine = "177.20.13.155"
 )
 
 func SendHttpToYigFs(method string, newServer string, client *http.Client, reqStr []byte) (result io.ReadCloser, err error) {

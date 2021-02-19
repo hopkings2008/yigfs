@@ -90,6 +90,20 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 			log.Printf("Succeed to get segment info, sqltext: %v", sqltext)
 			segment.Blocks = append(segment.Blocks, block)
 		}
+		
+		// get segment leader
+		sqltext := "select leader from segment_leader where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+		row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
+		err = row.Scan (
+			&segment.Leader,
+		)
+
+		if err != nil {
+			log.Printf("GetFileSegmentInfo: Failed to get the segment leader, err: %v", err)
+			err = ErrYIgFsInternalErr
+			return
+		}
+
 		resp.Segments = append(resp.Segments, segment)
 	}
 	

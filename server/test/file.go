@@ -20,6 +20,9 @@ func GetDirFiles(getDirFilesReq *types.GetDirFilesReq) (getDirFilesResp *types.G
         }
 
         resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+		if err != nil {
+			return getDirFilesResp, "", err
+		}
         defer resp.Close()
 
         getDirFilesInfo, err := ioutil.ReadAll(resp)
@@ -45,6 +48,9 @@ func GetDirFileAttr(getDirFileReq *types.GetDirFileInfoReq) (getDirFileResp *typ
         }
 
         resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+		if err != nil {
+			return getDirFileResp, "", err
+		}
         defer resp.Close()
 
         getDirFileInfo, err := ioutil.ReadAll(resp)
@@ -70,6 +76,9 @@ func GetFileAttr(getFileReq *types.GetFileInfoReq) (getFileAttrResp *types.GetFi
         }
 
         resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+        if err != nil {
+        	return getFileAttrResp, "", err
+		}
         defer resp.Close()
 
         var getFileInfoResp types.GetFileInfoResp
@@ -96,6 +105,9 @@ func GetFileLeader(getLeaderReq *types.GetLeaderReq) (getFileLeaderResp *types.G
 	}
 
 	resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+	if err != nil {
+		return getFileLeaderResp, "", err
+	}
 	defer resp.Close()
 
 	var getLeaderResp types.GetLeaderResp
@@ -106,4 +118,29 @@ func GetFileLeader(getLeaderReq *types.GetLeaderReq) (getFileLeaderResp *types.G
 	}
 
 	return getFileLeaderResp, string(getFileLeaderInfo), nil
+}
+
+func PutFile(createFileReq *types.CreateFileReq) (createFileResp *types.CreateFileResp, result string, err error) {
+	createFileResp = &types.CreateFileResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/dir/file"
+
+	reqStr, err := json.Marshal(createFileReq)
+	if err != nil {
+		return createFileResp, "", err
+	}
+
+	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+		return createFileResp, "", err
+	}
+	defer resp.Close()
+
+	createFileRespInfo, _ := ioutil.ReadAll(resp)
+
+	if err = json.Unmarshal(createFileRespInfo, &createFileResp); err != nil {
+		return createFileResp, "", err
+	}
+
+	return createFileResp, string(createFileRespInfo), nil
 }

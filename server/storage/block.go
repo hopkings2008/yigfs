@@ -53,7 +53,9 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 
 				segment.SegmentId0 = seg.SegmentId0
 				segment.SegmentId1 = seg.SegmentId1
+				segment.Leader = seg.Leader
 				segment.Blocks = blocks[startBlockId:]
+
 				resp.Segments = append(resp.Segments, segment)
 			}
 		}
