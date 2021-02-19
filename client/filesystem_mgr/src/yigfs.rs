@@ -8,47 +8,16 @@ use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
     ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate};
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
+use segment_mgr::segment_mgr::SegmentMgr;
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
-/*const HELLO_DIR_ATTR: FileAttr = FileAttr {
-    ino: 1,
-    size: 0,
-    blocks: 0,
-    atime: CREATE_TIME,
-    mtime: CREATE_TIME,
-    ctime: CREATE_TIME,
-    crtime: CREATE_TIME,
-    kind: FileType::Directory,
-    perm: 0o755,
-    nlink: 2,
-    uid: 501,
-    gid: 20,
-    rdev: 0,
-    flags: 0,
-};*/
-
 const HELLO_TXT_CONTENT: &'static str = "Hello World!\n";
 
-/*const HELLO_TXT_ATTR: FileAttr = FileAttr {
-    ino: 2,
-    size: 13,
-    blocks: 1,
-    atime: CREATE_TIME,
-    mtime: CREATE_TIME,
-    ctime: CREATE_TIME,
-    crtime: CREATE_TIME,
-    kind: FileType::RegularFile,
-    perm: 0o644,
-    nlink: 1,
-    uid: 501,
-    gid: 20,
-    rdev: 0,
-    flags: 0,
-};*/
 
 pub struct Yigfs<'a>{
     pub meta_service_mgr: &'a Box<dyn MetaServiceMgr>,
+    pub segment_mgr: &'a Box<SegmentMgr<'a>>,
 }
 
 impl<'a> Filesystem for Yigfs<'a> {
@@ -222,6 +191,8 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return;
             }
         }
+        // set the ino as file handle directly to skip caching. will add file handle manager & cache later.
+        // cache ino->leader to reduce the net io.
         reply.created(&TTL, &self.to_usefs_attr(&file_info.attr), file_info.attr.generation, file_info.attr.ino, flags);
     }
 }

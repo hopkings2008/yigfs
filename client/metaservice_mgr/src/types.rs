@@ -94,3 +94,19 @@ pub struct SetFileAttr {
     /// Group id
     pub gid: Option<u32>,
 }
+
+#[derive(Debug, Default)]
+pub struct Segment {
+    pub seg_id0: u64,
+    pub seg_id1: u64,
+    pub blocks: Vec<Block>,
+}
+
+#[derive(Debug, Default)]
+pub struct Block {
+    pub offset: u64,
+    pub seg_start_addr: u64,
+    pub seg_end_addr: u64,
+    pub size: i64,
+}
+

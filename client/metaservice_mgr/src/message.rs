@@ -208,3 +208,38 @@ pub struct RespSetFileAttr {
     #[serde(rename(serialize = "file", deserialize = "file"))]
     pub attr: MsgFileAttr,
 }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgSegment {
+    pub seg_id0: u64,
+    pub seg_id1: u64,
+    pub blocks: Vec<MsgBlock>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgBlock {
+    pub offset: u64,
+    pub seg_start_addr: u64,
+    pub seg_end_addr: u64,
+    pub size: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqGetSegments {
+    pub region: String,
+    pub bucket: String,
+    pub ino: u64,
+    pub generation: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub offset: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub size: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespGetSegments {
+    pub result: RespResult,
+    pub segments: Vec<MsgSegment>,
+}

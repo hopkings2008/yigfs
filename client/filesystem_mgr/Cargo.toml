@@ -11,4 +11,5 @@ fuse = "0.3"
 libc = "0.2.81"
 time = "0.1.38"
 metaservice_mgr = {path = "../metaservice_mgr"}
+segment_mgr = {path = "../segment_mgr"}
 common = {path = "../common" }

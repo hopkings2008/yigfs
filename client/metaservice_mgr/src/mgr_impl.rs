@@ -1,7 +1,7 @@
 #[path="./message.rs"]
 mod message;
 
-use crate::{mgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
+use crate::{mgr, types::{Block, FileLeader, NewFileInfo, Segment, SetFileAttr}};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
 use common::http_client;
@@ -13,7 +13,7 @@ use common::http_client::HttpMethod;
 use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, 
     ReqFileLeader, ReqMount, ReqReadDir, ReqSetFileAttr, RespDirFileAttr, 
     RespFileAttr, RespFileCreate, RespFileLeader, RespReadDir, RespSetFileAttr,
-    MsgSetFileAttr};
+    MsgSetFileAttr, ReqGetSegments, RespGetSegments};
 pub struct MetaServiceMgrImpl{
     http_client: Box<http_client::HttpClient>,
     meta_server_url: String,
@@ -319,6 +319,77 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             },
             attr: self.to_file_attr(&resp_file_created.file_info),
         })
+    }
+
+    fn get_file_segments(&self, ino: u64, offset: Option<u64>, size: Option<i64>) -> Result<Vec<Segment>, Errno>{
+        let req_get_segments = ReqGetSegments{
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            ino: ino,
+            generation: 0,
+            offset: offset,
+            size: size,
+        };
+        let body: String;
+        let ret = json::encode_to_str::<ReqGetSegments>(&req_get_segments);
+        match ret {
+            Ok(ret) => {
+                body = ret;
+            }
+            Err(err) => {
+                println!("failed to encode {:?}, err: {}", req_get_segments, err);
+                return Err(Errno::Eintr);
+            }
+        }
+        let url = format!("{}/v1/file/segments", self.meta_server_url);
+        let resp_text: RespText;
+        let ret = self.http_client.request(&url, &body, &HttpMethod::Put);
+        match ret  {
+            Ok(ret) => {
+                resp_text = ret;
+            }
+            Err(err) => {
+                println!("failed to send {} to get_file_segments, err: {}", body, err);
+                return Err(Errno::Eintr);
+            }
+        }
+        if resp_text.status >= 300 {
+            println!("get_file_segments failed with status_code: {}, resp: {}", resp_text.status, resp_text.body);
+            return Err(Errno::Eintr);
+        }
+        let resp : RespGetSegments;
+        let ret = json::decode_from_str::<RespGetSegments>(&resp_text.body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                println!("got invalid response: {} for get_file_segments, err: {}", resp_text.body, err);
+                return Err(Errno::Eintr);
+            }
+        }
+        if resp.result.err_code != 0 {
+            println!("failed to get_file_segments for {}, err_code: {}, err_msg: {}",
+            body, resp.result.err_code, resp.result.err_msg);
+            return Err(Errno::Eintr);
+        }
+        let mut segments: Vec<Segment> = Vec::new();
+        for s in resp.segments {
+            let mut segment : Segment = Default::default();
+            segment.seg_id0 = s.seg_id0;
+            segment.seg_id1 = s.seg_id1;
+            for b in s.blocks {
+                let block = Block{
+                    offset: b.offset,
+                    seg_start_addr: b.seg_start_addr,
+                    seg_end_addr: b.seg_end_addr,
+                    size: b.size,
+                };
+                segment.blocks.push(block);
+            }
+            segments.push(segment);
+        }
+        Ok(segments)
     }
 }
 
