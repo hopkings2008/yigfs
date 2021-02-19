@@ -323,6 +323,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
     fn get_file_segments(&self, ino: u64, offset: Option<u64>, size: Option<i64>) -> Result<Vec<Segment>, Errno>{
         let req_get_segments = ReqGetSegments{
+            zone: self.zone.clone(),
             region: self.region.clone(),
             bucket: self.bucket.clone(),
             ino: ino,

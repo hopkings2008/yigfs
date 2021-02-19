@@ -229,6 +229,7 @@ pub struct MsgBlock {
 pub struct ReqGetSegments {
     pub region: String,
     pub bucket: String,
+    pub zone: String,
     pub ino: u64,
     pub generation: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
