@@ -10,7 +10,7 @@ import (
 
 
 func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) (err error) {
-	if file.BucketName == "" || file.FileName == "" || file.ParentIno == 0 || file.ZoneId == "" || file.Machine == "" {
+	if file.BucketName == "" || file.FileName == "" || file.ParentIno == 0 || file.ZoneId == "" {
 		log.Printf("Some createFile required parameters are missing.")
 		err = ErrYigFsMissingRequiredParams
 		return
@@ -38,3 +38,18 @@ func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) 
 	}
 	return nil
 }
+
+func CheckSetFileAttrParams(ctx context.Context, file *types.SetFileAttrReq) (err error) {
+        if file.BucketName == "" || file.File.Ino == 0 {
+                log.Printf("Some SetFileAttr required parameters are missing.")
+                err = ErrYigFsMissingRequiredParams
+                return
+        }
+
+        if file.Region == "" {
+                file.Region = "cn-bj-1"
+        }
+
+        return nil
+}
+

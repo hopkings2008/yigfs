@@ -7,15 +7,15 @@ import (
         "time"
 
         "github.com/hopkings2008/yigfs/server/types"
-	    . "github.com/hopkings2008/yigfs/server/error"
+	. "github.com/hopkings2008/yigfs/server/error"
 )
 
 
 func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
         var maxNum = 1000
         args := make([]interface{}, 0)
-        sqltext := "select ino, file_name, type from dir where region=? and bucket_name=? and ino > ? order by ino limit ?;"
-        args = append(args, dir.Region, dir.BucketName, dir.Offset, maxNum)
+        sqltext := "select ino, file_name, type from file where region=? and bucket_name=? and parent_ino=? and ino > ? order by ino limit ?;"
+        args = append(args, dir.Region, dir.BucketName, dir.ParentIno, dir.Offset, maxNum)
 
         rows, err := t.Client.Query(sqltext, args...)
         if err == sql.ErrNoRows {
@@ -59,7 +59,8 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
 func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
-        sqltext := "select ino, generation, size, type, ctime, mtime, atime, perm, nlink, uid, gid, blocks from dir where region=? and bucket_name=? and parent_ino=? and file_name=?"
+        sqltext := "select ino, generation, size, type, ctime, mtime, atime, perm, nlink, uid, gid," + 
+		" blocks from file where region=? and bucket_name=? and parent_ino=? and file_name=?"
         row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.ParentIno, file.FileName)
         err = row.Scan(
                 &resp.Ino,
@@ -113,7 +114,8 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
         resp = &types.FileInfo{}
         var ctime, mtime, atime string
-        sqltext := "select generation, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink, uid, gid, blocks from dir where region=? and bucket_name=? and ino=?"
+        sqltext := "select generation, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink," + 
+		" uid, gid, blocks from file where region=? and bucket_name=? and ino=?"
         row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino)
         err = row.Scan(
                 &resp.Generation,
@@ -167,8 +169,9 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         now := time.Now().UTC()
 
-        sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
-        args := []interface{}{types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
+        sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+        args := []interface{}{types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
+		now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
         _, err = t.Client.Exec(sqltext, args...)
         if err != nil {
 		log.Printf("Failed to init root dir ., err: %v", err)
@@ -183,8 +186,9 @@ func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq)
 func (t *TidbClient) InitParentDir(ctx context.Context, rootDir *types.InitDirReq) (err error) {
         now := time.Now().UTC()
 
-	sqltext := "insert into dir (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
-        args := []interface{}{types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
+	sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+        args := []interface{}{types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
+		now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid}
         _, err = t.Client.Exec(sqltext, args...)
         if err != nil {
                 log.Printf("Failed to init root parent dir .., err: %v", err)
@@ -212,7 +216,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 		atime = time.Unix(0, file.Atime).UTC()
 	}
 
-	sqltext := "insert into dir(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
+	sqltext := "insert into file(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
 		" nlink, uid, gid, blocks) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
 	args := []interface{}{file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
 		file.Type, ctime, mtime, atime, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
@@ -226,22 +230,34 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 	return
 }
 
-func (t *TidbClient) UpdateFile(ctx context.Context, file *types.CreateFileReq) (err error) {
+func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error) {
 	now := time.Now().UTC()
+	generation := 0
 
+	ctime := now
+        if file.File.Ctime != 0 {
+                ctime = time.Unix(0, file.File.Ctime).UTC()
+        }
 	mtime := now
-	if file.Mtime != 0 {
-		mtime = time.Unix(0, file.Mtime).UTC()
+	if file.File.Mtime != 0 {
+		mtime = time.Unix(0, file.File.Mtime).UTC()
 	}
-
-	sqltext := "update dir set type=?, mtime=?, perm=?, nlink=?, uid=?, gid=? where ino=? and region=? and bucket_name=?"
-	args := []interface{}{file.Type, mtime, file.Perm, file.Nlink, file.Uid, file.Gid, file.Ino, file.Region, file.BucketName}
+	atime := now
+	if file.File.Atime != 0 {
+		atime = time.Unix(0, file.File.Atime).UTC()
+	}
+	
+	sqltext := "update file set size=?, ctime=?, mtime=?, atime=?, perm=?, uid=?, gid=?, blocks=? where" + 
+		" region=? and bucket_name=? and ino=? and generation=?"
+	args := []interface{}{file.File.Size, ctime, mtime, atime, file.File.Perm, file.File.Uid, file.File.Gid, file.File.Blocks, 
+		file.Region, file.BucketName, file.File.Ino, generation}
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
-		log.Printf("Failed to update file to tidb, err: %v", err)
+		log.Printf("Failed to set file attr to tidb, err: %v", err)
 		err = ErrYIgFsInternalErr
 		return
 	}
-	log.Printf("Succeed to update file, sqltext: %v", sqltext)
+
+	log.Printf("Succeed to set file attr to tidb, sqltext: %v", sqltext)
 	return
 }

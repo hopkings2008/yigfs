@@ -25,6 +25,9 @@ func(yigFs *YigFsStorage) ListDirFiles(ctx context.Context, dir *types.GetDirFil
 }
 
 func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFileReq) (resp *types.CreateFileResp, err error) {
+	resp = &types.CreateFileResp {}
+	var getUpFileLeaderResp = &types.GetLeaderResp{}
+	
 	// check file exist or not
 	getFileReq := &types.GetDirFileInfoReq {
 		Region: file.Region,
@@ -42,7 +45,8 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 		// if file does not exist, create it.
 		err = yigFs.MetaStorage.Client.CreateFile(ctx, file)
 		if err != nil {
-			log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+			log.Printf("Failed to create file, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
+				file.Region, file.BucketName, file.ParentIno, file.FileName, err)
 			return
 		}
 
@@ -52,51 +56,46 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 			return
 		}
 
-		resp = &types.CreateFileResp {
-			File: dirFileInfoResp,
-		}
+		resp.File = dirFileInfoResp
 
-		// create or update leader and zone
 		leader := &types.GetLeaderReq {
 			ZoneId: file.ZoneId,
-			Region:file.Region,
+			Region: file.Region,
 			BucketName: file.BucketName,
 			Ino: dirFileInfoResp.Ino,
-			Machine: file.Machine,
 		}
 
-		err = UpdateLeaderAndZone(ctx, leader, yigFs)
+		// get leader and update file leader
+		getUpFileLeaderResp, err = GetUpFileLeader(ctx, leader, yigFs)
 		if err != nil {
+			log.Printf("CreateFile: Failed to get leader for new file, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v",
+				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, err)
 			return
 		}
 
-		resp.LeaderInfo = &types.LeaderInfo {
-			ZoneId: leader.ZoneId,
-			Leader: leader.Machine,
-		}
+		resp.LeaderInfo = getUpFileLeaderResp.LeaderInfo
 		return
 	case nil:
-		// if file exist, get it leader.
-                resp = &types.CreateFileResp {
-                        File: dirFileInfoResp,
-                }
+		// if file exist, return ErrYigFsFileAlreadyExist and leader info.
+		resp.File = dirFileInfoResp
 
 		leader := &types.GetLeaderReq {
 			ZoneId: file.ZoneId,
-			Region:file.Region,
+			Region: file.Region,
 			BucketName: file.BucketName,
 			Ino: dirFileInfoResp.Ino,
-			Machine: file.Machine,
 		}
 
-		var getLeaderResp = &types.GetLeaderResp{}
-		getLeaderResp, err = GetUpLeader(ctx, leader, yigFs)
+		// get leader
+		getUpFileLeaderResp, err = GetUpFileLeader(ctx, leader, yigFs)
 		if err != nil {
+			log.Printf("CreateFile: Failed to get leader for existed file, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v",
+				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, err)
 			return
 		}
 
-		resp.LeaderInfo = getLeaderResp.LeaderInfo
-		return
+		resp.LeaderInfo = getUpFileLeaderResp.LeaderInfo
+		return resp, ErrYigFsFileAlreadyExist
 	default:
 		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
 			getFileReq.Region, getFileReq.BucketName, getFileReq.ParentIno, getFileReq.FileName, err)
@@ -107,7 +106,8 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 func(yigFs *YigFsStorage) GetDirFileAttr(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {
 	resp, err = yigFs.MetaStorage.Client.GetDirFileInfo(ctx, file)
 	if err != nil {
-		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", file.Region, file.BucketName, file.ParentIno, file.FileName, err)
+		log.Printf("Failed to get file attr, region: %s, bucket: %s, parent_ino: %d, filename: %s, err: %v", 
+			file.Region, file.BucketName, file.ParentIno, file.FileName, err)
 		return
 	}
 	return
@@ -163,3 +163,28 @@ func(yigFs *YigFsStorage) InitDirAndZone(ctx context.Context, rootDir *types.Ini
 	return nil
 }
 
+func(yigFs *YigFsStorage) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (resp *types.SetFileAttrResp, err error) {
+	resp = &types.SetFileAttrResp{}
+
+	err = yigFs.MetaStorage.Client.SetFileAttr(ctx, file)
+	if err != nil {
+		log.Printf("Failed to set file attr, region: %s, bucket: %s, ino: %d", file.Region, file.BucketName, file.File.Ino)
+		return resp, err
+	}
+
+	getFileInfoResp := &types.GetFileInfoReq {
+		Region: file.Region,
+		BucketName: file.BucketName,
+		Ino: file.File.Ino,
+	}
+
+	getFileInfoReq, err := yigFs.MetaStorage.Client.GetFileInfo(ctx, getFileInfoResp)
+	if err != nil {
+		log.Printf("SetFileAttr: Failed to get file info, region: %s, bucket: %s, ino: %d, err: %v",
+			getFileInfoResp.Region, getFileInfoResp.BucketName, getFileInfoResp.Ino, err)
+		return resp, err
+	}
+
+	resp.File = getFileInfoReq
+	return resp, nil
+}

@@ -28,9 +28,9 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 	}
 
 	// check request params
-	if dirReq.BucketName == "" {
-		log.Printf("GetDirFiles required bucket name is missing.")
-		resp.Result = GetErrInfo(ErrYigFsMissingBucketname)
+	if dirReq.BucketName == "" || dirReq.ParentIno == 0 {
+		log.Printf("Some GetDirFiles required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
 	}
@@ -97,11 +97,9 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 	resp, err = yigFs.YigFsAPI.CreateFile(reqContext, fileReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
-		ctx.JSON(resp)
-		return
+	} else {
+		resp.Result = GetErrInfo(NoYigFsErr)
 	}
-
-	resp.Result = GetErrInfo(NoYigFsErr)
 	
 	ctx.JSON(resp)
 	return
@@ -202,7 +200,7 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 }
 
 func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
-	resp := &types.InitDirResp {
+	resp := &types.NonBodyResp {
 		Result: types.YigFsMetaError{},
 	}
 	defer GetSpendTime("InitDirHandler")()
@@ -235,6 +233,49 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 
 	// init dir and zone
 	err := yigFs.YigFsAPI.InitDirAndZone(reqContext, dirReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	resp.Result = GetErrInfo(NoYigFsErr)
+
+	ctx.JSON(resp)
+	return
+}
+
+func(yigFs MetaAPIHandlers) SetFileAttrHandler(ctx iris.Context) {
+	resp := &types.SetFileAttrResp {
+		Result: types.YigFsMetaError{},
+	}
+	defer GetSpendTime("SetFileAttrHandler")()
+
+	// get req
+	fileReq := &types.SetFileAttrReq{}
+	if err := ctx.ReadJSON(&fileReq); err != nil {
+                log.Printf("Failed to read SetFileAttrReq from body, err: %v", err)
+                resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
+                return
+        }
+
+	r := ctx.Request()
+        reqContext := r.Context()
+
+	// check request params
+	err := CheckSetFileAttrParams(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	uuidStr := uuid.New()
+	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// set file attr
+	resp, err = yigFs.YigFsAPI.SetFileAttr(reqContext, fileReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
