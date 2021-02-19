@@ -34,7 +34,7 @@ const (
 	SegEndAddr = 127
 	SegmentId0 = 1
 	SegmentId1 = 1
-	BadMachine = "177.20.13.155"
+	Machine2 = "172.20.13.156"
 )
 
 func SendHttpToYigFs(method string, newServer string, client *http.Client, reqStr []byte) (result io.ReadCloser, err error) {

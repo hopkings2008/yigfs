@@ -37,6 +37,33 @@ func GetMachineAndUpdateFileLeader(ctx context.Context, leader *types.GetLeaderR
 	return
 }
 
+func CreateFileLeaderAndUpdateZone(ctx context.Context, leader *types.GetLeaderReq, yigFs *YigFsStorage) (err error) {
+	// create file leader
+	err = yigFs.MetaStorage.Client.CreateOrUpdateFileLeader(ctx, leader)
+	if err != nil {
+		log.Printf("Failed to create leader, zone_id: %s, region: %s, bucket: %s, ino: %d, leader: %s, err: %v",
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Machine, err)
+		return
+	}
+
+	// create or update zone
+	zone := &types.InitDirReq{
+		ZoneId: leader.ZoneId,
+		Region: leader.Region,
+		BucketName: leader.BucketName,
+		Machine: leader.Machine,
+	}
+	
+	err = yigFs.MetaStorage.Client.CreateOrUpdateZone(ctx, zone)
+	if err != nil {
+		log.Printf("Failed to create or update zone, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err)
+		return
+	}
+	
+	return
+}
+
 func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *YigFsStorage) (resp *types.GetLeaderResp, err error) {
 	resp, err = yigFs.MetaStorage.Client.GetFileLeaderInfo(ctx, leader)
 	switch err {

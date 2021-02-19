@@ -103,11 +103,13 @@ func Test_CreateFiles(t *testing.T) {
 		Type:       types.COMMON_FILE,
 		Perm:       types.FILE_PERM,
 		Nlink:      Nlink,
+		Machine:    Machine,
 	}
 
 	for i := 0; i < 5; i++ {
 		// the first and second create the same file.
 		if i >= 2 {
+			createFileReq.Machine = Machine2
 			createFileReq.FileName = FileName + strconv.Itoa(i)
 		}
 
