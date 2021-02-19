@@ -41,6 +41,7 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 	resp, err = yigFs.MetaStorage.Client.GetFileLeaderInfo(ctx, leader)
 	switch err {
 	case ErrYigFsNoSuchLeader:
+		log.Printf("The file does not have leader, zone_id: %s, region: %s, bucket: %s, ino: %d", leader.ZoneId, leader.Region, leader.BucketName, leader.Ino)
 		// if leader does not exist, get a up machine from zone and update leader info
 		getMachineResp, err := GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
 		if err != nil {
@@ -49,6 +50,7 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 		return getMachineResp, nil
 	case nil:
 		// if leader exist, determine where leader status is up
+		leader.Machine = resp.LeaderInfo.Leader
 		var getMachineInfoResp = &types.GetMachineInfoResp{}
 		getMachineInfoResp, err = yigFs.MetaStorage.Client.GetMachineInfo(ctx, leader)
 		if err != nil && err != ErrYigFsNoSuchMachine {
@@ -59,6 +61,8 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 
 		// if status does not up or the target leader is not existed in zone, get a up machine from zone and update leader info.
 		if err == ErrYigFsNoSuchMachine || getMachineInfoResp.Status != types.MachineUp {
+			log.Printf("The file leader existed, but the status is not valid, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v, status: %v", 
+				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err, getMachineInfoResp.Status)
 			getMachineResp, err := GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
 			if err != nil {
 				return resp, err

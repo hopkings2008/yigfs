@@ -53,6 +53,9 @@ func Test_InitDir(t *testing.T) {
 	}
 
 	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+		t.Fatal("failed to send Test_InitDir http/2 request, err:", err)
+	}
 	defer resp.Close()
 
 	var initDirResp types.NonBodyResp
@@ -80,11 +83,11 @@ func Test_InitDir(t *testing.T) {
 	} else if getDirFilesResp.Result.ErrCode != 0 {
 		t.Fatal("Failed to get dir files, resp code:, err:", getDirFilesResp.Result.ErrCode, getDirFilesResp.Result.ErrMsg)
 	} else {
-		t.Log("Succeed to get dir files, result:", getDirFilesInfo)
+		t.Log("Succeed to get dir files, resp:", getDirFilesInfo)
 	}
 
 	if IsInitDirFilesValid(getDirFilesResp) {
-		t.Log("Succeed to init dir, result:", string(result))
+		t.Log("Succeed to init dir, resp:", string(result))
 	} else {
 		t.Fatal("Failed to init dir.")
 	}
@@ -111,6 +114,9 @@ func Test_CreateFile(t *testing.T) {
 	}
 
 	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+                t.Fatal("failed to send Test_CreateFile http/2 request, err:", err)
+        }
 	defer resp.Close()
 
 	var createFileResp types.CreateFileResp
@@ -132,10 +138,10 @@ func Test_CreateFile(t *testing.T) {
                 s.Elem().SetUint(createFileResp.File.Ino)
 
 		// get segments
-		getSegmentReq := &types.GetSegmentReq{
+		getSegmentReq := &types.GetSegmentReq {
 			Region:     Region,
 			BucketName: BucketName,
-			Ino:        testFile.CreateIno,
+			Ino:        createFileResp.File.Ino,
 			Generation: Generation,
 			Offset:     0,
 			Size:       0,
@@ -289,6 +295,9 @@ func Test_SetFileAttr(t *testing.T) {
 	}
 
 	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+                t.Fatal("failed to send Test_SetFileAttr http/2 request, err:", err)
+        }
 	defer resp.Close()
 
 	var setFileAttrResp types.SetFileAttrResp
