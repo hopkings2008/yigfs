@@ -378,6 +378,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             let mut segment : Segment = Default::default();
             segment.seg_id0 = s.seg_id0;
             segment.seg_id1 = s.seg_id1;
+            segment.leader = s.leader;
             for b in s.blocks {
                 let block = Block{
                     offset: b.offset,
