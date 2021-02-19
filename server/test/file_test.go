@@ -316,7 +316,7 @@ func Test_WriteFile(t *testing.T) {
 
 	// get segments when offset and size both not 0
 	getSegmentReq.Offset = Size
-	getSegmentReq.Size = 5 * Size
+	getSegmentReq.Size = 5 * Size - 1
 	getSegResp, getSegInfo, err = GetSegmentInfo(getSegmentReq)
 	if err != nil {
 		t.Fatalf("Failed to get segment info when offset is: %d, size is: %d, err: %v", getSegmentReq.Offset, getSegmentReq.Size, err)
