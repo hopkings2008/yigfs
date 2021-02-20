@@ -7,7 +7,7 @@ pub struct SegmentMgr<'a> {
 }
 
 impl<'a> SegmentMgr<'a> {
-    fn get_file_segments(&self, ino: u64)-> Result<Vec<Segment>, Errno> {
+    pub fn get_file_segments(&self, ino: u64)-> Result<Vec<Segment>, Errno> {
         let mut segments : Vec<Segment> = Vec::new();
         let segs : Vec<metaservice_mgr::types::Segment>;
         let ret = self.meta_service_mgr.get_file_segments(ino, None, None);

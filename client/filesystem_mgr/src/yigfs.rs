@@ -6,9 +6,10 @@ use std::ffi::OsStr;
 use libc::{c_int, ENOENT};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
-    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate};
+    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen};
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
-use segment_mgr::segment_mgr::SegmentMgr;
+use segment_mgr::{segment_mgr::SegmentMgr, types::Segment};
+use common::uuid;
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -18,10 +19,13 @@ const HELLO_TXT_CONTENT: &'static str = "Hello World!\n";
 pub struct Yigfs<'a>{
     pub meta_service_mgr: &'a Box<dyn MetaServiceMgr>,
     pub segment_mgr: &'a Box<SegmentMgr<'a>>,
+    // fsid for this mounted yigfs instance
+    fsid: String,
 }
 
 impl<'a> Filesystem for Yigfs<'a> {
     fn init(&mut self, req: &Request) -> Result<(), c_int> {
+        println!("init: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
         let ret = self.meta_service_mgr.mount(req.uid(), req.gid());
         match ret {
             Ok(_) => {
@@ -32,6 +36,9 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return Err(ENOENT);
             }
         }
+    }
+    fn destroy(&mut self, req: &Request) {
+        println!("destroy: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
     }
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name_str: String;
@@ -185,19 +192,51 @@ impl<'a> Filesystem for Yigfs<'a> {
                 file_info = ret;
             }
             Err(err) => {
-                println!("failed to new_ino_leader: parent: {}, name: {}, err: {:?}",
-                parent, name, err);
-                reply.error(libc::EIO);
+                if !err.is_exists() {
+                    println!("failed to new_ino_leader: parent: {}, name: {}, err: {:?}",
+                    parent, name, err);
+                    reply.error(libc::EIO);
+                    return;
+                }
+                println!("new_ino_leader: parent: {}, name: {} already exists", parent, name);
+                reply.error(libc::EEXIST);
                 return;
             }
         }
         // set the ino as file handle directly to skip caching. will add file handle manager & cache later.
+        // will check flags and set this later.
         // cache ino->leader to reduce the net io.
         reply.created(&TTL, &self.to_usefs_attr(&file_info.attr), file_info.attr.generation, file_info.attr.ino, flags);
+    }
+
+    fn open(&mut self, req: &Request, ino: u64, flags: u32, reply: ReplyOpen){
+        let mut segments : Vec<Segment>;
+        println!("open: uid: {}, gid: {}, ino: {}, flags: {}",
+        req.uid(), req.gid(), ino, flags);
+        let ret = self.segment_mgr.get_file_segments(ino);
+        match ret {
+            Ok(ret) => {
+                segments = ret;
+            }
+            Err(err) => {
+                println!("failed to get segments for ino: {}, err: {:?}", ino, err);
+                reply.error(libc::ENOENT);
+                return;
+            }
+        }
+        //cache the segments for the ino.
+        reply.opened(ino, flags);
     }
 }
 
 impl<'a> Yigfs<'a>{
+    pub fn create(meta: &'a Box<dyn MetaServiceMgr>, seg: &'a Box<SegmentMgr>)-> Yigfs<'a>{
+        Yigfs{
+            meta_service_mgr: meta,
+            segment_mgr: seg,
+            fsid: uuid::uuid_string(),
+        }
+    }
     fn to_usefs_attr(&self, attr: &metaservice_mgr::types::FileAttr) -> FileAttr {
         FileAttr{
             ino: attr.ino,

@@ -22,10 +22,7 @@ impl<'a> FilesystemMgr<'a>{
     }
 
     pub fn mount(&self, mount_options : MountOptions) {
-        let yfs = Yigfs{
-            meta_service_mgr: &self.meta_service_mgr,
-            segment_mgr: &self.segment_mgr,
-        };
+        let yfs = Yigfs::create(&self.meta_service_mgr, &self.segment_mgr);
         let ret = fuse::mount(yfs, &mount_options.mnt, &[]);
         match ret {
             Ok(_) => {
