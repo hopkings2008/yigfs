@@ -58,22 +58,26 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 
 		resp.File = dirFileInfoResp
 
+		// create file leader and update zone
 		leader := &types.GetLeaderReq {
 			ZoneId: file.ZoneId,
 			Region: file.Region,
 			BucketName: file.BucketName,
 			Ino: dirFileInfoResp.Ino,
+			Machine: file.Machine,
 		}
 
-		// get leader and update file leader
-		getUpFileLeaderResp, err = GetUpFileLeader(ctx, leader, yigFs)
+		err = CreateFileLeaderAndUpdateZone(ctx, leader, yigFs)
 		if err != nil {
-			log.Printf("CreateFile: Failed to get leader for new file, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v",
-				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, err)
+			log.Printf("CreateFile: Failed to create leader for new file, zone_id: %s, region: %s, bucket: %s, ino: %d, machine: %s, err: %v",
+				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, file.Machine, err)
 			return
 		}
 
-		resp.LeaderInfo = getUpFileLeaderResp.LeaderInfo
+		resp.LeaderInfo = &types.LeaderInfo {
+			ZoneId: file.ZoneId,
+			Leader: file.Machine,
+		}
 		return
 	case nil:
 		// if file exist, return ErrYigFsFileAlreadyExist and leader info.

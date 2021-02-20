@@ -2,11 +2,10 @@ package test
 
 import (
 	"encoding/json"
-	"io"
 	"io/ioutil"
 
-	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/test/lib"
+	"github.com/hopkings2008/yigfs/server/types"
 )
 
 
@@ -21,6 +20,9 @@ func PutSegmentInfo(createSegmentReq *types.CreateSegmentReq) (createSegResp *ty
 	}
 
 	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+		return createSegResp, "", err
+	}
 	defer resp.Close()
 
 	createSegInfo, err := ioutil.ReadAll(resp)
@@ -45,8 +47,10 @@ func GetSegmentInfo(getSegmentReq *types.GetSegmentReq) (getSegmentInfoResp *typ
 		return getSegmentInfoResp, "", err
 	}
 
-	var resp io.ReadCloser
-	resp, err = SendHttpToYigFs("GET", newServer, sc, reqStr)
+	resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+	if err != nil {
+		return getSegmentInfoResp, "", err
+	}
 	defer resp.Close()
 
 	getSegInfo, err := ioutil.ReadAll(resp)

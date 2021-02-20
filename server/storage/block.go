@@ -37,10 +37,10 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 			blocks := seg.Blocks
 			for key, block := range blocks {
 				startBlockId = -1
-				if block.Offset < fileSize && block.Offset + int64(block.Size) >= fileSize {
+				if block.SegStartAddr < fileSize && block.SegEndAddr >= fileSize {
 					startBlockId = key
 					break
-				} else if block.Offset >= fileSize {
+				} else if block.SegStartAddr >= fileSize {
 					startBlockId = key
 					break
 				}
@@ -53,7 +53,9 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 
 				segment.SegmentId0 = seg.SegmentId0
 				segment.SegmentId1 = seg.SegmentId1
+				segment.Leader = seg.Leader
 				segment.Blocks = blocks[startBlockId:]
+
 				resp.Segments = append(resp.Segments, segment)
 			}
 		}

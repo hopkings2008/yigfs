@@ -179,7 +179,7 @@ func (t *TidbClient) InitRootDir(ctx context.Context, rootDir *types.InitDirReq)
                 return
         }
 
-	log.Printf("succeed to init root dir")
+	log.Printf("succeed to init root dir, sqltext: %v", sqltext)
 	return
 }
 
@@ -196,7 +196,7 @@ func (t *TidbClient) InitParentDir(ctx context.Context, rootDir *types.InitDirRe
                 return
         }
 
-        log.Printf("succeed to init root parent dir")
+        log.Printf("succeed to init root parent dir, sqltext: %v", sqltext)
         return
 }
 

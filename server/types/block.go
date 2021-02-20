@@ -13,6 +13,7 @@ type GetSegmentReq struct {
 	Generation uint64          `json:"generation"`
 	Offset     int64          `json:"offset"`
 	Size       int          `json:"size"`
+	ZoneId     string 	`json:"zone"`
 }
 
 type GetSegmentResp struct {
@@ -23,6 +24,7 @@ type GetSegmentResp struct {
 type SegmentInfo struct {
 	SegmentId0 int64 `json:"seg_id0"`
 	SegmentId1 int64 `json:"seg_id1"`
+	Leader string `json:"leader"`
 	Blocks []BlockInfo `json:"blocks"`
 }
 
