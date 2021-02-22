@@ -9,6 +9,21 @@ pub struct Segment {
     pub blocks: Vec<Block>,
 }
 
+impl Segment {
+    pub fn copy(&self) -> Segment{
+        let mut s = Segment{
+            seg_id0: self.seg_id0,
+            seg_id1: self.seg_id1,
+            leader: self.leader.clone(),
+            blocks: Vec::<Block>::new(),
+        };
+        for b in &self.blocks{
+            s.blocks.push(b.copy());
+        }
+        return s;
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct Block {
     pub ino: u64,
@@ -21,4 +36,17 @@ pub struct Block {
     pub seg_end_addr: u64,
     // the size of this block
     pub size: i64,
+}
+
+impl Block {
+    pub fn copy(&self) -> Block{
+        Block{
+            ino: self.ino,
+            generation: self.generation,
+            offset: self.offset,
+            seg_start_addr: self.seg_start_addr,
+            seg_end_addr: self.seg_end_addr,
+            size: self.size,
+        }
+    }
 }

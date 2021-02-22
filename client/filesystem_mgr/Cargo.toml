@@ -13,3 +13,4 @@ time = "0.1.38"
 metaservice_mgr = {path = "../metaservice_mgr"}
 segment_mgr = {path = "../segment_mgr"}
 common = {path = "../common" }
+crossbeam-channel = "0.4"

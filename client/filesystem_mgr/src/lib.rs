@@ -1,3 +1,5 @@
+mod types;
+mod file_handle;
 mod yigfs;
 use yigfs::Yigfs;
 use metaservice_mgr::mgr::MetaServiceMgr;
