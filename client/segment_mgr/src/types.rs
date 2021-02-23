@@ -10,7 +10,7 @@ pub struct Segment {
 }
 
 impl Segment {
-    pub fn copy(&self) -> Segment{
+    pub fn copy(&self) -> Self{
         let mut s = Segment{
             seg_id0: self.seg_id0,
             seg_id1: self.seg_id1,
@@ -39,7 +39,7 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn copy(&self) -> Block{
+    pub fn copy(&self) -> Self{
         Block{
             ino: self.ino,
             generation: self.generation,

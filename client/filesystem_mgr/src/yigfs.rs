@@ -6,7 +6,7 @@ use std::ffi::OsStr;
 use libc::{c_int, ENOENT};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
-    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen};
+    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen, ReplyWrite};
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
 use segment_mgr::{segment_mgr::SegmentMgr, types::Segment};
 use common::uuid;
@@ -265,6 +265,13 @@ impl<'a> Filesystem for Yigfs<'a> {
             return;
         }
         reply.opened(ino, flags);
+    }
+
+    fn write(&mut self, req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite){
+        println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, flags: {}",
+        req.uid(), req.gid(), ino, fh, offset, flags);
+        //we must check the leader and use leader's write.
+        //currently, skip this logic.
     }
 }
 

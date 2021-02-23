@@ -9,7 +9,7 @@ pub struct FileHandle {
 }
 
 impl FileHandle {
-    pub fn copy(&self)->FileHandle {
+    pub fn copy(&self)->Self {
         let mut handle = FileHandle{
             ino: self.ino,
             leader: self.leader.clone(),
@@ -21,7 +21,7 @@ impl FileHandle {
         return handle;
     }
     
-    pub fn new(ino: u64)->FileHandle{
+    pub fn new(ino: u64)->Self{
         FileHandle{
             ino: ino,
             leader: String::from(""),
