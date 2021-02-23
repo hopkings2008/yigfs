@@ -21,4 +21,15 @@ impl Errno {
             }
         }
     }
+    
+    pub fn is_success(&self) -> bool {
+        match *self {
+            Errno::Esucc =>{
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
 }

@@ -1,98 +1,41 @@
 extern crate crossbeam_channel;
 
-use crate::types::{FileHandle, MsgQueryHandle, MsgUpdateHandle, MsgUpdateHandleType};
 use std::collections::HashMap;
+use std::thread;
+use std::thread::JoinHandle;
+use crate::types::{FileHandle, MsgQueryHandle, MsgFileHandleOp};
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
+use common::defer;
 
 pub struct FileHandleMgr {
-    // ino-->FileHandle
-    handles: HashMap<u64, FileHandle>,
     //for update file handle.
-    handle_update_tx: Sender<MsgUpdateHandle>,
-    handle_update_rx: Receiver<MsgUpdateHandle>,
-    handle_query_tx: Sender<MsgQueryHandle>,
-    handle_query_rx: Receiver<MsgQueryHandle>,
+    handle_op_tx: Sender<MsgFileHandleOp>,
     stop_tx: Sender<u32>,
-    stop_rx: Receiver<u32>,
+    handle_mgr_th: Option<JoinHandle<()>>,
 }
 
 impl FileHandleMgr {
     pub fn create() -> FileHandleMgr {
-        let (tx, rx) = bounded::<MsgUpdateHandle>(100);
-        let (tx_query, rx_query) = bounded::<MsgQueryHandle>(1);
+        let (tx, rx) = bounded::<MsgFileHandleOp>(100);
         let (stop_tx, stop_rx) = bounded::<u32>(1);
-        let mut mgr = FileHandleMgr{
+        
+        let mut handle_mgr = HandleMgr{
             handles: HashMap::<u64, FileHandle>::new(),
-            handle_update_tx: tx,
-            handle_update_rx: rx,
-            handle_query_tx: tx_query,
-            handle_query_rx: rx_query,
-            stop_tx: stop_tx,
+            handle_op_rx: rx,
             stop_rx: stop_rx,
         };
+
+        let mgr = FileHandleMgr{
+            handle_op_tx: tx,
+            stop_tx: stop_tx,
+            handle_mgr_th: Some(thread::spawn(move || handle_mgr.start())),
+        };
+
         return mgr;
     }
 
-    pub fn start(&mut self) {
-        loop {
-            select!{
-                recv(self.handle_update_rx) -> msg => {
-                    match msg {
-                        Ok(msg) => {
-                            match msg.update_type {
-                                MsgUpdateHandleType::MsgHandleAdd => {
-                                    self.handles.insert(msg.handle.ino, msg.handle);
-                                }
-                                MsgUpdateHandleType::MsgHandleDel => {
-                                    self.handles.remove(&msg.handle.ino);
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            println!("got invalid handle update msg, err: {}", err);
-                        }
-                    }
-                },
-                recv(self.handle_query_rx) -> msg => {
-                    match msg {
-                        Ok(msg)=> {
-                            if let Some(h) = self.handles.get(&msg.ino){
-                                let resp_handle = h.clone();
-                                let ret = msg.tx.send(Some(resp_handle.copy()));
-                                match ret {
-                                    Ok(_) => {}
-                                    Err(err) => {
-                                        println!("failed to send handle for ino: {}, err: {}",
-                                        msg.ino, err);
-                                    }
-                                }
-                                // drop the sender of msg.
-                                drop(msg.tx);
-                            }
-                        }
-                        Err(err) => {
-                            println!("got invalid handle query msg, err: {}", err);
-                        }
-                    }
-                },
-                recv(self.stop_rx) -> msg => {
-                    match msg {
-                        Ok(_) => {
-                            println!("got stop signal, stop the loop...");
-                            break;
-                        }
-                        Err(err) => {
-                            println!("recv invalid stop signal with err: {} and stop the loop...", err);
-                            break;
-                        }
-                    }
-                },
-            }
-        }
-    }
-
-    pub fn stop(&self){
+    pub fn stop(mut self){
         let ret = self.stop_tx.send(1);
         match ret {
             Ok(_) => {}
@@ -100,13 +43,25 @@ impl FileHandleMgr {
                 println!("failed to stop file handle mgr, err: {}", err);
             }
         }
+        // join the HandleMgr thread.
+        if let Some(h) = self.handle_mgr_th.take() {
+            let ret = h.join();
+            match ret {
+                Ok(_) => {
+                    println!("FileHandleMgr has stopped.");
+                }
+                Err(_) => {
+                    println!("FileHandleMgr failes to stop, join failed");
+                }
+            }
+        }
+        drop(self.handle_op_tx);
+        drop(self.stop_tx);
     }
+
     pub fn add(&mut self, handle: &FileHandle) -> Errno {
-        let msg = MsgUpdateHandle{
-            update_type: MsgUpdateHandleType::MsgHandleAdd,
-            handle: handle.copy(),
-        };
-        let ret = self.handle_update_tx.send(msg);
+        let msg = MsgFileHandleOp::Add(handle.copy());
+        let ret = self.handle_op_tx.send(msg);
         match ret {
             Ok(_) => {
                 return Errno::Esucc;
@@ -119,11 +74,8 @@ impl FileHandleMgr {
     }
 
     pub fn del(&mut self, ino: u64) -> Errno {
-        let msg = MsgUpdateHandle{
-            update_type: MsgUpdateHandleType::MsgHandleDel,
-            handle: FileHandle::new(ino),
-        };
-        let ret = self.handle_update_tx.send(msg);
+        let msg = MsgFileHandleOp::Del(ino);
+        let ret = self.handle_op_tx.send(msg);
         match ret {
             Ok(_) => {
                 return Errno::Esucc;
@@ -137,11 +89,16 @@ impl FileHandleMgr {
 
     pub fn get(&mut self, ino: u64) -> Result<FileHandle, Errno>{
         let (tx, rx) = bounded::<Option<FileHandle>>(1);
-        let msg = MsgQueryHandle{
+        let query = MsgQueryHandle{
             ino: ino,
             tx: tx,
         };
-        let ret = self.handle_query_tx.send(msg);
+        defer!{
+            let rxc = rx.clone();
+            drop(rxc);
+        };
+        let msg = MsgFileHandleOp::Get(query);
+        let ret = self.handle_op_tx.send(msg);
         match ret {
             Ok(_) => {
                 let ret = rx.recv();
@@ -157,14 +114,93 @@ impl FileHandleMgr {
                         }
                     }
                     Err(err) => {
-                        println!("failed to get handle for ino: {}, recv failed with err: {}", ino, err);
+                        println!("get: failed to get handle for ino: {}, recv failed with err: {}", ino, err);
                         return Err(Errno::Eintr);
                     }
                 }
             }
             Err(err) => {
-                println!("failed to get handle for ino: {}, err: {}", ino, err);
+                println!("get: failed to get handle for ino: {}, failed to send query with err: {}", ino, err);
                 return Err(Errno::Eintr);
+            }
+        }
+    }
+}
+
+struct HandleMgr {
+    // ino-->FileHandle
+    handles: HashMap<u64, FileHandle>,
+    handle_op_rx: Receiver<MsgFileHandleOp>,
+    stop_rx: Receiver<u32>,
+}
+
+impl HandleMgr {
+    pub fn start(&mut self) {
+        loop {
+            select!{
+                recv(self.handle_op_rx) -> msg => {
+                    let op : MsgFileHandleOp;
+                    match msg {
+                        Ok(msg) => {
+                            op = msg;
+                        }
+                        Err(err) => {
+                            println!("handle_op: failed to got handle_op msg, err: {}", err);
+                            continue;
+                        }
+                    }
+                    match op {
+                        MsgFileHandleOp::Add(h) => {
+                            self.add(h);
+                        }
+                        MsgFileHandleOp::Del(ino) => {
+                            self.del(ino);
+                        }
+                        MsgFileHandleOp::Get(m) => {
+                            self.get(m);
+                        }
+                    }
+                },
+                recv(self.stop_rx) -> msg => {
+                    let rx = self.stop_rx.clone();
+                    drop(rx);
+                    match msg {
+                        Ok(_) => {
+                            println!("got stop signal, stop the loop...");
+                            break;
+                        }
+                        Err(err) => {
+                            println!("recv invalid stop signal with err: {} and stop the loop...", err);
+                            break;
+                        }
+                    }
+                },
+            }
+        }
+    }
+
+    fn add(&mut self, handle: FileHandle) {
+        self.handles.insert(handle.ino, handle);
+    }
+
+    fn del(&mut self, ino: u64) {
+        self.handles.remove(&ino);
+    }
+
+    fn get(&mut self, msg: MsgQueryHandle){
+        let mut handle: Option<FileHandle> = None;
+        let tx = msg.tx.clone();
+        defer!{
+            drop(tx);
+        };
+        if let Some(h) = self.handles.get(&msg.ino) {
+            handle = Some(h.copy());
+        }
+        let ret = msg.tx.send(handle);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                println!("failed to send handle for ino: {}, err: {}", msg.ino, err);
             }
         }
     }

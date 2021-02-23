@@ -1,5 +1,5 @@
-use segment_mgr::types::{Segment};
-use crossbeam_channel::{Sender};
+pub use segment_mgr::types::{Segment};
+pub use crossbeam_channel::{Sender};
 
 #[derive(Debug)]
 pub struct FileHandle {
@@ -45,4 +45,11 @@ pub struct MsgUpdateHandle{
 pub struct MsgQueryHandle{
     pub ino: u64,
     pub tx: Sender<Option<FileHandle>>,
+}
+
+#[derive(Debug)]
+pub enum MsgFileHandleOp{
+    Add(FileHandle),
+    Del(u64),
+    Get(MsgQueryHandle),
 }

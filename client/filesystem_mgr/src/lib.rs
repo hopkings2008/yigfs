@@ -1,6 +1,6 @@
-mod types;
-mod file_handle;
-mod yigfs;
+pub mod types;
+pub mod file_handle;
+pub mod yigfs;
 use yigfs::Yigfs;
 use metaservice_mgr::mgr::MetaServiceMgr;
 use segment_mgr::segment_mgr::SegmentMgr;
