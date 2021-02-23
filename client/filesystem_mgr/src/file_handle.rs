@@ -35,7 +35,7 @@ impl FileHandleMgr {
         return mgr;
     }
 
-    pub fn stop(mut self){
+    pub fn stop(&mut self){
         let ret = self.stop_tx.send(1);
         match ret {
             Ok(_) => {}
@@ -55,8 +55,8 @@ impl FileHandleMgr {
                 }
             }
         }
-        drop(self.handle_op_tx);
-        drop(self.stop_tx);
+        drop(self.handle_op_tx.clone());
+        drop(self.stop_tx.clone());
     }
 
     pub fn add(&mut self, handle: &FileHandle) -> Errno {

@@ -10,6 +10,7 @@ use fuse::{FileType, FileAttr, Filesystem, Request,
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
 use segment_mgr::{segment_mgr::SegmentMgr, types::Segment};
 use common::uuid;
+use crate::file_handle::FileHandleMgr;
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -21,6 +22,7 @@ pub struct Yigfs<'a>{
     pub segment_mgr: &'a Box<SegmentMgr<'a>>,
     // fsid for this mounted yigfs instance
     fsid: String,
+    handle_mgr: FileHandleMgr,
 }
 
 impl<'a> Filesystem for Yigfs<'a> {
@@ -39,6 +41,7 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
     fn destroy(&mut self, req: &Request) {
         println!("destroy: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
+        self.handle_mgr.stop();
     }
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name_str: String;
@@ -235,6 +238,7 @@ impl<'a> Yigfs<'a>{
             meta_service_mgr: meta,
             segment_mgr: seg,
             fsid: uuid::uuid_string(),
+            handle_mgr: FileHandleMgr::create(),
         }
     }
     fn to_usefs_attr(&self, attr: &metaservice_mgr::types::FileAttr) -> FileAttr {

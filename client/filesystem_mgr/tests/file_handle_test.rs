@@ -78,9 +78,12 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
             mgr.stop();
             return Err(format!("got valid handle of ino: {} even if the handle is removed.", ret.ino));
         }
-        Err(_) => {
+        Err(err) => {
             mgr.stop();
-            return Ok(());
+            if !err.is_exists(){
+                return Ok(());
+            }
+            return Err(format!("the get api returns the incorrect error: {:?}", err));
         }
     }
 }
