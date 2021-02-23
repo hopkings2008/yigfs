@@ -5,7 +5,18 @@ use filesystem_mgr::types::{FileHandle, Segment};
 fn test_file_handle_mgr_start()->Result<(), String> {
     let mut mgr = FileHandleMgr::create();
     mgr.stop();
-    return Ok(());
+    let ret = mgr.get(1);
+    match ret {
+        Ok(h) => {
+            return Err(format!("got handle with ino: {} after stop", h.ino));
+        }
+        Err(err) => {
+            if err.is_enoent() {
+                return Err(format!("got non exists error after stop"));
+            }
+            return Ok(());
+        }
+    }
 }
 
 #[test]

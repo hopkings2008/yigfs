@@ -21,6 +21,17 @@ impl Errno {
             }
         }
     }
+
+    pub fn is_enoent(&self) -> bool {
+        match *self{
+            Errno::Enoent => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
     
     pub fn is_success(&self) -> bool {
         match *self {
