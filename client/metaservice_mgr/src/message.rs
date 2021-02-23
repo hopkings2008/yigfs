@@ -120,7 +120,6 @@ pub struct ReqFileLeader {
     pub zone: String,
     pub machine: String,
     pub ino: u64,
-    pub flag: u8,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

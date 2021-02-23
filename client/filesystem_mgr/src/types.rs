@@ -4,6 +4,7 @@ pub use crossbeam_channel::{Sender};
 #[derive(Debug)]
 pub struct FileHandle {
     pub ino: u64,
+    pub leader: String,
     pub segments: Vec<Segment>,
 }
 
@@ -11,6 +12,7 @@ impl FileHandle {
     pub fn copy(&self)->FileHandle {
         let mut handle = FileHandle{
             ino: self.ino,
+            leader: self.leader.clone(),
             segments: Vec::<Segment>::new(),
         };
         for s in &self.segments {
@@ -22,6 +24,7 @@ impl FileHandle {
     pub fn new(ino: u64)->FileHandle{
         FileHandle{
             ino: ino,
+            leader: String::from(""),
             segments: Vec::<Segment>::new(),
         }
     }

@@ -209,6 +209,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         // cache ino->FileHandle.
         let h = FileHandle{
             ino: file_info.attr.ino,
+            leader: file_info.leader_info.leader.clone(),
             segments: Vec::<Segment>::new(),
         };
         let ret = self.handle_mgr.add(&h);
@@ -224,8 +225,22 @@ impl<'a> Filesystem for Yigfs<'a> {
 
     fn open(&mut self, req: &Request, ino: u64, flags: u32, reply: ReplyOpen){
         let mut segments : Vec<Segment>;
+        let leader : FileLeader;
         println!("open: uid: {}, gid: {}, ino: {}, flags: {}",
         req.uid(), req.gid(), ino, flags);
+        let ret = self.meta_service_mgr.get_file_leader(ino);
+        match ret {
+            Ok(ret) => {
+                leader = ret;
+                println!("got file leader {:?} for ino: {}", leader, ino);
+            }
+            Err(err) => {
+                println!("failed to get_file_leader for ino: {}", ino);
+                reply.error(libc::EBADEXEC);
+                return;
+            }
+        }
+        
         let ret = self.segment_mgr.get_file_segments(ino);
         match ret {
             Ok(ret) => {
@@ -240,6 +255,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         //cache the segments for the ino.
         let h = FileHandle{
             ino: ino,
+            leader: leader.leader.clone(),
             segments: segments,
         };
         let ret = self.handle_mgr.add(&h);

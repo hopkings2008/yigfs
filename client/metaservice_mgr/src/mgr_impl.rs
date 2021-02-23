@@ -196,14 +196,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
     }
 
-    fn get_file_leader(&self, ino: u64, flag: u8) -> Result<FileLeader, Errno>{
+    fn get_file_leader(&self, ino: u64) -> Result<FileLeader, Errno>{
         let req_file_leader = ReqFileLeader{
             region: self.region.clone(),
             bucket: self.region.clone(),
             zone: self.zone.clone(),
             machine: self.machine.clone(),
             ino: ino,
-            flag: flag,
         };
         let body: String;
         let ret = json::encode_to_str::<ReqFileLeader>(&req_file_leader);

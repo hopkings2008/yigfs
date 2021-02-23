@@ -24,6 +24,7 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
     let mut mgr = FileHandleMgr::create();
     let h1 = FileHandle{
         ino: 1,
+        leader: String::from(""),
         segments: Vec::<Segment>::new(),
     };
     let ret = mgr.add(&h1);
@@ -55,6 +56,7 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
     let mut mgr = FileHandleMgr::create();
     let h1 = FileHandle{
         ino: ino,
+        leader: String::from(""),
         segments: Vec::<Segment>::new(),
     };
     let ret = mgr.add(&h1);
