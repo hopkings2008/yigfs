@@ -164,6 +164,8 @@ impl HandleMgr {
                 recv(self.stop_rx) -> msg => {
                     let rx = self.stop_rx.clone();
                     drop(rx);
+                    let rx = self.handle_op_rx.clone();
+                    drop(rx);
                     match msg {
                         Ok(_) => {
                             println!("got stop signal, stop the loop...");
