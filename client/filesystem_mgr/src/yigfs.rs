@@ -10,7 +10,7 @@ use fuse::{FileType, FileAttr, Filesystem, Request,
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
 use segment_mgr::{segment_mgr::SegmentMgr, types::Segment};
 use common::uuid;
-use crate::file_handle::FileHandleMgr;
+use crate::{file_handle::FileHandleMgr, types::FileHandle};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -206,7 +206,17 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return;
             }
         }
-        // set the ino as file handle directly to skip caching. will add file handle manager & cache later.
+        // cache ino->FileHandle.
+        let h = FileHandle{
+            ino: file_info.attr.ino,
+            segments: Vec::<Segment>::new(),
+        };
+        let ret = self.handle_mgr.add(&h);
+        if !ret.is_success() {
+            println!("failed to cache handle for ino: {}", h.ino);
+            reply.error(libc::EBADEXEC);
+            return;
+        }
         // will check flags and set this later.
         // cache ino->leader to reduce the net io.
         reply.created(&TTL, &self.to_usefs_attr(&file_info.attr), file_info.attr.generation, file_info.attr.ino, flags);
@@ -228,6 +238,16 @@ impl<'a> Filesystem for Yigfs<'a> {
             }
         }
         //cache the segments for the ino.
+        let h = FileHandle{
+            ino: ino,
+            segments: segments,
+        };
+        let ret = self.handle_mgr.add(&h);
+        if !ret.is_success() {
+            println!("failed to cache file handle for ino: {}", ino);
+            reply.error(libc::EBADEXEC);
+            return;
+        }
         reply.opened(ino, flags);
     }
 }
