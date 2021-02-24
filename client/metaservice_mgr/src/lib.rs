@@ -1,11 +1,13 @@
 pub mod types;
 pub mod mgr;
-mod mgr_impl;
+pub mod mgr_impl;
 
-use common;
+use common::config::Config;
+use common::runtime::Executor;
 
-pub fn create_metaserver_mgr(cfg: &common::config::Config) -> Result<Box<dyn mgr::MetaServiceMgr>, String>{
-    let ret = mgr_impl::MetaServiceMgrImpl::new(cfg);
+
+pub fn new_metaserver_mgr(cfg: &Config, exec: &Executor) -> Result<Box<dyn mgr::MetaServiceMgr>, String>{
+    let ret = mgr_impl::MetaServiceMgrImpl::new(cfg, exec);
     match ret {
         Ok(ret) => {
             return Ok(Box::new(ret));

@@ -1,10 +1,11 @@
 extern crate hyper;
+extern crate tokio;
 
 use std::collections::HashMap;
 use std::io::Read;
 use hyper::{Client, Request, Body};
 use bytes::Buf as _;
-use tokio::runtime::Runtime;
+use crate::runtime::Executor;
 
 pub enum HttpMethod{
     Get,
@@ -22,6 +23,7 @@ pub struct RespText{
 pub struct HttpClient{
     pub retry_times: u32,
     http_client: Client<hyper::client::HttpConnector, hyper::Body>,
+    exec: Executor,
 }
 
 struct Resp{
@@ -31,10 +33,11 @@ struct Resp{
 }
 
 impl HttpClient{
-    pub fn new(retry_times: u32) -> HttpClient{
+    pub fn new(retry_times: u32, exec: &Executor) -> HttpClient{
         HttpClient{
             retry_times: retry_times,
             http_client: Client::new(),
+            exec: exec.clone(),
         }
     }
 
@@ -57,8 +60,7 @@ impl HttpClient{
                 }
             }
             let mut resp : Resp;
-            let result = Runtime::new()
-                    .expect("Failed to create Tokio runtime").block_on(self.send(req));
+            let result = self.exec.get_runtime().block_on(self.send(req));
             match result {
                 Ok(result) => {
                     resp = result;

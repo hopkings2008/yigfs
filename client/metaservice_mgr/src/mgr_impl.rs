@@ -6,10 +6,11 @@ use crate::types::DirEntry;
 use crate::types::FileAttr;
 use common::http_client;
 use common::http_client::RespText;
-use common::config;
+use common::config::Config;
 use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
+use common::runtime::Executor;
 use message::{MsgFileAttr, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, 
     ReqFileLeader, ReqMount, ReqReadDir, ReqSetFileAttr, RespDirFileAttr, 
     RespFileAttr, RespFileCreate, RespFileLeader, RespReadDir, RespSetFileAttr,
@@ -21,6 +22,7 @@ pub struct MetaServiceMgrImpl{
     bucket: String,
     zone: String,
     machine: String,
+    exec: Executor,
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
@@ -395,8 +397,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 }
 
 impl MetaServiceMgrImpl {
-    pub fn new(meta_cfg: &config::Config) -> Result<MetaServiceMgrImpl, String> {
-        let http_client = Box::new(http_client::HttpClient::new(3));
+    pub fn new(meta_cfg: &Config, exec: &Executor) -> Result<MetaServiceMgrImpl, String> {
+        let http_client = Box::new(http_client::HttpClient::new(3, exec));
         Ok(MetaServiceMgrImpl{
             http_client: http_client,
             meta_server_url: meta_cfg.metaserver_config.meta_server.clone(),
@@ -404,6 +406,7 @@ impl MetaServiceMgrImpl {
             bucket: meta_cfg.s3_config.bucket.clone(),
             zone: meta_cfg.zone_config.zone.clone(),
             machine: meta_cfg.zone_config.machine.clone(),
+            exec: exec.clone(),
         })
     }
 
@@ -568,3 +571,6 @@ impl MetaServiceMgrImpl {
         }
     }
 }
+
+
+

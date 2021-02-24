@@ -1,6 +1,6 @@
 use crate::types::{DirEntry, FileLeader, NewFileInfo, SetFileAttr, Segment};
 use crate::types::FileAttr;
-use crate::common::error::Errno;
+use common::error::Errno;
 
 pub trait MetaServiceMgr {
     fn mount(&self, uid: u32, gid: u32) -> Result<(), Errno>;
