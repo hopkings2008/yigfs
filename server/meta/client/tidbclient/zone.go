@@ -11,17 +11,15 @@ import (
 )
 
 
-func CreateOrUpdateZoneSql(zone *types.InitDirReq) (sqltext string, args []interface{}) {
-	now := time.Now().UTC()
-
+func CreateOrUpdateZoneSql() (sqltext string) {
 	sqltext = "insert into zone values(?,?,?,?,?,?,?,?) on duplicate key update status=values(status), mtime=values(mtime)"
-	args = []interface{}{zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp, 0, now, now}
-	return sqltext, args
+	return sqltext
 }
 
 func (t *TidbClient) CreateOrUpdateZone(ctx context.Context, zone *types.InitDirReq) (err error) {
-	sqltext, args := CreateOrUpdateZoneSql(zone)
-	_, err = t.Client.Exec(sqltext, args...)
+	now := time.Now().UTC()
+	sqltext := CreateOrUpdateZoneSql()
+	_, err = t.Client.Exec(sqltext, zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
 		log.Printf("Failed to create or update zone to tidb, err: %v", err)
 		err = ErrYIgFsInternalErr

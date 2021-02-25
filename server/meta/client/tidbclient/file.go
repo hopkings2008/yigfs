@@ -304,8 +304,9 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 	}
 
 	// create zone
-	sqltext, args := CreateOrUpdateZoneSql(rootDir)
-	_, err = sqlTx.Exec(sqltext, args...)
+	sqltext := CreateOrUpdateZoneSql()
+	now := time.Now().UTC()
+	_, err = sqlTx.Exec(sqltext, rootDir.ZoneId, rootDir.Region, rootDir.BucketName, rootDir.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
 		log.Printf("InitRootDirs: Failed to create zone, err: %v", err)
 		return ErrYIgFsInternalErr
@@ -369,15 +370,8 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 	}
 
 	// create file leader
-	leader := &types.GetLeaderReq {
-		ZoneId: file.ZoneId,
-		Region: file.Region,
-		BucketName: file.BucketName,
-		Ino: ino,
-		Machine: file.Machine,
-	}
-	sqltext, args = CreateOrUpdateFileLeaderSql(leader)
-	_, err = sqlTx.Exec(sqltext, args...)
+	sqltext = CreateOrUpdateFileLeaderSql()
+	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, ino, file.Generation, file.Machine, now, now, types.NotDeleted)
 	if err != nil {
 		log.Printf("CreateFile: Failed to create file leader to tidb, err: %v", err)
 		err = ErrYIgFsInternalErr
@@ -385,14 +379,8 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 	}
 
 	// create or update zone
-	zone := &types.InitDirReq{
-		ZoneId: leader.ZoneId,
-		Region: leader.Region,
-		BucketName: leader.BucketName,
-		Machine: leader.Machine,
-	}
-	sqltext, args = CreateOrUpdateZoneSql(zone)
-	_, err = sqlTx.Exec(sqltext, args...)
+	sqltext = CreateOrUpdateZoneSql()
+	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, file.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
 		log.Printf("CreateFile: Failed to create or update zone to tidb, err: %v", err)
 		err = ErrYIgFsInternalErr

@@ -11,11 +11,9 @@ import (
 )
 
 
-func CreateOrUpdateFileLeaderSql(leader *types.GetLeaderReq) (sqltext string, args []interface{}) {
-	now := time.Now().UTC()
+func CreateOrUpdateFileLeaderSql() (sqltext string) {
 	sqltext = "insert into file_leader values(?,?,?,?,?,?,?,?,?) on duplicate key update leader=values(leader), mtime=values(mtime), is_deleted=values(is_deleted)"
-	args = []interface{}{leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation, leader.Machine, now, now, types.NotDeleted}
-	return sqltext, args
+	return sqltext
 }
 
 func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLeaderReq) (resp *types.GetLeaderResp, err error) {
@@ -44,8 +42,9 @@ func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLea
 }
 
 func (t *TidbClient) CreateOrUpdateFileLeader(ctx context.Context, leader *types.GetLeaderReq) (err error) {
-	sqltext, args := CreateOrUpdateFileLeaderSql(leader)
-	_, err = t.Client.Exec(sqltext, args...)
+	now := time.Now().UTC()
+	sqltext := CreateOrUpdateFileLeaderSql()
+	_, err = t.Client.Exec(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation, leader.Machine, now, now, types.NotDeleted)
 	if err != nil {
 		log.Printf("Failed to create file leader to tidb, err: %v", err)
 		err = ErrYIgFsInternalErr
