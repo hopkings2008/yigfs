@@ -29,57 +29,57 @@ func GetFileInfoSql() (sqltext string) {
 }
 
 func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
-    var maxNum = 1000
-    args := make([]interface{}, 0)
-    sqltext := "select ino, file_name, type from file where region=? and bucket_name=? and parent_ino=? and ino > ? order by ino limit ?;"
-    args = append(args, dir.Region, dir.BucketName, dir.ParentIno, dir.Offset, maxNum)
+	var maxNum = 1000
+	args := make([]interface{}, 0)
+	sqltext := "select ino, file_name, type from file where region=? and bucket_name=? and parent_ino=? and ino > ? order by ino limit ?;"
+	args = append(args, dir.Region, dir.BucketName, dir.ParentIno, dir.Offset, maxNum)
 
-    rows, err := t.Client.Query(sqltext, args...)
-    if err == sql.ErrNoRows {
-        err = ErrYigFsNotFindTargetDirFiles
-        return
-    } else if err != nil {
+	rows, err := t.Client.Query(sqltext, args...)
+	if err == sql.ErrNoRows {
+		err = ErrYigFsNotFindTargetDirFiles
+		return
+	} else if err != nil {
 		log.Printf("Failed to query dir files, err: %v", err)
 		err = ErrYIgFsInternalErr
-        return
-    }
-    defer rows.Close()
+		return
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        var tmp types.GetDirFileInfo
-        err = rows.Scan(
-            &tmp.Ino,
-            &tmp.FileName,
-            &tmp.Type)
-        if err != nil {
+	for rows.Next() {
+		var tmp types.GetDirFileInfo
+		err = rows.Scan(
+			&tmp.Ino,
+			&tmp.FileName,
+			&tmp.Type)
+		if err != nil {
 			log.Printf("Failed to list dir files in row, err: %v", err)
 			err = ErrYIgFsInternalErr
-            return
-    	}
-    	dirFilesResp = append(dirFilesResp, &tmp)
-    }
-    err = rows.Err()
-    if err != nil {
+			return
+		}
+		dirFilesResp = append(dirFilesResp, &tmp)
+	}
+	err = rows.Err()
+	if err != nil {
 		log.Printf("Failed to list dir files in rows, err: %v", err)
 		err = ErrYIgFsInternalErr
-        return
-    }
+		return
+	}
 
 	dirLength := len(dirFilesResp)
-    if dirLength > 0 {
+	if dirLength > 0 {
 		offset = dirFilesResp[dirLength - 1].Ino + 1   //nextStartIno
 	}
 
-    log.Printf("succeed to list dir files, sqltext: %v, req offset: %v, resp offset: %v", sqltext, dir.Offset, offset)
-    return
+	log.Printf("succeed to list dir files, sqltext: %v, req offset: %v, resp offset: %v", sqltext, dir.Offset, offset)
+	return
 }
 
 func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error) {
-    resp = &types.FileInfo{}
-    var ctime, mtime, atime string
-    sqltext := GetDirFileInfoSql()
-    row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.ParentIno, file.FileName)
-    err = row.Scan(
+	resp = &types.FileInfo{}
+	var ctime, mtime, atime string
+	sqltext := GetDirFileInfoSql()
+	row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.ParentIno, file.FileName)
+	err = row.Scan(
 		&resp.Ino,
 		&resp.Generation,
 		&resp.Size,
@@ -93,10 +93,10 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 		&resp.Gid,
 		&resp.Blocks,)
 
-    if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		err = ErrYigFsNoSuchFile
 		return
-    } else if err != nil {
+	} else if err != nil {
 		log.Printf("Failed to get the dir file info, err: %v", err)
 		err = ErrYIgFsInternalErr
 		return
@@ -106,12 +106,12 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 	if err != nil {
 		return
 	}
-    mTime, err := time.Parse(types.TIME_LAYOUT_TIDB, mtime)
+	mTime, err := time.Parse(types.TIME_LAYOUT_TIDB, mtime)
 	if err != nil {
 		return
 	}
 	aTime, err := time.Parse(types.TIME_LAYOUT_TIDB, atime)
-    if err != nil {
+	if err != nil {
 		return
 	}
 
@@ -267,7 +267,8 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 		var stmt *sql.Stmt
 		now := time.Now().UTC()
 
-		sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?,?)"
+		sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid)" +
+			" values(?,?,?,?,?,?,?,?,?,?,?)"
 		stmt, err = sqlTx.Prepare(sqltext)
 		if err != nil {
 			log.Printf("Failed to prepare init root dirs, err: %v", err)
@@ -283,7 +284,8 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 	
 		for _, dirIno := range dirs {
 			if dirIno == types.RootDirIno {
-				_, err = stmt.Exec(dirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
+				_, err = stmt.Exec(dirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
+					now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 				if err != nil {
 					log.Printf("Failed to init root dir ., err: %v", err)
 					return ErrYIgFsInternalErr
@@ -291,7 +293,8 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 			}
 	
 			if dirIno == types.RootParentDirIno {
-				_, err = stmt.Exec(dirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
+				_, err = stmt.Exec(dirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
+					now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 				if err != nil {
 					log.Printf("Failed to init root parent dir .., err: %v", err)
 					return ErrYIgFsInternalErr
