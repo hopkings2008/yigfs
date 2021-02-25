@@ -10,6 +10,14 @@ import (
 	"github.com/hopkings2008/yigfs/server/types"
 )
 
+
+func CreateOrUpdateFileLeaderSql(leader *types.GetLeaderReq) (sqltext string, args []interface{}) {
+	now := time.Now().UTC()
+	sqltext = "insert into file_leader values(?,?,?,?,?,?,?,?,?) on duplicate key update leader=values(leader), mtime=values(mtime), is_deleted=values(is_deleted)"
+	args = []interface{}{leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation, leader.Machine, now, now, types.NotDeleted}
+	return sqltext, args
+}
+
 func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLeaderReq) (resp *types.GetLeaderResp, err error) {
 	resp = &types.GetLeaderResp {
 		LeaderInfo: &types.LeaderInfo{},
@@ -36,11 +44,7 @@ func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLea
 }
 
 func (t *TidbClient) CreateOrUpdateFileLeader(ctx context.Context, leader *types.GetLeaderReq) (err error) {
-	now := time.Now().UTC()
-	generation := 0
-
-	sqltext := "insert into file_leader values(?,?,?,?,?,?,?,?,?) on duplicate key update leader=values(leader), mtime=values(mtime), is_deleted=values(is_deleted)"
-	args := []interface{}{leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, generation, leader.Machine, now, now, types.NotDeleted}
+	sqltext, args := CreateOrUpdateFileLeaderSql(leader)
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
 		log.Printf("Failed to create file leader to tidb, err: %v", err)

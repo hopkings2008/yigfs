@@ -10,10 +10,15 @@ import (
 	"github.com/hopkings2008/yigfs/server/types"
 )
 
+func GetSegmentLeaderSql() (sqltext string) {
+	sqltext = "select leader from segment_leader where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+	return sqltext
+}
+
 func (t *TidbClient) GetSegmentLeaderInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error) {
 	resp = &types.LeaderInfo {}
 
-	sqltext := "select leader from segment_leader where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+	sqltext := GetSegmentLeaderSql()
 	row := t.Client.QueryRow(sqltext, segment.ZoneId, segment.Region, segment.BucketName, segment.SegmentId0, segment.SegmentId1)
 	err = row.Scan (
 		&resp.Leader,

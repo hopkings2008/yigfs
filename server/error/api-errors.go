@@ -44,8 +44,8 @@ const (
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 	NoYigFsErr: {
 		AwsErrorCode:   "NoYigFsErr",
-                Description:    "ok.",
-                HttpStatusCode: 0,
+		Description:    "ok.",
+		HttpStatusCode: 0,
 	},
 	ErrYIgFsInternalErr: {
 		AwsErrorCode:   "ErrYIgFsInternalErr",

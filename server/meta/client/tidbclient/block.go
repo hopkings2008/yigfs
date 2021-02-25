@@ -13,11 +13,18 @@ import (
 )
 
 
+func GetBlockInfoSql() (sqltext string) {
+	sqltext = "select size, offset, seg_start_addr, seg_end_addr from block where region=? and bucket_name=?" + 
+		" and ino=? and generation=? and seg_id0=? and seg_id1=? and block_id=?;"
+	return sqltext
+}
+
 func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
 	var segmentId0, segmentId1 int64
 	var blockId int64
 	var segmentMap = make(map[interface{}][]int64)
 	block := types.BlockInfo{}
+	var stmt *sql.Stmt
 
 	resp = &types.GetSegmentResp {
 		Segments: []*types.SegmentInfo{},
@@ -70,11 +77,25 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 		segment.SegmentId0 = segmentIds[0]
 		segment.SegmentId1 = segmentIds[1]
 
+		// get block info
+		sqltext = GetBlockInfoSql()
+		stmt, err = t.Client.Prepare(sqltext)
+		if err != nil {
+			log.Printf("Failed to prepare get block info, err: %v", err)
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		defer func() {
+			closeErr := stmt.Close()
+			if closeErr != nil {
+				log.Printf("Failed to close get block info stmt, err: %v", err)
+				err = ErrYIgFsInternalErr
+			}
+		}()
+
 		for _, blockId := range blockIds {
-			// get block info
-			sqltext := "select size, offset, seg_start_addr, seg_end_addr from block where region=? and bucket_name=?" + 
-				" and ino=? and generation=? and seg_id0=? and seg_id1=? and block_id=?;"
-			row := t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, segment.SegmentId0, segment.SegmentId1, blockId)
+			row := stmt.QueryRow(seg.Region, seg.BucketName, seg.Ino, seg.Generation, segment.SegmentId0, segment.SegmentId1, blockId)
 			err = row.Scan(
 				&block.Size,
 				&block.Offset,
@@ -87,12 +108,11 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 				return
 			}
 
-			log.Printf("Succeed to get segment info, sqltext: %v", sqltext)
 			segment.Blocks = append(segment.Blocks, block)
 		}
 		
 		// get segment leader
-		sqltext := "select leader from segment_leader where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+		sqltext = GetSegmentLeaderSql()
 		row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
 		err = row.Scan (
 			&segment.Leader,

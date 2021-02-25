@@ -11,11 +11,16 @@ import (
 )
 
 
-func (t *TidbClient) CreateOrUpdateZone(ctx context.Context, zone *types.InitDirReq) (err error) {
+func CreateOrUpdateZoneSql(zone *types.InitDirReq) (sqltext string, args []interface{}) {
 	now := time.Now().UTC()
 
-	sqltext := "insert into zone values(?,?,?,?,?,?,?,?) on duplicate key update status=values(status), mtime=values(mtime)"
-	args := []interface{}{zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp, 0, now, now}
+	sqltext = "insert into zone values(?,?,?,?,?,?,?,?) on duplicate key update status=values(status), mtime=values(mtime)"
+	args = []interface{}{zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp, 0, now, now}
+	return sqltext, args
+}
+
+func (t *TidbClient) CreateOrUpdateZone(ctx context.Context, zone *types.InitDirReq) (err error) {
+	sqltext, args := CreateOrUpdateZoneSql(zone)
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
 		log.Printf("Failed to create or update zone to tidb, err: %v", err)
@@ -49,23 +54,23 @@ func (t *TidbClient) GetOneUpMachine(ctx context.Context, zone *types.GetLeaderR
 
 func (t *TidbClient) GetMachineInfo(ctx context.Context, zone *types.GetLeaderReq) (resp *types.GetMachineInfoResp, err error) {
 	resp = &types.GetMachineInfoResp{}
-        sqltext := "select status, weight from zone where id=? and region=? and bucket_name=? and machine=?"
-        row := t.Client.QueryRow(sqltext, zone.ZoneId, zone.Region, zone.BucketName, zone.Machine)
-        err = row.Scan(
-                &resp.Status,
+	sqltext := "select status, weight from zone where id=? and region=? and bucket_name=? and machine=?"
+	row := t.Client.QueryRow(sqltext, zone.ZoneId, zone.Region, zone.BucketName, zone.Machine)
+	err = row.Scan(
+		&resp.Status,
 		&resp.Weight,
-        )
+	)
 
-        if err == sql.ErrNoRows {
-                err = ErrYigFsNoSuchMachine
-                return
-        } else if err != nil {
-                log.Printf("Failed to get machine info, err: %v", err)
-                err = ErrYIgFsInternalErr
-                return
-        }
+	if err == sql.ErrNoRows {
+		err = ErrYigFsNoSuchMachine
+		return
+	} else if err != nil {
+		log.Printf("Failed to get machine info, err: %v", err)
+		err = ErrYIgFsInternalErr
+		return
+	}
 
-        log.Printf("succeed to get machine info, sqltext: %v", sqltext)
-        return
+	log.Printf("succeed to get machine info, sqltext: %v", sqltext)
+	return
 }
 
