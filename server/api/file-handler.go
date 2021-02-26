@@ -254,14 +254,14 @@ func(yigFs MetaAPIHandlers) SetFileAttrHandler(ctx iris.Context) {
 	// get req
 	fileReq := &types.SetFileAttrReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-                log.Printf("Failed to read SetFileAttrReq from body, err: %v", err)
-                resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		log.Printf("Failed to read SetFileAttrReq from body, err: %v", err)
+		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
-                return
-        }
+		return
+	}
 
 	r := ctx.Request()
-        reqContext := r.Context()
+	reqContext := r.Context()
 
 	// check request params
 	err := CheckSetFileAttrParams(reqContext, fileReq)

@@ -140,16 +140,53 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	}
 	blockId := node.Generate()
 
+	var tx interface{}
+	var sqlTx *sql.Tx
+	tx, err = t.Client.Begin()
+	defer func() {
+		if err == nil {
+			err = sqlTx.Commit()
+		} else {
+			sqlTx.Rollback()
+		}
+	}()
+
+	sqlTx, _ = tx.(*sql.Tx)
+
 	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 	args := []interface{}{seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId,
 		seg.Segment.Block.Size, seg.Segment.Block.Offset, seg.Segment.Block.SegStartAddr, seg.Segment.Block.SegEndAddr, now, now, types.NotDeleted}
-	_, err = t.Client.Exec(sqltext, args...)
+	_, err = sqlTx.Exec(sqltext, args...)
 	if err != nil {
 		log.Printf("Failed to create segment to tidb, err: %v", err)
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to create segment to tidb, sqltext: %v", sqltext)
+	// if segment leader not exist, create it.
+	var leader string
+
+	sqltext = GetSegmentLeaderSql()
+	row := sqlTx.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0, seg.Segment.SegmentId1)
+	err = row.Scan (
+		&leader,
+	)
+
+	if err == sql.ErrNoRows {
+		sqltext = CreateSegmentLeaderSql()
+		_, err = sqlTx.Exec(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0,
+			seg.Segment.SegmentId1, seg.Machine, now, now, types.NotDeleted)
+		if err != nil {
+			log.Printf("CreateFileSegment: Failed to create segment leader, err: %v", err)
+			err = ErrYIgFsInternalErr
+			return
+		}
+	} else if err != nil {
+		log.Printf("CreateFileSegment: Failed to get the segment leader, err: %v", err)
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	log.Printf("Succeed to create segment to tidb")
 	return
 }

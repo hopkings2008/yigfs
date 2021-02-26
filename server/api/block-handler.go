@@ -89,7 +89,7 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// check segment leader
-	segLeaderType, err := yigFs.YigFsAPI.CheckSegmentLeader(reqContext, segReq)
+	err := yigFs.YigFsAPI.CheckSegmentLeader(reqContext, segReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -102,16 +102,6 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
 		return
-	}
-
-	// create segment leader if it does not exist
-	if segLeaderType == types.SegmentLeaderNotExist {
-		err = yigFs.YigFsAPI.CreateSegmentLeader(reqContext, segReq)
-		if err != nil {
-			resp.Result = GetErrInfo(err)
-			ctx.JSON(resp)
-			return
-		}
 	}
 
 	resp.Result = GetErrInfo(NoYigFsErr)

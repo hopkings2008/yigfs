@@ -112,7 +112,7 @@ func(yigFs *YigFsStorage) GetFileLeader(ctx context.Context, leader *types.GetLe
 	return
 }
 
-func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (segmentType int, err error) {
+func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
 	// get segment leader
 	segLeader := &types.GetSegLeaderReq {
 		ZoneId: segment.ZoneId,
@@ -145,7 +145,6 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 			err = ErrYigFsMachineNotMatchLeader
 		}
 
-		segmentType = types.SegmentLeaderNotExist
 		return
 	case nil:
 		// if segment leader exist, check request machine match leader or not
@@ -153,21 +152,10 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 			err = ErrYigFsMachineNotMatchLeader
 		}
 
-		segmentType = types.SegmentLeaderExist
 		return
 	default:
 		log.Printf("Failed to get segment leader, zone_id: %s, region: %s, bucket: %s, seg_id0: %d, seg_id1: %d, err: %v",
 			segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, err)
 		return
 	}
-}
-
-func(yigFs *YigFsStorage) CreateSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
-	err = yigFs.MetaStorage.Client.CreateSegmentLeader(ctx, segment)
-	if err != nil {
-		log.Printf("Failed to create segment leader, zone_id: %s, region: %s, bucket: %s, seg_id0: %d, seg_id1: %d, err: %v",
-			segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, err)
-		return
-	}
-	return
 }

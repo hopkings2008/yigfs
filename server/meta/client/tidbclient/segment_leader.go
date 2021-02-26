@@ -15,6 +15,11 @@ func GetSegmentLeaderSql() (sqltext string) {
 	return sqltext
 }
 
+func CreateSegmentLeaderSql() (sqltext string) {
+	sqltext = "insert into segment_leader values(?,?,?,?,?,?,?,?,?)"
+	return sqltext
+}
+
 func (t *TidbClient) GetSegmentLeaderInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error) {
 	resp = &types.LeaderInfo {}
 
@@ -41,9 +46,10 @@ func (t *TidbClient) GetSegmentLeaderInfo(ctx context.Context, segment *types.Ge
 func (t *TidbClient) CreateSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
 	now := time.Now().UTC()
 
-	sqltext := "insert into segment_leader values(?,?,?,?,?,?,?,?,?)"
+	sqltext := CreateSegmentLeaderSql()
 	args := []interface{}{segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0,
 		segment.Segment.SegmentId1, segment.Machine, now, now, types.NotDeleted}
+		
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
 		log.Printf("Failed to create segment leader to tidb, err: %v", err)
