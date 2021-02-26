@@ -1,9 +1,12 @@
 extern crate hyper;
+extern crate hyper_tls;
 extern crate tokio;
 
 use std::collections::HashMap;
 use std::io::Read;
 use hyper::{Client, Request, Body};
+use hyper::client::HttpConnector;
+use hyper_tls::HttpsConnector;
 use bytes::Buf as _;
 use crate::runtime::Executor;
 
@@ -22,7 +25,8 @@ pub struct RespText{
 
 pub struct HttpClient{
     pub retry_times: u32,
-    http_client: Client<hyper::client::HttpConnector, hyper::Body>,
+    http_client: Client<HttpConnector, hyper::Body>,
+    https_client: Client<hyper_tls::HttpsConnector<HttpConnector>, hyper::Body>,
     exec: Executor,
 }
 
@@ -34,9 +38,11 @@ struct Resp{
 
 impl HttpClient{
     pub fn new(retry_times: u32, exec: &Executor) -> HttpClient{
+        let https = HttpsConnector::new();
         HttpClient{
             retry_times: retry_times,
             http_client: Client::new(),
+            https_client: Client::builder().build::<_, hyper::Body>(https),
             exec: exec.clone(),
         }
     }
@@ -54,6 +60,8 @@ impl HttpClient{
             match ret {
                 Ok(ret) => {
                     req = ret;
+                    // use http2
+                    //*(req.version_mut()) = hyper::Version::HTTP_2;
                 }
                 Err(error) => {
                     return Err(format!("failed to create request from url: {}, body: {}, err: {}", url.clone(), body.clone(), error)); 
@@ -116,8 +124,6 @@ impl HttpClient{
     }
     
     async fn send(&self, req: hyper::Request<hyper::Body>) -> Result<Resp, String>{
-        // use the http2
-        //*req.version_mut() = hyper::Version::HTTP_2;
         let resp = self.http_client.request(req).await;
         match resp {
             Ok(resp) => {

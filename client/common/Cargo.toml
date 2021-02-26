@@ -16,5 +16,6 @@ bytes = "1"
 time = "0.1"
 hex = "0.4"
 hyper = { version = "0.14", features = ["full"] }
+hyper-tls = "0.5.0"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
