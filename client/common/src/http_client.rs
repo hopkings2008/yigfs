@@ -124,7 +124,18 @@ impl HttpClient{
     }
     
     async fn send(&self, req: hyper::Request<hyper::Body>) -> Result<Resp, String>{
-        let resp = self.http_client.request(req).await;
+        let mut is_https = false;
+        if let Some(s) = req.uri().scheme() {
+            if s.as_str() == "https" {
+                is_https = true;
+            }
+        }
+        let resp: Result<hyper::Response<Body>, hyper::Error>;
+        if is_https {
+            resp = self.https_client.request(req).await;
+        } else {
+            resp = self.http_client.request(req).await;
+        }
         match resp {
             Ok(resp) => {
                 let status = resp.status().as_u16();
