@@ -112,15 +112,8 @@ func(yigFs *YigFsStorage) GetFileAttr(ctx context.Context, file *types.GetFileIn
 }
 
 func(yigFs *YigFsStorage) InitDirAndZone(ctx context.Context, rootDir *types.InitDirReq) (err error) {
-	// get init dir
-	fileInos, err := yigFs.MetaStorage.Client.GetInitDirs(ctx, rootDir)
-	if err != nil {
-		log.Printf("Failed to get init dirs, region: %s, bucket: %s, err: %v", rootDir.Region, rootDir.BucketName, err)
-		return
-	}
-	
 	// init dir
-	err = yigFs.MetaStorage.Client.InitRootDirs(ctx, rootDir, fileInos)
+	err = yigFs.MetaStorage.Client.InitRootDirs(ctx, rootDir)
 	if err != nil {
 		log.Printf("Failed to init dirs, region: %s, bucket: %s, zoneId: %s, machine: %s, err: %v", 
 			rootDir.Region, rootDir.BucketName, rootDir.ZoneId, rootDir.Machine, err)

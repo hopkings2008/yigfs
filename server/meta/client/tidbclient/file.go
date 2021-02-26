@@ -180,76 +180,11 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 	return
 }
 
-func (t *TidbClient) GetInitDirs(ctx context.Context, rootDir *types.InitDirReq) (files []uint64, err error) {
+func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+	now := time.Now().UTC()
 	resp := &types.FileInfo{}
 	var ctime, mtime, atime string
 
-	files = make([]uint64, 2)
-	sqltext := GetFileInfoSql()
-	stmt, err := t.Client.Prepare(sqltext)
-	if err != nil {
-		log.Printf("Failed to prepare get root dirs, err: %v", err)
-		return files, ErrYIgFsInternalErr
-	}
-
-	defer func() {
-		closeErr := stmt.Close()
-		if closeErr != nil {
-			log.Printf("Failed to close get root dirs stmt, err: %v", err)
-		}
-	}()
-	
-	row := stmt.QueryRow(rootDir.Region, rootDir.BucketName, types.RootDirIno)
-	err = row.Scan(
-		&resp.Generation,
-		&resp.ParentIno,
-		&resp.FileName,
-		&resp.Size,
-		&resp.Type,
-		&ctime,
-		&mtime,
-		&atime,
-		&resp.Perm,
-		&resp.Nlink,
-		&resp.Uid,
-		&resp.Gid,
-		&resp.Blocks,
-	)
-	if err == sql.ErrNoRows {
-		files = append(files, types.RootDirIno)
-	} else if err != nil {
-		log.Printf("GetRootDirs: Failed to get the root dir info, err: %v", err)
-		return files, ErrYIgFsInternalErr
-	}
-
-	row = stmt.QueryRow(rootDir.Region, rootDir.BucketName, types.RootParentDirIno)
-	err = row.Scan(
-		&resp.Generation,
-		&resp.ParentIno,
-		&resp.FileName,
-		&resp.Size,
-		&resp.Type,
-		&ctime,
-		&mtime,
-		&atime,
-		&resp.Perm,
-		&resp.Nlink,
-		&resp.Uid,
-		&resp.Gid,
-		&resp.Blocks,
-	)
-	if err == sql.ErrNoRows {
-		files = append(files, types.RootParentDirIno)
-	} else if err != nil {
-		log.Printf("GetRootDirs: Failed to get the root parent dir info, err: %v", err)
-		return files, ErrYIgFsInternalErr
-	}
-
-	log.Printf("Succeed to get init dirs from tidb")
-	return files, nil
-}
-
-func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq, dirs []uint64) (err error) {
 	var tx interface{}
 	var sqlTx *sql.Tx
 	tx, err = t.Client.Begin()
@@ -263,49 +198,69 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 
 	sqlTx, _ = tx.(*sql.Tx)
 
-	if len(dirs) != 0 {
-		var stmt *sql.Stmt
-		now := time.Now().UTC()
-
-		sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid)" +
-			" values(?,?,?,?,?,?,?,?,?,?,?)"
-		stmt, err = sqlTx.Prepare(sqltext)
+	sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid)" +
+		" values(?,?,?,?,?,?,?,?,?,?,?)"
+	getFilesql := GetFileInfoSql()
+	row := sqlTx.QueryRow(getFilesql, rootDir.Region, rootDir.BucketName, types.RootDirIno)
+	err = row.Scan(
+		&resp.Generation,
+		&resp.ParentIno,
+		&resp.FileName,
+		&resp.Size,
+		&resp.Type,
+		&ctime,
+		&mtime,
+		&atime,
+		&resp.Perm,
+		&resp.Nlink,
+		&resp.Uid,
+		&resp.Gid,
+		&resp.Blocks,
+	)
+	if err == sql.ErrNoRows {
+		// create root dir
+		_, err = sqlTx.Exec(sqltext, types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
+			now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 		if err != nil {
-			log.Printf("Failed to prepare init root dirs, err: %v", err)
+			log.Printf("Failed to init root dir ., err: %v", err)
 			return ErrYIgFsInternalErr
 		}
-	
-		defer func() {
-			err = stmt.Close()
-			if err != nil {
-				log.Printf("Failed to close init root dirs stmt, err: %v", err)
-			}
-		}()
-	
-		for _, dirIno := range dirs {
-			if dirIno == types.RootDirIno {
-				_, err = stmt.Exec(dirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
-					now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
-				if err != nil {
-					log.Printf("Failed to init root dir ., err: %v", err)
-					return ErrYIgFsInternalErr
-				}
-			}
-	
-			if dirIno == types.RootParentDirIno {
-				_, err = stmt.Exec(dirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
-					now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
-				if err != nil {
-					log.Printf("Failed to init root parent dir .., err: %v", err)
-					return ErrYIgFsInternalErr
-				}
-			}
-		}
+	} else if err != nil {
+		log.Printf("InitRootDirs: Failed to get the root dir info, err: %v", err)
+		return ErrYIgFsInternalErr
 	}
 
+	row = sqlTx.QueryRow(getFilesql, rootDir.Region, rootDir.BucketName, types.RootParentDirIno)
+	err = row.Scan(
+		&resp.Generation,
+		&resp.ParentIno,
+		&resp.FileName,
+		&resp.Size,
+		&resp.Type,
+		&ctime,
+		&mtime,
+		&atime,
+		&resp.Perm,
+		&resp.Nlink,
+		&resp.Uid,
+		&resp.Gid,
+		&resp.Blocks,
+	)
+	if err == sql.ErrNoRows {
+		// create root parent dir
+		_, err = sqlTx.Exec(sqltext, types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
+			now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
+		if err != nil {
+			log.Printf("Failed to init root parent dir .., err: %v", err)
+			return ErrYIgFsInternalErr
+		}
+	} else if err != nil {
+		log.Printf("InitRootDirs: Failed to get the root parent dir info, err: %v", err)
+		return ErrYIgFsInternalErr
+	}	
+
 	// create zone
-	sqltext := CreateOrUpdateZoneSql()
-	now := time.Now().UTC()
+	sqltext = CreateOrUpdateZoneSql()
 	_, err = sqlTx.Exec(sqltext, rootDir.ZoneId, rootDir.Region, rootDir.BucketName, rootDir.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
 		log.Printf("InitRootDirs: Failed to create zone, err: %v", err)

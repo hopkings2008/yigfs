@@ -23,12 +23,8 @@ func(m *Meta) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp
 	return m.Client.GetFileInfo(ctx, file)
 }
 
-func(m *Meta) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq, dirs []uint64) (err error) {
-	return m.Client.InitRootDirs(ctx, rootDir, dirs) 
-}
-
-func(m *Meta) GetInitDirs(ctx context.Context, rootDir *types.InitDirReq) (files []uint64, err error) {
-	return m.Client.GetInitDirs(ctx, rootDir) 
+func(m *Meta) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq) (err error) {
+	return m.Client.InitRootDirs(ctx, rootDir) 
 }
 
 func(m *Meta) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error) {

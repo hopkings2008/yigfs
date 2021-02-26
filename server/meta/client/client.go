@@ -13,9 +13,7 @@ type Client interface {
 	// Create file
 	CreateFile(ctx context.Context, file *types.CreateFileReq) (err error)
 	// Init root dirs
-	InitRootDirs(ctx context.Context, rootDir *types.InitDirReq, dirs []uint64) (err error)
-	// Get init dirs
-	GetInitDirs(ctx context.Context, rootDir *types.InitDirReq) (files []uint64, err error)
+	InitRootDirs(ctx context.Context, rootDir *types.InitDirReq) (err error)
 	// Get file attr from parent ino
 	GetDirFileInfo(ctx context.Context, file *types.GetDirFileInfoReq) (resp *types.FileInfo, err error)
 	// Get file info from ino
