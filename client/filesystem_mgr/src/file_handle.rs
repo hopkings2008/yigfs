@@ -59,7 +59,7 @@ impl FileHandleMgr {
         drop(self.stop_tx.clone());
     }
 
-    pub fn add(&mut self, handle: &FileHandle) -> Errno {
+    pub fn add(&self, handle: &FileHandle) -> Errno {
         let msg = MsgFileHandleOp::Add(handle.copy());
         let ret = self.handle_op_tx.send(msg);
         match ret {
@@ -73,7 +73,7 @@ impl FileHandleMgr {
         }
     }
 
-    pub fn del(&mut self, ino: u64) -> Errno {
+    pub fn del(&self, ino: u64) -> Errno {
         let msg = MsgFileHandleOp::Del(ino);
         let ret = self.handle_op_tx.send(msg);
         match ret {
@@ -87,7 +87,7 @@ impl FileHandleMgr {
         }
     }
 
-    pub fn get(&mut self, ino: u64) -> Result<FileHandle, Errno>{
+    pub fn get(&self, ino: u64) -> Result<FileHandle, Errno>{
         let (tx, rx) = bounded::<Option<FileHandle>>(1);
         let query = MsgQueryHandle{
             ino: ino,
@@ -105,7 +105,20 @@ impl FileHandleMgr {
                 match ret {
                     Ok(ret) => {
                         match ret {
-                            Some(h) => {
+                            Some(mut h) => {
+                                //sort the segments.
+                                let mut iter_seg = h.segments.iter_mut();
+                                loop {
+                                    let i = iter_seg.next();
+                                    match i {
+                                        Some(i) => {
+                                            i.blocks.sort_by(|a, b| a.offset.cmp(&b.offset));
+                                        }
+                                        None => {
+                                            break;
+                                        }
+                                    }
+                                }
                                 return Ok(h);
                             }
                             None => {
@@ -122,6 +135,22 @@ impl FileHandleMgr {
             Err(err) => {
                 println!("get: failed to get handle for ino: {}, failed to send query with err: {}", ino, err);
                 return Err(Errno::Eintr);
+            }
+        }
+    }
+
+    pub fn is_leader(&self, machine: &String, ino: u64) -> bool {
+        let ret = self.get(ino);
+        match ret {
+            Ok(ret) => {
+                if ret.leader == *machine {
+                    return true;
+                }
+                return false;
+            }
+            Err(err) => {
+                println!("failed to get file handle for ino: {}, err: {:?}", ino, err);
+                return false;
             }
         }
     }

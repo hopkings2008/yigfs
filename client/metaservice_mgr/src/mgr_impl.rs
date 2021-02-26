@@ -394,6 +394,10 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         Ok(segments)
     }
+
+    fn get_machine_id(&self) -> &String {
+        &self.machine
+    }
 }
 
 impl MetaServiceMgrImpl {

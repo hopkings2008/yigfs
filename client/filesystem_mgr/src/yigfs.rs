@@ -215,7 +215,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         let ret = self.handle_mgr.add(&h);
         if !ret.is_success() {
             println!("failed to cache handle for ino: {}", h.ino);
-            reply.error(libc::EBADEXEC);
+            reply.error(libc::EBADF);
             return;
         }
         // will check flags and set this later.
@@ -224,7 +224,7 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
 
     fn open(&mut self, req: &Request, ino: u64, flags: u32, reply: ReplyOpen){
-        let mut segments : Vec<Segment>;
+        let segments : Vec<Segment>;
         let leader : FileLeader;
         println!("open: uid: {}, gid: {}, ino: {}, flags: {}",
         req.uid(), req.gid(), ino, flags);
@@ -235,8 +235,8 @@ impl<'a> Filesystem for Yigfs<'a> {
                 println!("got file leader {:?} for ino: {}", leader, ino);
             }
             Err(err) => {
-                println!("failed to get_file_leader for ino: {}", ino);
-                reply.error(libc::EBADEXEC);
+                println!("failed to get_file_leader for ino: {}, err: {:?}", ino, err);
+                reply.error(libc::EBADF);
                 return;
             }
         }
@@ -261,7 +261,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         let ret = self.handle_mgr.add(&h);
         if !ret.is_success() {
             println!("failed to cache file handle for ino: {}", ino);
-            reply.error(libc::EBADEXEC);
+            reply.error(libc::EBADF);
             return;
         }
         reply.opened(ino, flags);
@@ -271,7 +271,30 @@ impl<'a> Filesystem for Yigfs<'a> {
         println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, flags: {}",
         req.uid(), req.gid(), ino, fh, offset, flags);
         //we must check the leader and use leader's write.
-        //currently, skip this logic.
+        let machine = self.meta_service_mgr.get_machine_id();
+        let handle : FileHandle;
+        let ret = self.handle_mgr.get(ino);
+        match ret {
+            Ok(ret) => {
+                handle = ret;
+            }
+            Err(err) => {
+                println!("failed to get file handle for ino: {}, err: {:?}", ino, err);
+                reply.error(libc::EBADF);
+                return;
+            }
+        }
+        //currently just return err if not leader.
+        if *machine != handle.leader {
+            println!("current machine: {} is not the leader for ino:{}, the real leader is {}",
+            machine, ino, handle.leader);
+            reply.error(libc::EBADF);
+            return;
+        }
+        // get the corrent segment for the offset.
+        // this file is newly created, no any segment, then, just create one.
+        if handle.segments.is_empty() {
+        }
     }
 }
 

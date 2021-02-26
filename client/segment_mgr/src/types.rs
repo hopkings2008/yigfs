@@ -22,6 +22,29 @@ impl Segment {
         }
         return s;
     }
+
+    pub fn size(&self) -> u64 {
+        let mut total : u64 = 0;
+        for b in &self.blocks {
+            total += b.size as u64;
+        }
+        total
+    }
+
+    pub fn contains(&self, offset: u64) -> bool {
+        if self.blocks.is_empty() {
+            return false;
+        }
+        let len = self.blocks.len();
+        if self.blocks[0].offset > offset {
+            return false;
+        }
+        if (self.blocks[len -1 ].offset + self.blocks[len-1].size as u64) < offset {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 #[derive(Debug, Default)]
