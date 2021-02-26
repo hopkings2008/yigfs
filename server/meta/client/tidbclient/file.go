@@ -24,7 +24,7 @@ func GetDirFileInoSql() (sqltext string) {
 
 func GetFileInfoSql() (sqltext string) {
 	sqltext = "select generation, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink," + 
-	" uid, gid, blocks from file where region=? and bucket_name=? and ino=?"
+		" uid, gid, blocks from file where region=? and bucket_name=? and ino=?"
 	return sqltext
 }
 
@@ -157,9 +157,9 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 	}
 
 	cTime, err := time.Parse(types.TIME_LAYOUT_TIDB, ctime)
-    if err != nil {
+	if err != nil {
 		return
-    }
+	}
 	mTime, err := time.Parse(types.TIME_LAYOUT_TIDB, mtime)
 	if err != nil {
 		return
