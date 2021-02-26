@@ -58,22 +58,7 @@ func(yigFs *YigFsStorage) CreateFile(ctx context.Context, file *types.CreateFile
 
 		resp.File = dirFileInfoResp
 
-		// create file leader and update zone
-		leader := &types.GetLeaderReq {
-			ZoneId: file.ZoneId,
-			Region: file.Region,
-			BucketName: file.BucketName,
-			Ino: dirFileInfoResp.Ino,
-			Machine: file.Machine,
-		}
-
-		err = CreateFileLeaderAndUpdateZone(ctx, leader, yigFs)
-		if err != nil {
-			log.Printf("CreateFile: Failed to create leader for new file, zone_id: %s, region: %s, bucket: %s, ino: %d, machine: %s, err: %v",
-				file.ZoneId, file.Region, file.BucketName, dirFileInfoResp.Ino, file.Machine, err)
-			return
-		}
-
+		// leader info
 		resp.LeaderInfo = &types.LeaderInfo {
 			ZoneId: file.ZoneId,
 			Leader: file.Machine,
@@ -128,43 +113,13 @@ func(yigFs *YigFsStorage) GetFileAttr(ctx context.Context, file *types.GetFileIn
 
 func(yigFs *YigFsStorage) InitDirAndZone(ctx context.Context, rootDir *types.InitDirReq) (err error) {
 	// init dir
-	file := &types.GetFileInfoReq {
-		Region: rootDir.Region,
-		BucketName: rootDir.BucketName,
-		Ino: types.RootDirIno,
-	}
-	_, err = yigFs.MetaStorage.Client.GetFileInfo(ctx, file)
-        if err != nil && err != ErrYigFsNoSuchFile {
-                log.Printf("Failed to get file attr, region: %s, bucket: %s, ino: %d, err: %v", file.Region, file.BucketName, file.Ino, err)
-                return
-        } else if err == ErrYigFsNoSuchFile {
-		err = yigFs.MetaStorage.Client.InitRootDir(ctx, rootDir)
-		if err != nil {
-			log.Printf("Failed to init root dir, region: %s, bucket: %s, err: %v", rootDir.Region, rootDir.BucketName, err)
-			return		
-		}
-	}
-
-	file.Ino = types.RootParentDirIno
-	_, err = yigFs.MetaStorage.Client.GetFileInfo(ctx, file)
-        if err != nil && err != ErrYigFsNoSuchFile {
-		log.Printf("Failed to get file attr, region: %s, bucket: %s, ino: %d, err: %v", file.Region, file.BucketName, file.Ino, err)
-                return
-        } else if err == ErrYigFsNoSuchFile {
-                err = yigFs.MetaStorage.Client.InitParentDir(ctx, rootDir)
-                if err != nil {
-                        log.Printf("Failed to init parent dir, region: %s, bucket: %s, err: %v", rootDir.Region, rootDir.BucketName, err)
-                        return
-                }
-        }
-
-	// init zone
-	err = yigFs.MetaStorage.Client.CreateOrUpdateZone(ctx, rootDir)
+	err = yigFs.MetaStorage.Client.InitRootDirs(ctx, rootDir)
 	if err != nil {
-		log.Printf("Failed to init zone, region: %s, bucket: %s, zone_id: %s, machine: %s, err: %v", rootDir.Region, rootDir.BucketName, rootDir.ZoneId, rootDir.Machine, err)
+		log.Printf("Failed to init dirs, region: %s, bucket: %s, zoneId: %s, machine: %s, err: %v", 
+			rootDir.Region, rootDir.BucketName, rootDir.ZoneId, rootDir.Machine, err)
 		return
 	}
-	return nil
+	return
 }
 
 func(yigFs *YigFsStorage) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (resp *types.SetFileAttrResp, err error) {

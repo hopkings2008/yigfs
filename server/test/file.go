@@ -1,97 +1,97 @@
 package test
 
 import (
-        "encoding/json"
-        "io/ioutil"
+	"encoding/json"
+	"io/ioutil"
 
-        "github.com/hopkings2008/yigfs/server/types"
-        . "github.com/hopkings2008/yigfs/server/test/lib"
+	"github.com/hopkings2008/yigfs/server/types"
+	. "github.com/hopkings2008/yigfs/server/test/lib"
 )
 
 
 func GetDirFiles(getDirFilesReq *types.GetDirFilesReq) (getDirFilesResp *types.GetDirFilesResp, result string, err error) {
-        getDirFilesResp = &types.GetDirFilesResp{}
-        sc := NewClient()
-        newServer := Endpoint + "/v1/dir/files"
+	getDirFilesResp = &types.GetDirFilesResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/dir/files"
 
-        reqStr, err := json.Marshal(getDirFilesReq)
-        if err != nil {
-                return getDirFilesResp, "", err
-        }
+	reqStr, err := json.Marshal(getDirFilesReq)
+	if err != nil {
+		return getDirFilesResp, "", err
+	}
 
-        resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
-		if err != nil {
-			return getDirFilesResp, "", err
-		}
-        defer resp.Close()
+	resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+	if err != nil {
+		return getDirFilesResp, "", err
+	}
+	defer resp.Close()
 
-        getDirFilesInfo, err := ioutil.ReadAll(resp)
-        if err != nil {
-                return getDirFilesResp, "", err
-        }
+	getDirFilesInfo, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return getDirFilesResp, "", err
+	}
 
-        if err = json.Unmarshal(getDirFilesInfo, &getDirFilesResp); err != nil {
-                return getDirFilesResp, "", err
-        }
+	if err = json.Unmarshal(getDirFilesInfo, &getDirFilesResp); err != nil {
+		return getDirFilesResp, "", err
+	}
 
-        return getDirFilesResp, string(getDirFilesInfo), nil
+	return getDirFilesResp, string(getDirFilesInfo), nil
 }
 
 func GetDirFileAttr(getDirFileReq *types.GetDirFileInfoReq) (getDirFileResp *types.GetFileInfoResp, result string, err error) {
-        getDirFileResp = &types.GetFileInfoResp{}
-        sc := NewClient()
-        newServer := Endpoint + "/v1/dir/file/attr"
+	getDirFileResp = &types.GetFileInfoResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/dir/file/attr"
 
-        reqStr, err := json.Marshal(getDirFileReq)
-        if err != nil {
-                return getDirFileResp, "", err
-        }
+	reqStr, err := json.Marshal(getDirFileReq)
+	if err != nil {
+		return getDirFileResp, "", err
+	}
 
-        resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
-		if err != nil {
-			return getDirFileResp, "", err
-		}
-        defer resp.Close()
+	resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+	if err != nil {
+		return getDirFileResp, "", err
+	}
+	defer resp.Close()
 
-        getDirFileInfo, err := ioutil.ReadAll(resp)
-        if err != nil {
-                return getDirFileResp, "", err
-        }
+	getDirFileInfo, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return getDirFileResp, "", err
+	}
 
-        if err = json.Unmarshal(getDirFileInfo, &getDirFileResp); err != nil {
-                return getDirFileResp, "", err
-        }
+	if err = json.Unmarshal(getDirFileInfo, &getDirFileResp); err != nil {
+		return getDirFileResp, "", err
+	}
 
-        return getDirFileResp, string(getDirFileInfo), nil
+	return getDirFileResp, string(getDirFileInfo), nil
 }
 
 func GetFileAttr(getFileReq *types.GetFileInfoReq) (getFileAttrResp *types.GetFileInfoResp, result string, err error) {
-        getFileAttrResp = &types.GetFileInfoResp{}
-        sc := NewClient()
-        newServer := Endpoint + "/v1/file/attr"
+	getFileAttrResp = &types.GetFileInfoResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/file/attr"
 
-        reqStr, err := json.Marshal(getFileReq)
-        if err != nil {
-                return getFileAttrResp, "", err
-        }
+	reqStr, err := json.Marshal(getFileReq)
+	if err != nil {
+		return getFileAttrResp, "", err
+	}
 
-        resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
-        if err != nil {
-        	return getFileAttrResp, "", err
-		}
-        defer resp.Close()
+	resp, err := SendHttpToYigFs("GET", newServer, sc, reqStr)
+	if err != nil {
+		return getFileAttrResp, "", err
+	}
+	defer resp.Close()
 
-        var getFileInfoResp types.GetFileInfoResp
-        fileAttrRespInfo, err := ioutil.ReadAll(resp)
-        if err != nil {
-                return getFileAttrResp, "", err
-        }
+	var getFileInfoResp types.GetFileInfoResp
+	fileAttrRespInfo, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return getFileAttrResp, "", err
+	}
 
-        if err = json.Unmarshal(fileAttrRespInfo, &getFileInfoResp); err != nil {
-                return getFileAttrResp, "", err
-        }
+	if err = json.Unmarshal(fileAttrRespInfo, &getFileInfoResp); err != nil {
+		return getFileAttrResp, "", err
+	}
 
-        return getFileAttrResp, string(fileAttrRespInfo), nil
+	return getFileAttrResp, string(fileAttrRespInfo), nil
 }
 
 func GetFileLeader(getLeaderReq *types.GetLeaderReq) (getFileLeaderResp *types.GetLeaderResp, result string, err error) {
