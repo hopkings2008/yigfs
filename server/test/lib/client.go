@@ -16,7 +16,7 @@ import (
 
 
 const (
-	Endpoint = "https://s3.test.com:9088"
+	Endpoint = "https://yigfs.test.com:9088"
 	Region = "cn-bj-1"
 	BucketName = "test_bucket"
 	Generation = 0
