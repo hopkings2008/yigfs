@@ -6,6 +6,8 @@ pub mod error;
 pub mod uuid;
 pub mod defer;
 pub mod runtime;
+pub mod thread;
+pub mod numbers;
 
 pub fn parse_config(path: String)->Result<config::Config, Box<dyn std::error::Error>>{
     let results = std::fs::read_to_string(path);

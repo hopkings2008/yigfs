@@ -8,6 +8,12 @@ pub enum Errno{
     Enoent = 2,
     // already existing.
     Eexists = 3,
+    // seek error
+    Eseek = 4,
+    // eof
+    Eeof = 5,
+    // not found
+    Enotf = 6,
 }
 
 impl Errno {
@@ -36,6 +42,17 @@ impl Errno {
     pub fn is_success(&self) -> bool {
         match *self {
             Errno::Esucc =>{
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
+
+    pub fn is_eof(&self) -> bool {
+        match *self {
+            Errno::Eeof => {
                 true
             }
             _ => {
