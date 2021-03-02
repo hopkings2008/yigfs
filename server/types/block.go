@@ -43,11 +43,11 @@ type CreateSegmentReq struct {
 	Machine string `json:"machine"`
 	Ino uint64 `json:"ino"`
 	Generation uint64 `json:"generation"`
-	Segment *OneSegmentInfo `json:"segment"`
+	Segment CreateBlocksInfo `json:"segment"`
 }
 
-type OneSegmentInfo struct {
+type CreateBlocksInfo struct {
 	SegmentId0 int64 `json:"seg_id0"`
 	SegmentId1 int64 `json:"seg_id1"`
-	Block BlockInfo `json:"block"`
+	Blocks []BlockInfo `json:"blocks"`
 }
