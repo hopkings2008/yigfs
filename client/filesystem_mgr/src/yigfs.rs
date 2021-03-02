@@ -206,11 +206,34 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return;
             }
         }
+        let segments : Vec<Segment>;
+        let ret = self.segment_mgr.get_file_segments(file_info.attr
+            .ino, &file_info.leader_info.leader);
+        match ret {
+            Ok(ret) => {
+                segments = ret;
+            }
+            Err(err) => {
+                println!("create: failed to get segments for ino: {}, err: {:?}",
+                file_info.attr.ino, err);
+                reply.error(libc::EIO);
+                return;
+            }
+        }
+        // open the segments.
+        for s in &segments {
+            let ret = self.segment_mgr.open_segment(s);
+            if !ret.is_success() {
+                println!("create: failed to open segment({:?})", s);
+                reply.error(libc::EIO);
+                return;
+            }
+        }
         // cache ino->FileHandle.
         let h = FileHandle{
             ino: file_info.attr.ino,
             leader: file_info.leader_info.leader.clone(),
-            segments: Vec::<Segment>::new(),
+            segments: segments,
         };
         let ret = self.handle_mgr.add(&h);
         if !ret.is_success() {
@@ -241,7 +264,7 @@ impl<'a> Filesystem for Yigfs<'a> {
             }
         }
         
-        let ret = self.segment_mgr.get_file_segments(ino);
+        let ret = self.segment_mgr.get_file_segments(ino, &leader.leader);
         match ret {
             Ok(ret) => {
                 segments = ret;
@@ -249,6 +272,15 @@ impl<'a> Filesystem for Yigfs<'a> {
             Err(err) => {
                 println!("failed to get segments for ino: {}, err: {:?}", ino, err);
                 reply.error(libc::ENOENT);
+                return;
+            }
+        }
+        // open the segments.
+        for s in &segments {
+            let ret = self.segment_mgr.open_segment(s);
+            if !ret.is_success() {
+                println!("create: failed to open segment({:?})", s);
+                reply.error(libc::EIO);
                 return;
             }
         }

@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 common = {path="../common"}
 metaservice_mgr = {path = "../metaservice_mgr"}
+io_engine = {path = "../io_engine"}
+tokio = { version = "1", features = ["full"] }

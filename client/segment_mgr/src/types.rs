@@ -1,4 +1,4 @@
-
+use common::uuid;
 
 #[derive(Debug, Default)]
 pub struct Segment {
@@ -10,6 +10,15 @@ pub struct Segment {
 }
 
 impl Segment {
+    pub fn new(leader: &String) -> Self {
+        let ids = uuid::uuid_u64_le();
+        Segment{
+            seg_id0: ids[0],
+            seg_id1: ids[1],
+            leader: leader.clone(),
+            blocks: Vec::<Block>::new(),
+        }
+    }
     pub fn copy(&self) -> Self{
         let mut s = Segment{
             seg_id0: self.seg_id0,
