@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"time"
 	"log"
-	"math/rand"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -163,8 +162,8 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 		}
 	}()
 
-	for _, block := range seg.Segment.Blocks{
-		node, err := snowflake.NewNode(rand.Int63n(10))
+	for i, block := range seg.Segment.Blocks{
+		node, err := snowflake.NewNode(int64(i%10))
 		if err != nil {
 			log.Printf("Failed to create blockId, err: %v", err)
 			return ErrYIgFsInternalErr
