@@ -12,37 +12,62 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Sender, Receiver};
 use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
 
-struct IoThread {
+pub struct IoThread {
     thr: Thread,
     op_tx: Sender<MsgFileOp>,
-    op_rx: Receiver<MsgFileOp>,
     stop_tx: Sender<u8>,
-    stop_rx: Receiver<u8>,
+    exec: Executor,
 }
 
 impl IoThread  {
     pub fn create(name: &String, exec: &Executor)->Self {
         let (tx, rx) = mpsc::channel::<MsgFileOp>(1000);
         let(stop_tx, stop_rx) = mpsc::channel::<u8>(0);
-        IoThread {
-            thr: Thread::create(name),
-            op_tx: tx,
-            op_rx: rx,
-            stop_tx: stop_tx,
-            stop_rx: stop_rx,
-        }
-    }
-
-    pub fn start(self) {
         let mut worker = IoThreadWorker{
             handles: HashMap::<u128, File>::new(),
-            op_rx: self.op_rx,
-            stop_rx: self.stop_rx,
+            op_rx: rx,
+            stop_rx: stop_rx,
         };
-        self.thr.run(move ||{
+        let mut thr = IoThread {
+            thr: Thread::create(name),
+            op_tx: tx,
+            stop_tx: stop_tx,
+            exec: exec.clone(),
+        };
+        thr.thr.run(move ||{
             let runtime = Runtime::new().expect("create runtime for iothread");
             runtime.block_on(worker.start());
         });
+        return thr;
+    }
+
+    pub fn start(&self) {
+        
+    }
+
+    pub fn stop(&mut self) {
+        let ret = self.exec.get_runtime().block_on(self.stop_tx.send(1));
+        match ret {
+            Ok(_)=>{}
+            Err(err) => {
+                println!("failed to stop IoThreadWorker, err: {}", err);
+                return;
+            }
+        }
+        self.thr.join();
+    }
+
+    pub fn send_disk_io(&self, msg: MsgFileOp)->Errno{
+        let ret = self.exec.get_runtime().block_on(self.op_tx.send(msg));
+        match ret {
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                println!("send_disk_io: failed to send op, err: {}", err);
+                return Errno::Eintr;
+            }
+        }
     }
 }
 
@@ -66,7 +91,7 @@ impl IoThreadWorker {
         loop{
             tokio::select! {
                 Some(msg) = self.op_rx.recv() => {
-                    self.do_work(&msg);
+                    self.do_work(&msg).await;
                 }
                 Some(msg) = self.stop_rx.recv() => {
                     println!("got stop signal {}, stopping...", msg);
@@ -104,12 +129,12 @@ impl IoThreadWorker {
             }
             Err(err) => {
                 println!("failed to open({}), err: {}", name, err);
-                msg.response(Errno::Eintr);
+                msg.response(Errno::Eintr).await;
                 return;
             }
         }
         self.handles.insert(d, f);
-        msg.response(Errno::Esucc);
+        msg.response(Errno::Esucc).await;
         return;
     }
 
