@@ -6,7 +6,7 @@ use common::error::Errno;
 use common::runtime::Executor;
 use metaservice_mgr::mgr::MetaServiceMgr;
 use io_engine::io_thread_pool::IoThreadPool;
-use io_engine::types::{MsgFileOpenOp, MsgFileOp};
+use io_engine::types::{MsgFileOpenOp, MsgFileOp, MsgFileWriteOp, MsgFileWriteResp};
 pub struct SegmentMgr<'a> {
     meta_service_mgr: &'a Box<dyn MetaServiceMgr>,
     data_dirs: Vec<String>,
@@ -76,6 +76,38 @@ impl<'a> SegmentMgr<'a> {
         }
         println!("open_segment(id0: {}, id1: {}): got invalid ret", seg.seg_id0, seg.seg_id1);
         return Errno::Eintr;
+    }
+
+    pub fn write_segment(&self, seg: &mut Segment, ino: u64, offset: u64, data: &[u8]) -> Result<u32, Errno> {
+        let worker = self.io_pool.get_worker(seg.seg_id0, seg.seg_id1);
+        let (tx, mut rx) = mpsc::channel::<MsgFileWriteResp>(0);
+        let msg = MsgFileWriteOp{
+            id0: seg.seg_id0,
+            id1: seg.seg_id1,
+            offset: offset,
+            data: data.to_vec(),
+            resp_sender: tx,
+        };
+        let ret = worker.send_disk_io(MsgFileOp::OpWrite(msg));
+        if !ret.is_success() {
+            println!("write_segment: failed to send_disk_io for seg({:?}), offset: {}, err: {:?}",
+            seg, offset, ret);
+            return Err(Errno::Eintr);
+        }
+        let ret = self.exec.get_runtime().block_on(rx.recv());
+        if let Some(r) = ret {
+            if !r.err.is_success() {
+                println!("write_segment: failed to write segment for seg({:?}), offset: {}, err: {:?}",
+                seg, offset, r.err);
+                return Err(r.err);
+            }
+            // add block into segment.
+            seg.add_block(ino, offset, r.offset, r.nwrite);
+            // update the meta service.
+            return Ok(r.nwrite);
+        }
+        println!("write_segment: got invalid response for seg({:?}, offset: {}", seg, offset);
+        return Err(Errno::Eintr);
     }
 
     pub fn create(dirs: Vec<String>, mgr: &'a Box<dyn MetaServiceMgr>, exec: &Executor)->Box<SegmentMgr<'a>> {

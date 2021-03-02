@@ -142,11 +142,24 @@ impl IoThreadWorker {
     async fn do_write(&mut self, msg: &MsgFileWriteOp) {
         let d = NumberOp::to_u128(msg.id0, msg.id1);
         let mut resp_msg = MsgFileWriteResp{
+            offset: 0,
             nwrite: 0,
             err: Errno::Enotf,
         };
         if let Some(h) = self.handles.get_mut(&d) {
-            // should we seek before write?
+            // should we seek to end before write?
+            let ret = h.seek(SeekFrom::End(0)).await;
+            match ret {
+                Ok(ret) => {
+                    resp_msg.offset = ret;
+                }
+                Err(err) => {
+                    println!("do_write: failed to seek to end for msg({:?}, err: {}", msg, err);
+                    resp_msg.err = Errno::Eseek;
+                    msg.response(resp_msg).await;
+                    return;
+                }
+            }
             let ret = h.write(msg.data.as_slice()).await;
             match ret {
                 Ok(ret) => {

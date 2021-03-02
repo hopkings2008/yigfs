@@ -19,6 +19,7 @@ impl Segment {
             blocks: Vec::<Block>::new(),
         }
     }
+
     pub fn copy(&self) -> Self{
         let mut s = Segment{
             seg_id0: self.seg_id0,
@@ -32,7 +33,19 @@ impl Segment {
         return s;
     }
 
-    pub fn size(&self) -> u64 {
+    pub fn add_block(&mut self, ino: u64, offset: u64, seg_start_offset: u64, nwrite: u32) {
+        let b = Block{
+            ino: ino,
+            generation: 0,
+            offset: offset,
+            seg_start_addr: seg_start_offset,
+            seg_end_addr: seg_start_offset+nwrite as u64,
+            size: nwrite as i64,
+        };
+        self.blocks.push(b);
+    }
+
+    pub fn usage(&self) -> u64 {
         let mut total : u64 = 0;
         for b in &self.blocks {
             total += b.size as u64;
@@ -53,6 +66,13 @@ impl Segment {
         }
 
         return true;
+    }
+
+    pub fn is_empty(&self)->bool {
+        if self.blocks.is_empty() {
+            return true;
+        }
+        return false;
     }
 }
 

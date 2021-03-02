@@ -37,6 +37,7 @@ pub struct MsgFileCloseOp{
 
 #[derive(Debug)]
 pub struct MsgFileWriteResp {
+    pub offset: u64,
     pub nwrite: u32,
     pub err: Errno,
 }

@@ -3,7 +3,7 @@ extern crate libc;
 extern crate time;
 
 use std::ffi::OsStr;
-use libc::{c_int, ENOENT};
+use libc::{ENOENT, _PC_MAX_CANON, c_int};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
     ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen, ReplyWrite};
@@ -304,7 +304,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         req.uid(), req.gid(), ino, fh, offset, flags);
         //we must check the leader and use leader's write.
         let machine = self.meta_service_mgr.get_machine_id();
-        let handle : FileHandle;
+        let mut handle : FileHandle;
         let ret = self.handle_mgr.get(ino);
         match ret {
             Ok(ret) => {
@@ -324,8 +324,29 @@ impl<'a> Filesystem for Yigfs<'a> {
             return;
         }
         // get the corrent segment for the offset.
-        // this file is newly created, no any segment, then, just create one.
-        if handle.segments.is_empty() {
+        // find the segment whose usage is smallest.
+        let mut min_usage : u64 = u64::MAX;
+        let mut min_idx : usize = 0;
+        let l = handle.segments.len();
+        let mut i = 0;
+        while i < l {
+            if handle.segments[i].usage() < min_usage {
+                min_usage = handle.segments[i].usage();
+                min_idx = i;
+            }
+            i += 1;
+        }
+        // write the data to the segments.
+        let ret = self.segment_mgr.write_segment(&mut handle.segments[min_idx], ino, offset as u64, data);
+        match ret {
+            Ok(ret) => {
+                reply.written(ret);
+            }
+            Err(err) => {
+                println!("write: failed to write segment({:?}) for ino: {}, offset: {}, err: {:?}",
+                handle.segments[min_idx], ino, offset, err);
+                reply.error(libc::EIO);
+            }
         }
     }
 }
