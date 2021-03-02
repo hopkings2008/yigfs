@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"time"
 	"log"
-	"math/rand"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -132,16 +131,10 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 
 func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
 	now := time.Now().UTC()
-	node, err := snowflake.NewNode(rand.Int63n(10))
-	if err != nil {
-		log.Printf("Failed to create blockId, err: %v", err)
-		err = ErrYIgFsInternalErr
-		return
-	}
-	blockId := node.Generate()
 
 	var tx interface{}
 	var sqlTx *sql.Tx
+	var stmt *sql.Stmt
 	tx, err = t.Client.Begin()
 	defer func() {
 		if err == nil {
@@ -154,13 +147,35 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	sqlTx, _ = tx.(*sql.Tx)
 
 	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
-	args := []interface{}{seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId,
-		seg.Segment.Block.Size, seg.Segment.Block.Offset, seg.Segment.Block.SegStartAddr, seg.Segment.Block.SegEndAddr, now, now, types.NotDeleted}
-	_, err = sqlTx.Exec(sqltext, args...)
+	stmt, err = sqlTx.Prepare(sqltext)
 	if err != nil {
-		log.Printf("Failed to create segment to tidb, err: %v", err)
-		err = ErrYIgFsInternalErr
-		return
+		log.Printf("Failed to prepare insert block, err: %v", err)
+			err = ErrYIgFsInternalErr
+			return
+	}
+
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			log.Printf("Failed to close insert block stmt, err: %v", err)
+			err = ErrYIgFsInternalErr
+		}
+	}()
+
+	for i, block := range seg.Segment.Blocks{
+		node, err := snowflake.NewNode(int64(i%10))
+		if err != nil {
+			log.Printf("Failed to create blockId, err: %v", err)
+			return ErrYIgFsInternalErr
+		}
+		blockId := node.Generate()
+
+		_, err = stmt.Exec(seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, 
+			blockId, block.Size, block.Offset, block.SegStartAddr, block.SegEndAddr, now, now, types.NotDeleted)
+		if err != nil {
+			log.Printf("Failed to create segment to tidb, err: %v", err)
+			return ErrYIgFsInternalErr
+		}
 	}
 
 	// if segment leader not exist, create it.
