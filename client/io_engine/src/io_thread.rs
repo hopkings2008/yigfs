@@ -41,10 +41,6 @@ impl IoThread  {
         return thr;
     }
 
-    pub fn start(&self) {
-        
-    }
-
     pub fn stop(&mut self) {
         let ret = self.exec.get_runtime().block_on(self.stop_tx.send(1));
         match ret {
@@ -122,6 +118,11 @@ impl IoThreadWorker {
         let d = NumberOp::to_u128(msg.id0, msg.id1);
         let name = self.to_file_name(d, &msg.dir);
         let f: File;
+        // check wether the handle already opened
+        if self.handles.contains_key(&d) {
+            msg.response(Errno::Esucc).await;
+            return;
+        }
         let ret = OpenOptions::new().read(true).append(true).open(&name).await;
         match ret {
             Ok(ret) => {

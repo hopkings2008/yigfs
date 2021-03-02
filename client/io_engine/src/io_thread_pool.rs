@@ -13,7 +13,6 @@ impl IoThreadPool {
         };
         for i in 0..num {
             let thr = IoThread::create(&format!("IoThread{}", i+1), exec);
-            thr.start();
             pool.pool.push(thr);
         }
         return pool;
@@ -21,5 +20,12 @@ impl IoThreadPool {
 
     pub fn size(&self) -> u32 {
         self.pool.len() as u32
+    }
+
+    pub fn stop(&mut self) {
+        for i in &mut self.pool {
+            i.stop();
+        }
+        self.pool.clear();
     }
 }
