@@ -244,3 +244,19 @@ pub struct RespGetSegments {
     pub result: RespResult,
     pub segments: Vec<MsgSegment>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqAddBlock{
+    pub region: String,
+    pub bucket: String,
+    pub zone: String,
+    pub machine: String,
+    pub ino: u64,
+    pub generation: u64,
+    pub segment: MsgSegment,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespAddBock{
+    pub result: RespResult,
+}
