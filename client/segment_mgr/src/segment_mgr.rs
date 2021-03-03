@@ -104,6 +104,13 @@ impl<'a> SegmentMgr<'a> {
             // add block into segment.
             seg.add_block(ino, offset, r.offset, r.nwrite);
             // update the meta service.
+            let meta_seg = seg.to_meta_segment();
+            let ret = self.meta_service_mgr.add_file_block(ino, &meta_seg);
+            if !ret.is_success(){
+                println!("failed to add file block for ino: {}, meta_seg: {:?}, err: {:?}",
+                ino, meta_seg, ret);
+                return Err(ret);
+            }
             return Ok(r.nwrite);
         }
         println!("write_segment: got invalid response for seg({:?}, offset: {}", seg, offset);

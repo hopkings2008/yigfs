@@ -1,4 +1,6 @@
 use common::uuid;
+use metaservice_mgr::types::Block as MetaBlock;
+use metaservice_mgr::types::Segment as MetaSegment;
 
 #[derive(Debug, Default)]
 pub struct Segment {
@@ -74,6 +76,19 @@ impl Segment {
         }
         return false;
     }
+
+    pub fn to_meta_segment(&self) -> MetaSegment {
+        let mut meta_seg = MetaSegment {
+            seg_id0: self.seg_id0,
+            seg_id1: self.seg_id1,
+            leader: self.leader.clone(),
+            blocks: Vec::new(),
+        };
+        for b in &self.blocks {
+            meta_seg.blocks.push(b.to_meta_block());
+        }
+        return meta_seg;
+    }
 }
 
 #[derive(Debug, Default)]
@@ -95,6 +110,15 @@ impl Block {
         Block{
             ino: self.ino,
             generation: self.generation,
+            offset: self.offset,
+            seg_start_addr: self.seg_start_addr,
+            seg_end_addr: self.seg_end_addr,
+            size: self.size,
+        }
+    }
+
+    pub fn to_meta_block(&self) ->  MetaBlock{
+        MetaBlock{
             offset: self.offset,
             seg_start_addr: self.seg_start_addr,
             seg_end_addr: self.seg_end_addr,
