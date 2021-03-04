@@ -127,6 +127,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         match ret {
             Ok(ret) => {
                 file_attr = ret;
+                println!("set_attr: got result: {:?} for attr: {:?}", file_attr, set_attr);
             }
             Err(err) => {
                 println!("failed to set_file_attr for {:?}, err: {:?}", set_attr, err);
