@@ -22,8 +22,8 @@ type GetSegmentResp struct {
 }
 
 type SegmentInfo struct {
-	SegmentId0 int64 `json:"seg_id0"`
-	SegmentId1 int64 `json:"seg_id1"`
+	SegmentId0 uint64 `json:"seg_id0"`
+	SegmentId1 uint64 `json:"seg_id1"`
 	Leader string `json:"leader"`
 	Blocks []BlockInfo `json:"blocks"`
 }
@@ -47,7 +47,7 @@ type CreateSegmentReq struct {
 }
 
 type CreateBlocksInfo struct {
-	SegmentId0 int64 `json:"seg_id0"`
-	SegmentId1 int64 `json:"seg_id1"`
+	SegmentId0 uint64 `json:"seg_id0"`
+	SegmentId1 uint64 `json:"seg_id1"`
 	Blocks []BlockInfo `json:"blocks"`
 }

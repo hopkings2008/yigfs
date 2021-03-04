@@ -19,7 +19,7 @@ func GetBlockInfoSql() (sqltext string) {
 }
 
 func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
-	var segmentId0, segmentId1 int64
+	var segmentId0, segmentId1 uint64
 	var blockId int64
 	var segmentMap = make(map[interface{}][]int64)
 	block := types.BlockInfo{}
@@ -55,7 +55,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 			return
 		}
 
-		segmentId := [2]int64{segmentId0, segmentId1}
+		segmentId := [2]uint64{segmentId0, segmentId1}
 		segmentMap[segmentId] = append(segmentMap[segmentId], blockId)
 	}
 	err = rows.Err()
@@ -72,7 +72,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 			Blocks: []types.BlockInfo{},
 		}
 
-		segmentIds := segmentId.([2]int64)
+		segmentIds := segmentId.([2]uint64)
 		segment.SegmentId0 = segmentIds[0]
 		segment.SegmentId1 = segmentIds[1]
 
