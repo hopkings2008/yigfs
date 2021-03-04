@@ -86,11 +86,27 @@ impl IoThreadWorker {
     pub async fn start(&mut self) {
         loop{
             tokio::select! {
-                Some(msg) = self.op_rx.recv() => {
-                    self.do_work(&msg).await;
+                msg = self.op_rx.recv() => {
+                    match msg {
+                        Some(msg) => {
+                            self.do_work(&msg).await;
+                        }
+                        None => {
+                            println!("IoThreadWorker: op_tx has dropped.");
+                            break;
+                        }
+                    }
                 }
-                Some(msg) = self.stop_rx.recv() => {
-                    println!("got stop signal {}, stopping...", msg);
+                msg = self.stop_rx.recv() => {
+                    match msg {
+                        Some(msg) => {
+                            println!("IoThreadWorker: got stop signal {}, stopping...", msg);
+                        }
+                        None => {
+                            println!("IoThreadWorker: stop_tx has dropped.");
+                        }
+                    }
+                    
                     break;
                 }
             }

@@ -198,7 +198,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
     fn get_file_leader(&self, ino: u64) -> Result<FileLeader, Errno>{
         let req_file_leader = ReqFileLeader{
             region: self.region.clone(),
-            bucket: self.region.clone(),
+            bucket: self.bucket.clone(),
             zone: self.zone.clone(),
             machine: self.machine.clone(),
             ino: ino,
