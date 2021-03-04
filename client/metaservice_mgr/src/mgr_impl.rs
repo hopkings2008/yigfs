@@ -342,7 +342,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/file/segments", self.meta_server_url);
         let resp_text: RespText;
-        let ret = self.http_client.request(&url, &body, &HttpMethod::Put);
+        let ret = self.http_client.request(&url, &body, &HttpMethod::Get);
         match ret  {
             Ok(ret) => {
                 resp_text = ret;
