@@ -29,6 +29,6 @@ type GetSegLeaderReq struct {
 	ZoneId string `json:"zone"`
 	Region string `json:"region"`
 	BucketName string `json:"bucket"`
-	SegmentId0 int64 `json:"seg_id0"`
-	SegmentId1 int64 `json:"seg_id1"`
+	SegmentId0 uint64 `json:"seg_id0"`
+	SegmentId1 uint64 `json:"seg_id1"`
 }
