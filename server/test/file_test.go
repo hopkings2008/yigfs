@@ -249,8 +249,8 @@ func Test_WriteFile(t *testing.T) {
 		}
 
 		segment.Blocks = append(segment.Blocks, block)
-		offset += Size
-		startAddr += Size
+		offset += Size + 1
+		startAddr += Size + 1
 		endAddr += Size
 	}
 
@@ -267,6 +267,32 @@ func Test_WriteFile(t *testing.T) {
 
 	createSegmentReq.Segment.SegmentId0 ++
 	createSegmentReq.Segment.SegmentId1 ++
+
+	createSegResp, createSegInfo, err = PutSegmentInfo(createSegmentReq)
+	if err != nil {
+		t.Fatalf("Failed to upload block, err: %v", err)
+	} else if createSegResp.Result.ErrCode != 0 {
+		t.Fatalf("Failed to upload block, resp code: %d, err: %v", createSegResp.Result.ErrCode, createSegResp.Result.ErrMsg)
+	} else {
+		t.Logf("Succeed to upload block, resp: %s", createSegInfo)
+	}
+
+	// cover blocks
+	for i := 0; i < 2; i++ {
+		block := types.BlockInfo {
+			Offset: int64(offset),
+			SegStartAddr: int64(startAddr),
+			SegEndAddr: int64(endAddr),
+			Size: Size,
+		}
+
+		segment.Blocks = append(segment.Blocks, block)
+		offset += Size + 1
+		startAddr += Size + 1
+		endAddr += Size
+	}
+
+	createSegmentReq.Segment = *segment
 
 	createSegResp, createSegInfo, err = PutSegmentInfo(createSegmentReq)
 	if err != nil {
@@ -298,8 +324,8 @@ func Test_WriteFile(t *testing.T) {
 	}
 
 	blockNum := getBlockNumber(getSegResp)
-	if blockNum != 6 {
-		t.Fatalf("The target block numbers is 6, but get segment blocks number is: %v", blockNum)
+	if blockNum != 8 {
+		t.Fatalf("The target block numbers is 8, but get segment blocks number is: %v", blockNum)
 	}
 	
 	// get segments when offset is not 0
@@ -314,13 +340,13 @@ func Test_WriteFile(t *testing.T) {
 	}
 	
 	blockNum = getBlockNumber(getSegResp)
-	if blockNum != 4 {
-		t.Fatalf("The target block numbers is 4, but get segment blocks number is: %v", blockNum)
+	if blockNum != 6 {
+		t.Fatalf("The target block numbers is 6, but get segment blocks number is: %v", blockNum)
 	}
 
 	// get segments when offset and size both not 0
 	getSegmentReq.Offset = Size
-	getSegmentReq.Size = Size
+	getSegmentReq.Size = 3*Size
 	getSegResp, getSegInfo, err = GetSegmentInfo(getSegmentReq)
 	if err != nil {
 		t.Fatalf("Failed to get segment info when offset is: %d, size is: %d, err: %v", getSegmentReq.Offset, getSegmentReq.Size, err)
@@ -332,7 +358,7 @@ func Test_WriteFile(t *testing.T) {
 	}
 
 	blockNum = getBlockNumber(getSegResp)
-        if blockNum != 2 {
+        if blockNum != 1 {
                 t.Fatalf("The target block numbers is 1, but get segment blocks number is: %v", blockNum)
         }
 }

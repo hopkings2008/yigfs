@@ -28,6 +28,16 @@ func GetFileInfoSql() (sqltext string) {
 	return sqltext
 }
 
+func GetFileSizeAndBlocksSql() (sqltext string) {
+	sqltext = "select size, blocks from file where region=? and bucket_name=? and ino=? and generation=?"
+	return sqltext
+}
+
+func UpdateFileSizeAndBlocksSql() (sqltext string) {
+	sqltext = "update file set size=?, mtime=?, blocks=? where region=? and bucket_name=? and ino=? and generation=?"
+	return sqltext
+}
+
 func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq) (dirFilesResp []*types.GetDirFileInfo, offset uint64, err error) {
 	var maxNum = 1000
 	args := make([]interface{}, 0)
