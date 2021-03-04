@@ -268,6 +268,10 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 
 			log.Printf("Deleted last insert block, seg_id0: %d, seg_id1: %d, block_id: %d", 
 				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId)
+
+			// update decreased block size and number.
+			decreasedBlockSize += uint64(block.Size)
+			decreasedBlocksNumber += 1
 		}
 
 		// upload block
