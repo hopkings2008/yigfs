@@ -139,7 +139,7 @@ impl IoThreadWorker {
             msg.response(Errno::Esucc).await;
             return;
         }
-        let ret = OpenOptions::new().read(true).append(true).open(&name).await;
+        let ret = OpenOptions::new().create(true).read(true).append(true).open(&name).await;
         match ret {
             Ok(ret) => {
                 f = ret;
