@@ -449,7 +449,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             }
         }
 
-        if resp_text.status != 0 {
+        if resp_text.status >=300 {
             println!("add_file_block: failed to add block for {}, got status: {}",
             body, resp_text.status);
             return Errno::Eintr;
