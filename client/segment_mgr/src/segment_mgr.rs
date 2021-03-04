@@ -57,7 +57,7 @@ impl<'a> SegmentMgr<'a> {
 
     pub fn open_segment(&self, seg: &Segment) -> Errno {
         let worker = self.io_pool.get_worker(seg.seg_id0, seg.seg_id1);
-        let (tx, mut rx) = mpsc::channel::<Errno>(0);
+        let (tx, mut rx) = mpsc::channel::<Errno>(1);
         let msg = MsgFileOpenOp{
             id0: seg.seg_id0,
             id1: seg.seg_id1,
@@ -80,7 +80,7 @@ impl<'a> SegmentMgr<'a> {
 
     pub fn write_segment(&self, seg: &mut Segment, ino: u64, offset: u64, data: &[u8]) -> Result<u32, Errno> {
         let worker = self.io_pool.get_worker(seg.seg_id0, seg.seg_id1);
-        let (tx, mut rx) = mpsc::channel::<MsgFileWriteResp>(0);
+        let (tx, mut rx) = mpsc::channel::<MsgFileWriteResp>(1);
         let msg = MsgFileWriteOp{
             id0: seg.seg_id0,
             id1: seg.seg_id1,

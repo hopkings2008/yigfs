@@ -22,7 +22,7 @@ pub struct IoThread {
 impl IoThread  {
     pub fn create(name: &String, exec: &Executor)->Self {
         let (tx, rx) = mpsc::channel::<MsgFileOp>(1000);
-        let(stop_tx, stop_rx) = mpsc::channel::<u8>(0);
+        let(stop_tx, stop_rx) = mpsc::channel::<u8>(1);
         let mut worker = IoThreadWorker{
             handles: HashMap::<u128, File>::new(),
             op_rx: rx,
