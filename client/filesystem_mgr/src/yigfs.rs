@@ -84,7 +84,6 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
 
     fn setattr(&mut self, req: &Request, ino: u64, mode: Option<u32>, uid: Option<u32>, gid: Option<u32>, size: Option<u64>, atime: Option<Timespec>, mtime: Option<Timespec>, fh: Option<u64>, _crtime: Option<Timespec>, _chgtime: Option<Timespec>, _bkuptime: Option<Timespec>, _flags: Option<u32>, reply: ReplyAttr){
-        println!("setattr: uid: {}, gid: {}, pid: {}", req.uid(), req.gid(), req.pid());
         let mut set_attr = SetFileAttr{
             ino: ino,
             size: size,
@@ -95,6 +94,7 @@ impl<'a> Filesystem for Yigfs<'a> {
             uid: uid,
             gid: gid,
         };
+        
         match mode {
             Some(m) => {
                 set_attr.perm = Some(m as u16);
@@ -119,7 +119,9 @@ impl<'a> Filesystem for Yigfs<'a> {
                 set_attr.mtime = None;
             }
         }
+        set_attr.size = size;
 
+        println!("setattr: uid: {}, gid: {}, pid: {}, attr: {:?}", req.uid(), req.gid(), req.pid(), set_attr);
         let file_attr : metaservice_mgr::types::FileAttr;
         let ret = self.meta_service_mgr.set_file_attr(&set_attr);
         match ret {
