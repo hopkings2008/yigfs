@@ -303,8 +303,8 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
 
     fn write(&mut self, req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite){
-        println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, flags: {}",
-        req.uid(), req.gid(), ino, fh, offset, flags);
+        println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, data_size: {}, flags: {}",
+        req.uid(), req.gid(), ino, fh, offset, data.len(), flags);
         //we must check the leader and use leader's write.
         let machine = self.meta_service_mgr.get_machine_id();
         let mut handle : FileHandle;
