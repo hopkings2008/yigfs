@@ -20,7 +20,7 @@ func GetBlockInfoSql() (sqltext string) {
 
 func GetBlocksInfoSql() (sqltext string) {
 	sqltext = "select size, offset, block_id from block where region=? and bucket_name=?" +
-		" and ino=? and generation=? and seg_id0=? and seg_id1=? and is_deleted=? order by offset;"
+		" and ino=? and generation=? and seg_id0=? and seg_id1=? and is_deleted=?;"
 	return sqltext
 }
 
@@ -30,9 +30,13 @@ func DeleteBlockSql() (sqltext string) {
 	return sqltext
 }
 
-func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][]int64, sortIds []int64, err error){
+func GetBlocksSizeSql() (sqltext string) {
+	sqltext = "select size from block where region=? and bucket_name=? and ino=? and generation=? and is_deleted=?"
+	return sqltext
+}
+
+func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][]int64, err error){
 	blockMap = make(map[int64][]int64)
-	sortIds = make([]int64, 0)
 
 	sqltext := GetBlocksInfoSql()
 	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
@@ -62,8 +66,6 @@ func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][
 
 		blockMap[block_id] = append(blockMap[block_id], int64(offset))
 		blockMap[block_id] = append(blockMap[block_id], int64(size))
-
-		sortIds = append(sortIds, block_id)
 	}
 	
 	err = rows.Err()
@@ -73,7 +75,7 @@ func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][
 		return
 	}
 
-	return blockMap, sortIds, nil
+	return blockMap, nil
 }
 
 func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
@@ -190,10 +192,6 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 
 func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
 	now := time.Now().UTC()
-	var increasedBlockSize uint64 = 0
-	var decreasedBlockSize uint64 = 0
-	var increasedBlocksNumber uint32 = 0
-	var decreasedBlocksNumber uint32 = 0 
 	
 	var tx interface{}
 	var sqlTx *sql.Tx
@@ -226,13 +224,11 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	}()
 	
 	// get existed blocks
-	blockMap, sortIds, err := GetBlocks(seg, t)
+	blockMap, err := GetBlocks(seg, t)
 	if err != nil {
 		log.Printf("CreateFileSegment: Failed to get the segment blocks, err: %v", err)
 		return ErrYIgFsInternalErr
 	}
-
-	log.Printf("Existed blocks is: %v, sorting block id is: %v", blockMap, sortIds)
 
 	// deleted covered existed blocks
 	var lastInsertOffset int64 = 0
@@ -240,34 +236,30 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	var lastInsertBlockId int64 = 0
 
 	for i, block := range seg.Segment.Blocks {
-		for key, sortId := range sortIds {
-			if blockMap[sortId][0] <= block.Offset && blockMap[sortId][0] + blockMap[sortId][1] >= block.Offset {
-				// if cover existed block, delete existed block.
+		for blockId, blockInfo := range blockMap {
+			
+			if (block.Offset <= blockInfo[0] && block.Offset + int64(block.Size) - int64(1) >= blockInfo[0] + int64(block.Size) - int64(1)) {
+				// if covered existed block, delete existed block.
 				sqltext = DeleteBlockSql()
 				_, err = sqlTx.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, sortId)
+					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
 				if err != nil {
 					log.Printf("CreateFileSegment: Failed to delete segment to tidb, err: %v", err)
 					return ErrYIgFsInternalErr
 				}
-
+	
 				log.Printf("Deleted covered block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, sortId)
-				
-				// update decreased block size and number.
-				decreasedBlockSize += uint64(block.Size)
-			 	decreasedBlocksNumber += 1
-				// delete the list key
-				sortIds = append(sortIds[:key] , sortIds[key+1:]...)
-			} else if blockMap[sortId][0] > block.Offset {
-				break
-			}
+					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
+
+				// deleted map keys
+				delete(blockMap, blockId)
+			} 
 		}
 
 		// Determine if the last uploaded block has been overwritten.
 		deleteLastBlock := false
 		if i != 0 {
-			if lastInsertOffset <= block.Offset && lastInsertOffset + lastInsertSize >= block.Offset {
+			if (block.Offset <= lastInsertOffset && block.Offset + int64(block.Size) - int64(1) >= lastInsertOffset + lastInsertSize - int64(1)) {
 				deleteLastBlock = true
 			}
 		}
@@ -284,10 +276,6 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 
 			log.Printf("Deleted last insert block, seg_id0: %d, seg_id1: %d, block_id: %d", 
 				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId)
-
-			// update decreased block size and number.
-			decreasedBlockSize += uint64(block.Size)
-			decreasedBlocksNumber += 1
 		}
 
 		// upload block
@@ -305,33 +293,46 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 			return ErrYIgFsInternalErr
 		}
 
-		// update increased block size and number.
-		increasedBlockSize += uint64(block.Size)
-		increasedBlocksNumber += 1
-
 		lastInsertOffset = block.Offset
 		lastInsertSize = int64(block.Size)
 		lastInsertBlockId = int64(blockId)
 	}
 
-	// get file size and blocks.
-	var allBlocksNumber uint32 = 0
+	// get the target file's all blocks
+	sqltext = GetBlocksSizeSql()
+	rows, err := sqlTx.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Failed to get blocks size, err: %v", err)
+		err = ErrYIgFsInternalErr
+		return
+	}
+	defer rows.Close()
+	
+	var size int
 	var allFileSize uint64 = 0
+	var allBlocksNumber uint32 = 0
 
-	sqltext = GetFileSizeAndBlocksSql()
-	row := sqlTx.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation)
-	err = row.Scan(
-		&allFileSize,
-		&allBlocksNumber,
-	)
+	for rows.Next() {
+		err = rows.Scan (
+			&size,
+		)
+		if err != nil {
+			log.Printf("Failed to get block size in row, err: %v", err)
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		allFileSize += uint64(size)
+		allBlocksNumber ++
+	}
+	
+	err = rows.Err()
 	if err != nil {
-		log.Printf("CreateFileSegment: Failed to get the file size and blocks number, err: %v", err)
+		log.Printf("Failed to get blocks size in rows, err: %v", err)
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	allFileSize = allFileSize + increasedBlockSize - decreasedBlockSize
-	allBlocksNumber = allBlocksNumber + increasedBlocksNumber - decreasedBlocksNumber
 
 	// update file size and blocks
 	sqltext = UpdateFileSizeAndBlocksSql()
@@ -345,7 +346,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	// if segment leader not exist, create it.
 	var leader string
 	sqltext = GetSegmentLeaderSql()
-	row = sqlTx.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0, seg.Segment.SegmentId1)
+	row := sqlTx.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0, seg.Segment.SegmentId1)
 	err = row.Scan (
 		&leader,
 	)
