@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"time"
+	"strings"
 	
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -400,10 +401,12 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 	}
 
 	if file.File.Uid != nil {
-		sqltext += " uid=?"
+		sqltext += " uid=?,"
 		args = append(args, *file.File.Uid)
 	}
-	
+
+	sqltext = strings.TrimRight(sqltext, ",")
+
 	sqltext += " where region=? and bucket_name=? and ino=? and generation=?"
 	args = append(args, file.Region, file.BucketName, file.File.Ino, file.File.Generation)
 	
