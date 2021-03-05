@@ -60,6 +60,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         match ret {
             Ok(ret) => {
                 let file_attr = self.to_usefs_attr(&ret);
+                println!("lookup: parent: {}, name: {}, attr: {:?}", parent, name_str, file_attr);
                 reply.entry(&TTL, &file_attr, ret.generation);
             }
             Err(error) => {

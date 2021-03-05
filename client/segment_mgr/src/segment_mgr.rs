@@ -112,7 +112,8 @@ impl<'a> SegmentMgr<'a> {
                 ino, meta_seg, ret);
                 return Err(ret);
             }
-            println!("write_segment: succeed to add_file_block for ino: {}, set: {:?}", ino, meta_seg);
+            println!("write_segment: succeed to add_file_block for ino: {}, set: {:?},  nwrite: {}", 
+                ino, meta_seg, r.nwrite);
             return Ok(r.nwrite);
         }
         println!("write_segment: got invalid response for seg({:?}, offset: {}", seg, offset);
