@@ -52,6 +52,7 @@ impl<'a> SegmentMgr<'a> {
             segments.push(segment);
         }
 
+        println!("the segments of ino: {} are: {:?}", ino, segments);
         Ok(segments)
     }
 
