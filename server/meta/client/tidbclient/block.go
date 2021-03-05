@@ -20,7 +20,7 @@ func GetBlockInfoSql() (sqltext string) {
 
 func GetBlocksInfoSql() (sqltext string) {
 	sqltext = "select size, offset, block_id from block where region=? and bucket_name=?" +
-		" and ino=? and generation=? and seg_id0=? and seg_id1=? and is_deleted=?;"
+		" and ino=? and generation=? and seg_id0=? and seg_id1=? and is_deleted=? order by offset;"
 	return sqltext
 }
 
@@ -28,6 +28,52 @@ func DeleteBlockSql() (sqltext string) {
 	sqltext = "update block set is_deleted=? where region=? and bucket_name=? and ino=?" +
 		" and generation=? and seg_id0=? and seg_id1=? and block_id=?;"
 	return sqltext
+}
+
+func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][]int64, sortIds []int64, err error){
+	blockMap = make(map[int64][]int64)
+	sortIds = make([]int64, 0)
+
+	sqltext := GetBlocksInfoSql()
+	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
+		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Failed to get blocks, err: %v", err)
+		err = ErrYIgFsInternalErr
+		return
+	}
+	defer rows.Close()
+	
+	var size int
+	var offset int64
+	var block_id int64
+
+	for rows.Next() {
+		err = rows.Scan (
+			&size,
+			&offset,
+			&block_id,
+		)
+		if err != nil {
+			log.Printf("Failed to get block in row, err: %v", err)
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		blockMap[block_id] = append(blockMap[block_id], int64(offset))
+		blockMap[block_id] = append(blockMap[block_id], int64(size))
+
+		sortIds = append(sortIds, block_id)
+	}
+	
+	err = rows.Err()
+	if err != nil {
+		log.Printf("Failed to get blocks in rows, err: %v", err)
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	return blockMap, sortIds, nil
 }
 
 func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
@@ -148,8 +194,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	var decreasedBlockSize uint64 = 0
 	var increasedBlocksNumber uint32 = 0
 	var decreasedBlocksNumber uint32 = 0 
-	var blockMap = make(map[int64][]int64)
-
+	
 	var tx interface{}
 	var sqlTx *sql.Tx
 	var stmt *sql.Stmt
@@ -181,44 +226,13 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	}()
 	
 	// get existed blocks
-	sqltext = GetBlocksInfoSql()
-	rows, err := sqlTx.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted)
-	if err != nil && err != sql.ErrNoRows {
-		log.Printf("CreateFileSegment: Failed to get blocks, err: %v", err)
-		err = ErrYIgFsInternalErr
-		return
-	}
-	defer rows.Close()
-	
-	var fileSize int
-	var offset int64
-	var block_id int64
-
-	for rows.Next() {
-		err = rows.Scan (
-			&fileSize,
-			&offset,
-			&block_id,
-		)
-		if err != nil {
-			log.Printf("CreateFileSegment: Failed to get block in row, err: %v", err)
-			err = ErrYIgFsInternalErr
-			return
-		}
-
-		blockMap[block_id] = append(blockMap[block_id], int64(offset))
-		blockMap[block_id] = append(blockMap[block_id], int64(fileSize))
-	}
-	
-	err = rows.Err()
+	blockMap, sortIds, err := GetBlocks(seg, t)
 	if err != nil {
-		log.Printf("CreateFileSegment: Failed to get blocks in rows, err: %v", err)
-		err = ErrYIgFsInternalErr
-		return
+		log.Printf("CreateFileSegment: Failed to get the segment blocks, err: %v", err)
+		return ErrYIgFsInternalErr
 	}
 
-	log.Printf("Existed blocks is: %v", blockMap)
+	log.Printf("Existed blocks is: %v, sorting block id is: %v", blockMap, sortIds)
 
 	// deleted covered existed blocks
 	var lastInsertOffset int64 = 0
@@ -226,29 +240,31 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	var lastInsertBlockId int64 = 0
 
 	for i, block := range seg.Segment.Blocks {
-		for existId, blocksInfo := range blockMap {
-			if blocksInfo[0] <= block.Offset && blocksInfo[0] + blocksInfo[1] >= block.Offset {
+		for key, sortId := range sortIds {
+			if blockMap[sortId][0] <= block.Offset && blockMap[sortId][0] + blockMap[sortId][1] >= block.Offset {
 				// if cover existed block, delete existed block.
 				sqltext = DeleteBlockSql()
 				_, err = sqlTx.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, existId)
+					seg.Segment.SegmentId0, seg.Segment.SegmentId1, sortId)
 				if err != nil {
 					log.Printf("CreateFileSegment: Failed to delete segment to tidb, err: %v", err)
 					return ErrYIgFsInternalErr
 				}
 
 				log.Printf("Deleted covered block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, existId)
+					seg.Segment.SegmentId0, seg.Segment.SegmentId1, sortId)
 				
 				// update decreased block size and number.
 				decreasedBlockSize += uint64(block.Size)
 			 	decreasedBlocksNumber += 1
-				// delete the map key
-				delete(blockMap, existId)
+				// delete the list key
+				sortIds = append(sortIds[:key] , sortIds[key+1:]...)
+			} else if blockMap[sortId][0] > block.Offset {
+				break
 			}
 		}
 
-		// Determine if the uploaded block has been overwritten.
+		// Determine if the last uploaded block has been overwritten.
 		deleteLastBlock := false
 		if i != 0 {
 			if lastInsertOffset <= block.Offset && lastInsertOffset + lastInsertSize >= block.Offset {
