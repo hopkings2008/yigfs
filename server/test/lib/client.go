@@ -27,8 +27,6 @@ const (
 	FileName = "test.txt"
 	Size = 128
 	Nlink = 1
-	UpdateUid = 20
-	UpdatePerm = 755
 	Offset = 0
 	SegStartAddr = 0
 	SegEndAddr = 127

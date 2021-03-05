@@ -384,11 +384,13 @@ func Test_SetFileAttr(t *testing.T) {
 	sc := NewClient()
 	newServer := Endpoint + "/v1/file/attr"
 
+	var updateUid = uint32(20)
+	var updatePerm = uint32(755)
+
 	file := &types.SetFileAttrInfo{
 		Ino: getDirFileResp.File.Ino,
-		Size: Size,
-		Perm: UpdatePerm,
-		Uid : UpdateUid,
+		Perm: &updatePerm,
+		Uid : &updateUid,
 	}
 
 	setFileAttrReq := &types.SetFileAttrReq {
@@ -420,7 +422,7 @@ func Test_SetFileAttr(t *testing.T) {
 		t.Fatalf("Failed to set file attr, resp code: %d, err: %v", setFileAttrResp.Result.ErrCode, setFileAttrResp.Result.ErrMsg)
 	}
 
-	if setFileAttrResp.File.Uid != UpdateUid || setFileAttrResp.File.Perm != UpdatePerm {
+	if setFileAttrResp.File.Uid != updateUid || setFileAttrResp.File.Perm != updatePerm {
 		t.Fatalf("Failed to update file attr, the parameters is not updated.")
 	}
 

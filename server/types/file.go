@@ -96,14 +96,15 @@ type GetFileInfoReq struct {
 
 type SetFileAttrInfo struct {
 	Ino uint64 `json:"ino"`
-	Size uint64 `json:"size"`
-	Ctime int64 `json:"ctime"`
-	Mtime int64 `json:"mtime"`
-	Atime int64 `json:"atime"`
-	Perm uint32 `json:"perm"`
-	Uid uint32 `json:"uid"`
-	Gid uint32 `json:"gid"`
-	Blocks uint32 `json:"blocks"`
+	Generation uint64 `json:"generation"`
+	Size *uint64 `json:"size"`
+	Ctime *int64 `json:"ctime"`
+	Mtime *int64 `json:"mtime"`
+	Atime *int64 `json:"atime"`
+	Perm *uint32 `json:"perm"`
+	Uid *uint32 `json:"uid"`
+	Gid *uint32 `json:"gid"`
+	Blocks *uint32 `json:"blocks"`
 }
 
 type SetFileAttrReq struct {
@@ -111,7 +112,6 @@ type SetFileAttrReq struct {
 	Region string `json:"region"`
 	BucketName string `json:"bucket"`
 	File *SetFileAttrInfo `json:"file"`
-	Generation uint64 `json:"generation"`
 }
 
 type SetFileAttrResp struct {
