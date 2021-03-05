@@ -358,27 +358,58 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 
 func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error) {
 	now := time.Now().UTC()
-	
-	ctime := now
-	if file.File.Ctime != 0 {
-		ctime = time.Unix(0, file.File.Ctime).UTC()
-	}
+
 	mtime := now
-	if file.File.Mtime != 0 {
-		mtime = time.Unix(0, file.File.Mtime).UTC()
+	if file.File.Mtime != nil {
+		mtime = time.Unix(0, *file.File.Mtime).UTC()
 	}
-	atime := now
-	if file.File.Atime != 0 {
-		atime = time.Unix(0, file.File.Atime).UTC()
+
+	sqltext := "update file set mtime=?,"
+	args := []interface{}{mtime}
+
+	if file.File.Atime != nil {
+		atime := time.Unix(0, *file.File.Atime).UTC()
+		sqltext += " atime=?,"
+		args = append(args, atime)
+	}
+
+	if file.File.Ctime != nil {
+		ctime := time.Unix(0, *file.File.Ctime).UTC()
+		sqltext += " ctime=?,"
+		args = append(args, ctime)
 	}
 	
-	sqltext := "update file set size=?, ctime=?, mtime=?, atime=?, perm=?, uid=?, gid=?, blocks=? where" + 
-		" region=? and bucket_name=? and ino=? and generation=?"
-	args := []interface{}{file.File.Size, ctime, mtime, atime, file.File.Perm, file.File.Uid, file.File.Gid, file.File.Blocks, 
-		file.Region, file.BucketName, file.File.Ino, file.Generation}
+	if file.File.Size != nil {
+		sqltext += " size=?,"
+		args = append(args, *file.File.Size)
+	}
+
+	if file.File.Blocks != nil {
+		sqltext += " blocks=?,"
+		args = append(args, *file.File.Blocks)
+	}
+
+	if file.File.Gid != nil {
+		sqltext += " gid=?,"
+		args = append(args, *file.File.Gid)
+	}
+
+	if file.File.Perm != nil {
+		sqltext += " perm=?,"
+		args = append(args, *file.File.Perm)
+	}
+
+	if file.File.Uid != nil {
+		sqltext += " uid=?"
+		args = append(args, *file.File.Uid)
+	}
+	
+	sqltext += " where region=? and bucket_name=? and ino=? and generation=?"
+	args = append(args, file.Region, file.BucketName, file.File.Ino, file.File.Generation)
+	
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
-		log.Printf("Failed to set file attr to tidb, err: %v", err)
+		log.Printf("Failed to set file attr to tidb, err: %v, sqltext: %v", err, sqltext)
 		err = ErrYIgFsInternalErr
 		return
 	}
