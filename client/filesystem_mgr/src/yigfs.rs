@@ -75,6 +75,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         match ret {
             Ok(ret) => {
                 let attr = self.to_usefs_attr(&ret);
+                println!("getattr: ino: {}, attr: {:?}", ino, attr);
                 reply.attr(&TTL, &attr);
             }
             Err(error) => {
