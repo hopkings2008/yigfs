@@ -23,6 +23,7 @@ type TidbConfig struct {
 type MetaServiceConfig struct {
 	Port              string        `toml:"port"`
 	LogDir            string        `toml:"log_dir"`
+	LogLevel          string        `toml:"log_level"`
 	TlsKeyFile        string        `toml:"tls_key_file"`
 	TlsCertFile       string        `toml:"tls_cert_file"`
 }

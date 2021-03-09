@@ -1,12 +1,13 @@
 package main
 
 import (
-	"log"
+	"fmt"
 
-	"github.com/kataras/iris"
-	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/api"
+	"github.com/hopkings2008/yigfs/server/helper"
+	"github.com/hopkings2008/yigfs/server/log"
 	"github.com/hopkings2008/yigfs/server/storage"
+	"github.com/kataras/iris"
 )
 
 
@@ -16,6 +17,11 @@ func main() {
 
 	// Setup config
 	helper.SetupConfig()
+
+	// Configurate log
+	logLevel := log.ParseLevel(helper.CONFIG.MetaServiceConfig.LogLevel)
+	helper.Logger = log.NewFileLogger(helper.CONFIG.MetaServiceConfig.LogDir, logLevel)
+	defer helper.Logger.Close()
 
 	// Instantiate database
 	yigFsStorage := storage.New()
@@ -48,7 +54,12 @@ func main() {
 	app.Put("/v1/file/block", apiHandlers.CreateSegmentHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
-	log.Fatal(app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile)))
+	err := app.Run(iris.Addr(port))
+	if err != nil {
+		helper.Logger.Error(nil, fmt.Sprintf("Failed to run yigfs, err: %v", err))
+	}
+	
+	//log.Fatal(app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile)))
 }
 
 

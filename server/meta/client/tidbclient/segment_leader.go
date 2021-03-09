@@ -3,11 +3,12 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
+	"fmt"
 
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 func GetSegmentLeaderSql() (sqltext string) {
@@ -33,13 +34,13 @@ func (t *TidbClient) GetSegmentLeaderInfo(ctx context.Context, segment *types.Ge
 		err = ErrYigFsNoSuchLeader
 		return
 	} else if err != nil {
-		log.Printf("Failed to get the segment leader, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the segment leader, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
 	resp.ZoneId = segment.ZoneId
-	log.Printf("succeed to get the segment leader from tidb, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get the segment leader from tidb, sqltext: %v", sqltext))
 	return
 }
 
@@ -52,12 +53,12 @@ func (t *TidbClient) CreateSegmentLeader(ctx context.Context, segment *types.Cre
 		
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
-		log.Printf("Failed to create segment leader to tidb, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment leader to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to create segment leader to tidb, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create segment leader to tidb, sqltext: %v", sqltext))
 	return
 }
 

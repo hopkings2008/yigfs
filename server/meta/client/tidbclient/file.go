@@ -3,12 +3,13 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
 	"strings"
+	"fmt"
 	
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -50,7 +51,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
 		err = ErrYigFsNotFindTargetDirFiles
 		return
 	} else if err != nil {
-		log.Printf("Failed to query dir files, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to query dir files, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -63,7 +64,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
 			&tmp.FileName,
 			&tmp.Type)
 		if err != nil {
-			log.Printf("Failed to list dir files in row, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to list dir files in row, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -71,7 +72,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Printf("Failed to list dir files in rows, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to list dir files in rows, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -81,7 +82,7 @@ func (t *TidbClient) ListDirFiles(ctx context.Context, dir *types.GetDirFilesReq
 		offset = dirFilesResp[dirLength - 1].Ino + 1   //nextStartIno
 	}
 
-	log.Printf("succeed to list dir files, sqltext: %v, req offset: %v, resp offset: %v", sqltext, dir.Offset, offset)
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to list dir files, sqltext: %v, req offset: %v, resp offset: %v", sqltext, dir.Offset, offset))
 	return
 }
 
@@ -108,7 +109,7 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 		err = ErrYigFsNoSuchFile
 		return
 	} else if err != nil {
-		log.Printf("Failed to get the dir file info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the dir file info, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -134,7 +135,7 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 	resp.ParentIno = file.ParentIno
 	resp.FileName = file.FileName
 
-	log.Printf("succeed to get dir file info, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get dir file info, sqltext: %v", sqltext))
 	return
 }
 
@@ -162,7 +163,7 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 		err = ErrYigFsNoSuchFile
 		return
 	} else if err != nil {
-		log.Printf("Failed to get the file info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the file info, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -187,7 +188,7 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 	resp.Region = file.Region
 	resp.BucketName = file.BucketName
 
-	log.Printf("succeed to get file info, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get file info, sqltext: %v", sqltext))
 	return
 }
 
@@ -233,11 +234,11 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 		_, err = sqlTx.Exec(sqltext, types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
 			now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 		if err != nil {
-			log.Printf("Failed to init root dir ., err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to init root dir ., err: %v", err))
 			return ErrYIgFsInternalErr
 		}
 	} else if err != nil {
-		log.Printf("InitRootDirs: Failed to get the root dir info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("InitRootDirs: Failed to get the root dir info, err: %v", err))
 		return ErrYIgFsInternalErr
 	}
 
@@ -262,11 +263,11 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 		_, err = sqlTx.Exec(sqltext, types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
 			now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 		if err != nil {
-			log.Printf("Failed to init root parent dir .., err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to init root parent dir .., err: %v", err))
 			return ErrYIgFsInternalErr
 		}
 	} else if err != nil {
-		log.Printf("InitRootDirs: Failed to get the root parent dir info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("InitRootDirs: Failed to get the root parent dir info, err: %v", err))
 		return ErrYIgFsInternalErr
 	}	
 
@@ -274,11 +275,11 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 	sqltext = CreateOrUpdateZoneSql()
 	_, err = sqlTx.Exec(sqltext, rootDir.ZoneId, rootDir.Region, rootDir.BucketName, rootDir.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
-		log.Printf("InitRootDirs: Failed to create zone, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("InitRootDirs: Failed to create zone, err: %v", err))
 		return ErrYIgFsInternalErr
 	}
 
-	log.Printf("Succeed to init root dirs to tidb")
+	helper.Logger.Info(ctx, "Succeed to init root dirs to tidb.")
 	return
 }
 
@@ -317,7 +318,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 		file.Type, ctime, mtime, atime, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
 	_, err = sqlTx.Exec(sqltext, args...)
 	if err != nil {
-		log.Printf("CreateFile: Failed to create file to tidb, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to create file to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -330,7 +331,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 		&ino)
 
 	if err != nil {
-		log.Printf("CreateFile: Failed to get the dir file info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to get the dir file info, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -339,7 +340,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 	sqltext = CreateOrUpdateFileLeaderSql()
 	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, ino, file.Generation, file.Machine, now, now, types.NotDeleted)
 	if err != nil {
-		log.Printf("CreateFile: Failed to create file leader to tidb, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to create file leader to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -348,12 +349,12 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 	sqltext = CreateOrUpdateZoneSql()
 	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, file.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
-		log.Printf("CreateFile: Failed to create or update zone to tidb, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to create or update zone to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to create file to tidb")
+	helper.Logger.Info(ctx, "Succeed to create file to tidb.")
 	return
 }
 
@@ -412,11 +413,11 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 	
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
-		log.Printf("Failed to set file attr to tidb, err: %v, sqltext: %v", err, sqltext)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to set file attr to tidb, err: %v, sqltext: %v", err, sqltext))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to set file attr to tidb, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to set file attr to tidb, sqltext: %v", sqltext))
 	return
 }

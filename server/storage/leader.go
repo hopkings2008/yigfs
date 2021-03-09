@@ -2,10 +2,11 @@ package storage
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -13,7 +14,8 @@ func GetMachineAndUpdateFileLeader(ctx context.Context, leader *types.GetLeaderR
 	// get a up machine from zone
 	machine, err := yigFs.MetaStorage.Client.GetOneUpMachine(ctx, leader)
 	if err != nil {
-		log.Printf("Failed to get one up machine, zone_id: %s, region: %s, bucket: %s, err: %v", leader.ZoneId, leader.Region, leader.BucketName, err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get one up machine, zone_id: %s, region: %s, bucket: %s, err: %v", 
+			leader.ZoneId, leader.Region, leader.BucketName, err))
 		return
 	}
 
@@ -21,8 +23,8 @@ func GetMachineAndUpdateFileLeader(ctx context.Context, leader *types.GetLeaderR
 	leader.Machine = machine
 	err = yigFs.MetaStorage.Client.CreateOrUpdateFileLeader(ctx, leader)
 	if err != nil {
-		log.Printf("Failed to create leader, zone_id: %s, region: %s, bucket: %s, ino: %d, leader: %s, err: %v",
-			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Machine, err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create leader, zone_id: %s, region: %s, bucket: %s, ino: %d, leader: %s, err: %v",
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Machine, err))
 		return
 	}
 
@@ -33,7 +35,7 @@ func GetMachineAndUpdateFileLeader(ctx context.Context, leader *types.GetLeaderR
 		},
 	}
 
-	log.Printf("Get one up machine is: %s, zone_id is: %s", machine, leader.ZoneId)
+	helper.Logger.Info(ctx, fmt.Sprintf("Get one up machine is: %s, zone_id is: %s", machine, leader.ZoneId))
 	return
 }
 
@@ -41,8 +43,8 @@ func CreateFileLeaderAndUpdateZone(ctx context.Context, leader *types.GetLeaderR
 	// create file leader
 	err = yigFs.MetaStorage.Client.CreateOrUpdateFileLeader(ctx, leader)
 	if err != nil {
-		log.Printf("Failed to create leader, zone_id: %s, region: %s, bucket: %s, ino: %d, leader: %s, err: %v",
-			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Machine, err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create leader, zone_id: %s, region: %s, bucket: %s, ino: %d, leader: %s, err: %v",
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Machine, err))
 		return
 	}
 
@@ -56,8 +58,8 @@ func CreateFileLeaderAndUpdateZone(ctx context.Context, leader *types.GetLeaderR
 	
 	err = yigFs.MetaStorage.Client.CreateOrUpdateZone(ctx, zone)
 	if err != nil {
-		log.Printf("Failed to create or update zone, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
-			leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create or update zone, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err))
 		return
 	}
 	
@@ -68,7 +70,8 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 	resp, err = yigFs.MetaStorage.Client.GetFileLeaderInfo(ctx, leader)
 	switch err {
 	case ErrYigFsNoSuchLeader:
-		log.Printf("The file does not have leader, zone_id: %s, region: %s, bucket: %s, ino: %d", leader.ZoneId, leader.Region, leader.BucketName, leader.Ino)
+		helper.Logger.Warn(ctx, fmt.Sprintf("The file does not have leader, zone_id: %s, region: %s, bucket: %s, ino: %d, starting to create it", 
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino))
 		// if leader does not exist, get a up machine from zone and update leader info
 		getMachineResp, err := GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
 		if err != nil {
@@ -81,15 +84,15 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 		var getMachineInfoResp = &types.GetMachineInfoResp{}
 		getMachineInfoResp, err = yigFs.MetaStorage.Client.GetMachineInfo(ctx, leader)
 		if err != nil && err != ErrYigFsNoSuchMachine {
-			log.Printf("Failed to get machine info, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
-				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get machine info, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
+				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err))
 			return resp, err
 		}
 
 		// if status does not up or the target leader is not existed in zone, get a up machine from zone and update leader info.
 		if err == ErrYigFsNoSuchMachine || getMachineInfoResp.Status != types.MachineUp {
-			log.Printf("The file leader existed, but the status is not valid, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v, status: %v", 
-				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err, getMachineInfoResp.Status)
+			helper.Logger.Error(ctx, fmt.Sprintf("The file leader existed, but the status is not valid, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v, status: %v", 
+				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err, getMachineInfoResp.Status))
 			getMachineResp, err := GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
 			if err != nil {
 				return resp, err
@@ -99,7 +102,8 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 
 		return resp, nil
 	default:
-		log.Printf("Failed to get leader, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v", leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get leader, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v", 
+			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, err))
 		return
 	}
 }
@@ -154,8 +158,8 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 
 		return
 	default:
-		log.Printf("Failed to get segment leader, zone_id: %s, region: %s, bucket: %s, seg_id0: %d, seg_id1: %d, err: %v",
-			segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment leader, zone_id: %s, region: %s, bucket: %s, seg_id0: %d, seg_id1: %d, err: %v",
+			segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, err))
 		return
 	}
 }

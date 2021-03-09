@@ -5,6 +5,7 @@ tidb_info = "root:@tcp(10.5.0.17:4000)/yigfs"
 [meta_service_config]
 port = "9088"
 log_dir = "/var/log/yigfsmeta"
+log_level = "info"
 tls_key_file = "/etc/yigfsmeta/serverkey.pem"
 tls_cert_file = "/etc/yigfsmeta/servercert.pem"
 

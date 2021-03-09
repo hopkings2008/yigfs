@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"time"
-	"log"
+	"fmt"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -42,7 +43,7 @@ func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][
 	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
 		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted)
 	if err != nil && err != sql.ErrNoRows {
-		log.Printf("Failed to get blocks, err: %v", err)
+		helper.Logger.Error(nil, fmt.Sprintf("Failed to get blocks, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -59,7 +60,7 @@ func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][
 			&block_id,
 		)
 		if err != nil {
-			log.Printf("Failed to get block in row, err: %v", err)
+			helper.Logger.Error(nil, fmt.Sprintf("Failed to get block in row, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -70,7 +71,7 @@ func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][
 	
 	err = rows.Err()
 	if err != nil {
-		log.Printf("Failed to get blocks in rows, err: %v", err)
+		helper.Logger.Error(nil, fmt.Sprintf("Failed to get blocks in rows, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -99,7 +100,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 		err = ErrYigFsNoTargetSegment
 		return
 	} else if err != nil {
-		log.Printf("Failed to get segment info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment info, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -111,7 +112,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 			&segmentId1,
 			&blockId)
 		if err != nil {
-			log.Printf("Failed to get segment info in row, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment info in row, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -121,12 +122,12 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Printf("Failed to get segment info in rows, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment info in rows, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("segmentMap is %v", segmentMap)
+	helper.Logger.Info(ctx, fmt.Sprintf("GetFileSegmentInfo: segmentMap is %v", segmentMap))
 
 	for segmentId, blockIds := range segmentMap {
 		segment := &types.SegmentInfo {
@@ -141,7 +142,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 		sqltext = GetBlockInfoSql()
 		stmt, err = t.Client.Prepare(sqltext)
 		if err != nil {
-			log.Printf("Failed to prepare get block info, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare get block info, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -149,7 +150,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 		defer func() {
 			closeErr := stmt.Close()
 			if closeErr != nil {
-				log.Printf("Failed to close get block info stmt, err: %v", err)
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to close get block info stmt, err: %v", err))
 				err = ErrYIgFsInternalErr
 			}
 		}()
@@ -163,7 +164,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 				&block.SegEndAddr)
 
 			if err != nil {
-				log.Printf("Failed to get the block info, err: %v", err)
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the block info, err: %v", err))
 				err = ErrYIgFsInternalErr
 				return
 			}
@@ -179,7 +180,7 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 		)
 
 		if err != nil {
-			log.Printf("GetFileSegmentInfo: Failed to get the segment leader, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("GetFileSegmentInfo: Failed to get the segment leader, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -210,15 +211,15 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	sqltext := "insert into block values(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
 	stmt, err = sqlTx.Prepare(sqltext)
 	if err != nil {
-		log.Printf("Failed to prepare insert block, err: %v", err)
-			err = ErrYIgFsInternalErr
-			return
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare insert block, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
 	}
 
 	defer func() {
 		closeErr := stmt.Close()
 		if closeErr != nil {
-			log.Printf("Failed to close insert block stmt, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close insert block stmt, err: %v", err))
 			err = ErrYIgFsInternalErr
 		}
 	}()
@@ -226,7 +227,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	// get existed blocks
 	blockMap, err := GetBlocks(seg, t)
 	if err != nil {
-		log.Printf("CreateFileSegment: Failed to get the segment blocks, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to get the segment blocks, err: %v", err))
 		return ErrYIgFsInternalErr
 	}
 
@@ -244,12 +245,12 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 				_, err = sqlTx.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
 					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
 				if err != nil {
-					log.Printf("CreateFileSegment: Failed to delete segment to tidb, err: %v", err)
+					helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to delete segment to tidb, err: %v", err))
 					return ErrYIgFsInternalErr
 				}
 	
-				log.Printf("Deleted covered block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
+				helper.Logger.Info(ctx, fmt.Sprintf("Deleted covered block, seg_id0: %d, seg_id1: %d, block_id: %d", 
+					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId))
 
 				// deleted map keys
 				delete(blockMap, blockId)
@@ -270,18 +271,18 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 			_, err = sqlTx.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
 				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId)
 			if err != nil {
-				log.Printf("CreateFileSegment: Failed to delete lastInsertBlockId to tidb, err: %v", err)
+				helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to delete lastInsertBlockId to tidb, err: %v", err))
 				return ErrYIgFsInternalErr
 			}
 
-			log.Printf("Deleted last insert block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId)
+			helper.Logger.Info(ctx, fmt.Sprintf("Deleted last insert block, seg_id0: %d, seg_id1: %d, block_id: %d", 
+				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId))
 		}
 
 		// upload block
 		node, err := snowflake.NewNode(int64(i%10))
 		if err != nil {
-			log.Printf("Failed to create blockId, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
 			return ErrYIgFsInternalErr
 		}
 		blockId := node.Generate()
@@ -289,7 +290,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 		_, err = stmt.Exec(seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, 
 			blockId, block.Size, block.Offset, block.SegStartAddr, block.SegEndAddr, now, now, types.NotDeleted)
 		if err != nil {
-			log.Printf("Failed to create segment to tidb, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment to tidb, err: %v", err))
 			return ErrYIgFsInternalErr
 		}
 
@@ -302,7 +303,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	sqltext = GetBlocksSizeSql()
 	rows, err := sqlTx.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted)
 	if err != nil && err != sql.ErrNoRows {
-		log.Printf("Failed to get blocks size, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks size, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -317,7 +318,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 			&size,
 		)
 		if err != nil {
-			log.Printf("Failed to get block size in row, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get block size in row, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -328,7 +329,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	
 	err = rows.Err()
 	if err != nil {
-		log.Printf("Failed to get blocks size in rows, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks size in rows, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -338,7 +339,7 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 	sqltext = UpdateFileSizeAndBlocksSql()
 	_, err = sqlTx.Exec(sqltext, allFileSize, now, allBlocksNumber, seg.Region, seg.BucketName, seg.Ino, seg.Generation)
 	if err != nil {
-		log.Printf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
@@ -356,16 +357,16 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 		_, err = sqlTx.Exec(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0,
 			seg.Segment.SegmentId1, seg.Machine, now, now, types.NotDeleted)
 		if err != nil {
-			log.Printf("CreateFileSegment: Failed to create segment leader, err: %v", err)
+			helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to create segment leader, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
 	} else if err != nil {
-		log.Printf("CreateFileSegment: Failed to get the segment leader, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to get the segment leader, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to create segment to tidb")
+	helper.Logger.Info(ctx, "Succeed to create segment to tidb")
 	return
 }
