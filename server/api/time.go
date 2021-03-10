@@ -2,7 +2,9 @@ package api
 
 import (
 	"time"
-	"log"
+	"fmt"
+
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -10,6 +12,6 @@ func GetSpendTime(action string) func() {
 	start := time.Now().UTC().UnixNano()
 	return func() {
 		end := time.Now().UTC().UnixNano()
-		log.Printf(action + "cost time: %v", end - start)
+		helper.Logger.Info(nil, fmt.Sprintf(action + " cost time: %v", end - start))
 	}
 }

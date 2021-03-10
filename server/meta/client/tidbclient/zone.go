@@ -3,11 +3,12 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
+	"fmt"
 
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -21,12 +22,12 @@ func (t *TidbClient) CreateOrUpdateZone(ctx context.Context, zone *types.InitDir
 	sqltext := CreateOrUpdateZoneSql()
 	_, err = t.Client.Exec(sqltext, zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp, 0, now, now)
 	if err != nil {
-		log.Printf("Failed to create or update zone to tidb, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create or update zone to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to create or update zone to tidb, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create or update zone to tidb, sqltext: %v", sqltext))
 	return
 }
 
@@ -41,12 +42,12 @@ func (t *TidbClient) GetOneUpMachine(ctx context.Context, zone *types.GetLeaderR
 		err = ErrYigFsNoSuchMachine
 		return
 	} else if err != nil {
-		log.Printf("Failed to get one up machine, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get one up machine, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("succeed to get one up machine, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get one up machine, sqltext: %v", sqltext))
 	return
 }
 
@@ -63,12 +64,12 @@ func (t *TidbClient) GetMachineInfo(ctx context.Context, zone *types.GetLeaderRe
 		err = ErrYigFsNoSuchMachine
 		return
 	} else if err != nil {
-		log.Printf("Failed to get machine info, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get machine info, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
-
-	log.Printf("succeed to get machine info, sqltext: %v", sqltext)
+	
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get machine info, sqltext: %v", sqltext))
 	return
 }
 

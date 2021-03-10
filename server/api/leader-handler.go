@@ -2,15 +2,19 @@ package api
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/kataras/iris"
 	"github.com/google/uuid"
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 func(yigFs MetaAPIHandlers) GetFileLeaderHandler(ctx iris.Context) {
+	r := ctx.Request()
+    reqContext := r.Context()
+
 	resp := &types.GetLeaderResp {
 		Result: types.YigFsMetaError{},
 	}
@@ -19,7 +23,7 @@ func(yigFs MetaAPIHandlers) GetFileLeaderHandler(ctx iris.Context) {
 	// get req
 	leaderReq := &types.GetLeaderReq{}
 	if err := ctx.ReadJSON(&leaderReq); err != nil {
-		log.Printf("Failed to read GetLeaderReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read GetLeaderReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -27,19 +31,16 @@ func(yigFs MetaAPIHandlers) GetFileLeaderHandler(ctx iris.Context) {
 
 	// check request params
 	if leaderReq.BucketName == "" || leaderReq.ZoneId == "" || leaderReq.Ino == 0 {
-                log.Printf("Some geFileLeader required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some geFileLeader required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
-                return
-        }
+        return
+    }
 
-        if leaderReq.Region == "" {
-                leaderReq.Region = "cn-bj-1"
-        }
+    if leaderReq.Region == "" {
+		leaderReq.Region = "cn-bj-1"
+    }
 
-
-	r := ctx.Request()
-        reqContext := r.Context()
 	uuidStr := uuid.New()
 	leaderReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 

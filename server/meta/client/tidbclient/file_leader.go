@@ -3,11 +3,12 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"log"
 	"time"
+	"fmt"
 
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -31,13 +32,13 @@ func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLea
 		err = ErrYigFsNoSuchLeader
 		return
 	} else if err != nil {
-		log.Printf("Failed to get the file leader, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the file leader, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
 	resp.LeaderInfo.ZoneId = leader.ZoneId
-	log.Printf("succeed to get the file leader from tidb, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get the file leader from tidb, sqltext: %v", sqltext))
 	return
 }
 
@@ -46,11 +47,11 @@ func (t *TidbClient) CreateOrUpdateFileLeader(ctx context.Context, leader *types
 	sqltext := CreateOrUpdateFileLeaderSql()
 	_, err = t.Client.Exec(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation, leader.Machine, now, now, types.NotDeleted)
 	if err != nil {
-		log.Printf("Failed to create file leader to tidb, err: %v", err)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create file leader to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	log.Printf("Succeed to create file leader to tidb, sqltext: %v", sqltext)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create file leader to tidb, sqltext: %v", sqltext))
 	return
 }

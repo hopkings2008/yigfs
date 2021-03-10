@@ -2,12 +2,13 @@ package api
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/kataras/iris"
 	"github.com/google/uuid"
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -17,10 +18,13 @@ func(yigFs MetaAPIHandlers) GetSegmentHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("GetSegmentHandler")()
 
+	r := ctx.Request()
+    reqContext := r.Context()
+
 	// get req
 	segReq := &types.GetSegmentReq{}
 	if err := ctx.ReadJSON(&segReq); err != nil {
-		log.Printf("Failed to read GetSegmentReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read GetSegmentReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -28,7 +32,7 @@ func(yigFs MetaAPIHandlers) GetSegmentHandler(ctx iris.Context) {
 
 	// check request params
 	if segReq.BucketName == "" || segReq.Ino == 0 || segReq.ZoneId == "" {
-		log.Printf("Some GetSegmentInfo required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some GetSegmentInfo required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
@@ -38,8 +42,6 @@ func(yigFs MetaAPIHandlers) GetSegmentHandler(ctx iris.Context) {
 		segReq.Region = "cn-bj-1"
 	}
 
-	r := ctx.Request()
-        reqContext := r.Context()
 	uuidStr := uuid.New()
 	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
@@ -63,10 +65,13 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("CreateSegmentHandler")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	segReq := &types.CreateSegmentReq{}
 	if err := ctx.ReadJSON(&segReq); err != nil {
-		log.Printf("Failed to read CreateSegmentReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read CreateSegmentReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -74,7 +79,7 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 
 	// check request params
 	if segReq.ZoneId == "" || segReq.Machine == "" || segReq.BucketName == "" || segReq.Ino == 0 {
-		log.Printf("Some CreateSegment required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some CreateSegment required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
@@ -83,8 +88,6 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 		segReq.Region = "cn-bj-1"
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
 	uuidStr := uuid.New()
 	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 

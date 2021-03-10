@@ -2,16 +2,16 @@ package api
 
 import (
 	"context"
-	"log"
 
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
 func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) (err error) {
 	if file.BucketName == "" || file.FileName == "" || file.ParentIno == 0 || file.ZoneId == "" || file.Machine == "" {
-		log.Printf("Some createFile required parameters are missing.")
+		helper.Logger.Error(ctx, "Some createFile required parameters are missing.")
 		err = ErrYigFsMissingRequiredParams
 		return
 	}
@@ -41,7 +41,7 @@ func CheckAndAssignmentFileInfo(ctx context.Context, file *types.CreateFileReq) 
 
 func CheckSetFileAttrParams(ctx context.Context, file *types.SetFileAttrReq) (err error) {
 	if file.BucketName == "" || file.File.Ino == 0 {
-		log.Printf("Some SetFileAttr required parameters are missing.")
+		helper.Logger.Error(ctx, "Some SetFileAttr required parameters are missing.")
 		err = ErrYigFsMissingRequiredParams
 		return
 	}

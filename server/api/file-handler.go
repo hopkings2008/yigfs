@@ -2,12 +2,13 @@ package api
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/kataras/iris"
 	"github.com/google/uuid"
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -18,10 +19,13 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("GetDirFiles")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	dirReq := &types.GetDirFilesReq{}
 	if err := ctx.ReadJSON(&dirReq); err != nil {
-		log.Printf("Failed to read GetDirFilesReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read GetDirFilesReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -29,7 +33,7 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 
 	// check request params
 	if dirReq.BucketName == "" || dirReq.ParentIno == 0 {
-		log.Printf("Some GetDirFiles required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some GetDirFiles required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
@@ -39,8 +43,6 @@ func(yigFs MetaAPIHandlers) GetDirFilesHandler(ctx iris.Context) {
 		dirReq.Region = "cn-bj-1"
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
 	uuidStr := uuid.New()
 	dirReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
@@ -70,17 +72,17 @@ func(yigFs MetaAPIHandlers) CreateFileHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("CreateFileHandler")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	fileReq := &types.CreateFileReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-		log.Printf("Failed to read CreateDirFileInfo from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read CreateDirFileInfo from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
 	}
-
-	r := ctx.Request()
-	reqContext := r.Context()
 
 	// check request params
 	err := CheckAndAssignmentFileInfo(reqContext, fileReq)
@@ -111,10 +113,13 @@ func(yigFs MetaAPIHandlers) GetDirFileAttrHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("GetDirFileAttrHandler")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	fileReq := &types.GetDirFileInfoReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-		log.Printf("Failed to read GetDirFileInfoReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read GetDirFileInfoReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -122,7 +127,7 @@ func(yigFs MetaAPIHandlers) GetDirFileAttrHandler(ctx iris.Context) {
 
 	// check request params
 	if fileReq.BucketName == "" || fileReq.FileName == "" || fileReq.ParentIno == 0 {
-		log.Printf("Some GetDirFileAttr required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some GetDirFileAttr required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
@@ -132,8 +137,6 @@ func(yigFs MetaAPIHandlers) GetDirFileAttrHandler(ctx iris.Context) {
 		fileReq.Region = "cn-bj-1"
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
 	uuidStr := uuid.New()
 	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
@@ -158,10 +161,13 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("GetFileAttrHandler")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	fileReq := &types.GetFileInfoReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-		log.Printf("Failed to read GetFileInfoReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read GetFileInfoReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -169,7 +175,7 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 
 	// check request params
 	if fileReq.BucketName == "" || fileReq.Ino == 0 {
-		log.Printf("Some GetFileAttr required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some GetFileAttr required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
@@ -179,8 +185,6 @@ func(yigFs MetaAPIHandlers) GetFileAttrHandler(ctx iris.Context) {
 		fileReq.Region = "cn-bj-1"
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
 	uuidStr := uuid.New()
 	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
@@ -205,10 +209,13 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("InitDirHandler")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	dirReq := &types.InitDirReq{}
 	if err := ctx.ReadJSON(&dirReq); err != nil {
-		log.Printf("Failed to read InitDirReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read InitDirReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
@@ -216,7 +223,7 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 
 	// check request params
 	if dirReq.BucketName == "" || dirReq.Machine == "" || dirReq.ZoneId =="" {
-		log.Printf("Some InitDirHandler required parameters are missing.")
+		helper.Logger.Error(reqContext, "Some InitDirHandler required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
 		return
@@ -226,8 +233,6 @@ func(yigFs MetaAPIHandlers) InitDirHandler(ctx iris.Context) {
 		dirReq.Region = "cn-bj-1"
 	}
 
-	r := ctx.Request()
-	reqContext := r.Context()
 	uuidStr := uuid.New()
 	dirReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
@@ -251,17 +256,17 @@ func(yigFs MetaAPIHandlers) SetFileAttrHandler(ctx iris.Context) {
 	}
 	defer GetSpendTime("SetFileAttrHandler")()
 
+	r := ctx.Request()
+	reqContext := r.Context()
+
 	// get req
 	fileReq := &types.SetFileAttrReq{}
 	if err := ctx.ReadJSON(&fileReq); err != nil {
-		log.Printf("Failed to read SetFileAttrReq from body, err: %v", err)
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read SetFileAttrReq from body, err: %v", err))
 		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
 		ctx.JSON(resp)
 		return
 	}
-
-	r := ctx.Request()
-	reqContext := r.Context()
 
 	// check request params
 	err := CheckSetFileAttrParams(reqContext, fileReq)

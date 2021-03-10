@@ -2,10 +2,11 @@ package storage
 
 import (
 	"context"
-	"log"
+	"fmt"
 
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
+	"github.com/hopkings2008/yigfs/server/helper"
 )
 
 
@@ -18,8 +19,8 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 	getSegInfoResp := &types.GetSegmentResp{}
 	getSegInfoResp, err = yigFs.MetaStorage.Client.GetFileSegmentInfo(ctx, file)
 	if err != nil && err != ErrYigFsNoTargetSegment {
-		log.Printf("Failed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
-			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
+			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size))
 		return resp, err
 	} else if err == ErrYigFsNoTargetSegment || len(getSegInfoResp.Segments) == 0 {
 		return resp, nil
@@ -60,21 +61,21 @@ func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.Ge
 			}
 		}
 
-		log.Printf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
-			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size)
+		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
+			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size))
 		return resp, nil
 	}
 
-	log.Printf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d", 
-		file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d", 
+		file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size))
 	return getSegInfoResp, nil
 }
 
 func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
 	err = yigFs.MetaStorage.Client.CreateFileSegment(ctx, seg)
 	if err != nil {
-		log.Printf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
-			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1)
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
+			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1))
 		return
 	}
 	return
