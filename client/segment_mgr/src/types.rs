@@ -126,3 +126,22 @@ impl Block {
         }
     }
 }
+
+// below structs are for Leader usage.
+#[derive(Debug, Default)]
+pub struct SegmentIo {
+    pub id0: u64,
+    pub id1: u64,
+    // the folder which segment resides
+    pub dir: String,
+}
+
+#[derive(Debug, Default)]
+pub struct BlockIo {
+    pub id0: u64,
+    pub id1: u64,
+    // note: this offset is the start addr in the segment file.
+    pub offset: u64,
+    // the size of this block.
+    pub size: u32,
+}

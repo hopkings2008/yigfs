@@ -1,6 +1,9 @@
 use common::error::Errno;
-use crate::types::Segment;
+use crate::types::{SegmentIo, BlockIo};
 pub trait Leader {
-    fn open_segment(seg: &Segment) -> Errno;
-    fn write_segment(seg: &mut Segment, ino: u64, offset: u64, data: &[u8]) -> Result<u32, Errno>;
+    // open the segment for io
+    fn open(&self, seg: &SegmentIo) -> Errno;
+    // write the block into the segment file.
+    // all the blocks are appended to the segment file.
+    fn write(&self, seg: &SegmentIo, data: &[u8]) -> Result<BlockIo, Errno>;
 }
