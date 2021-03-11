@@ -14,6 +14,8 @@ pub enum Errno{
     Eeof = 5,
     // not found
     Enotf = 6,
+    // not support
+    Enotsupp = 7,
 }
 
 impl Errno {
