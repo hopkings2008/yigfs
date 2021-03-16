@@ -106,6 +106,7 @@ impl IoThreadWorker {
                             println!("IoThreadWorker: stop_tx has dropped.");
                         }
                     }
+                    self.exists().await;
                     
                     break;
                 }
@@ -282,6 +283,13 @@ impl IoThreadWorker {
                 }
             }
         }
+    }
+
+    async fn exists(&mut self) {
+        for (_,v) in &mut self.handles {
+            v.flush().await;
+        }
+        self.handles.clear();
     }
 
     fn to_file_name(&self, id: u128, dir: &String) -> String {

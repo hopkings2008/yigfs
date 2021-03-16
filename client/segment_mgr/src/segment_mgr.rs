@@ -70,7 +70,9 @@ impl<'a> SegmentMgr<'a> {
             id1: seg.seg_id1,
             dir: self.data_dirs[0].clone(),
         };
+        // get the correct io leader according to segment's leader.
         let leader = self.leader_mgr.get_leader(&seg.leader);
+        // write the block by using the io leader.
         let ret = leader.write(&seg_io, data);
         match ret {
             Ok(ret) => {
