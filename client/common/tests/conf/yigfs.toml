@@ -14,3 +14,12 @@ meta_server = "http//127.0.0.1"
 [zone_config]
 zone = "A9DADA1C-6F50-4602-94C6-D5F7FBCFF1EF"
 machine = "172.20.13.166"
+
+[[segment_configs]]
+dir="/data1/yigfs"
+size=67108864
+num=0
+[[segment_configs]]
+dir="/data2/yigfs"
+size=67108864
+num=0

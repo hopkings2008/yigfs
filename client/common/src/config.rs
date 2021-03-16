@@ -6,6 +6,7 @@ pub struct Config{
     pub s3_config: S3Config,
     pub metaserver_config: MetaServerConfig,
     pub zone_config: ZoneConfig,
+    pub segment_configs: Vec<SegmentConfig>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -29,4 +30,11 @@ pub struct MetaServerConfig {
 pub struct ZoneConfig {
     pub zone: String,
     pub machine: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct SegmentConfig {
+    pub dir: String,
+    pub size: u64,
+    pub num: u32, // by default is 0.
 }

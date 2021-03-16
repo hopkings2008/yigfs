@@ -107,7 +107,6 @@ impl IoThreadWorker {
                         }
                     }
                     self.exists().await;
-                    
                     break;
                 }
             }
@@ -286,8 +285,15 @@ impl IoThreadWorker {
     }
 
     async fn exists(&mut self) {
-        for (_,v) in &mut self.handles {
-            v.flush().await;
+        for (k,v) in &mut self.handles {
+            let ret = v.flush().await;
+            match ret {
+                Ok(_) =>{}
+                Err(err) => {
+                    let ids = NumberOp::from_u128(*k);
+                    println!("failed to flush file(id0: {}, id1: {}), err: {}", ids[0], ids[1], err);
+                }
+            }
         }
         self.handles.clear();
     }
