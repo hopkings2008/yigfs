@@ -29,7 +29,7 @@ const (
 	Nlink = 1
 	Offset = 0
 	SegStartAddr = 0
-	SegEndAddr = 127
+	SegEndAddr = 128
 	SegmentId0 = 1
 	SegmentId1 = 1
 	Machine2 = "172.20.13.156"

@@ -33,10 +33,20 @@ type Client interface {
 	// Get segment info
 	GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)
 	// Create segment
-	CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error)
+	CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (mergeNumber int, err error)
 	// get segment leader
 	GetSegmentLeaderInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error)
 	// create segment leader
 	CreateSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error)
+	// get covered existed blocks by blocks to be uploaded
+	GetCoveredExistedBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr int64) (blocks map[int64][]int64, err error)
+	// get covered blocks to be uploaded
+	GetCoverBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr int64) (blocks map[int64][]int64, err error)
+	// delete the block
+	DeleteBlock(ctx context.Context, seg *types.CreateSegmentReq, blockId int64) (err error)
+	// update the target file size and blocks number
+	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq, size uint64, blocksNum uint32) (err error)
+	// get the file size and blocks number
+	GetFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq) (size uint64, blocksNum uint32, err error)
 }
 

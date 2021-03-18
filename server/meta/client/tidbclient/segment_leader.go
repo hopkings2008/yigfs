@@ -12,12 +12,12 @@ import (
 )
 
 func GetSegmentLeaderSql() (sqltext string) {
-	sqltext = "select leader from segment_leader where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+	sqltext = "select leader, max_size from segment_leader where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
 	return sqltext
 }
 
 func CreateSegmentLeaderSql() (sqltext string) {
-	sqltext = "insert into segment_leader values(?,?,?,?,?,?,?,?,?)"
+	sqltext = "insert into segment_leader values(?,?,?,?,?,?,?,?,?,?)"
 	return sqltext
 }
 
@@ -28,6 +28,7 @@ func (t *TidbClient) GetSegmentLeaderInfo(ctx context.Context, segment *types.Ge
 	row := t.Client.QueryRow(sqltext, segment.ZoneId, segment.Region, segment.BucketName, segment.SegmentId0, segment.SegmentId1)
 	err = row.Scan (
 		&resp.Leader,
+		&resp.MaxSize,
 	)
 
 	if err == sql.ErrNoRows {
@@ -49,7 +50,7 @@ func (t *TidbClient) CreateSegmentLeader(ctx context.Context, segment *types.Cre
 
 	sqltext := CreateSegmentLeaderSql()
 	args := []interface{}{segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0,
-		segment.Segment.SegmentId1, segment.Machine, now, now, types.NotDeleted}
+		segment.Segment.SegmentId1, segment.Machine, segment.Segment.MaxSize, now, now, types.NotDeleted}
 		
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
