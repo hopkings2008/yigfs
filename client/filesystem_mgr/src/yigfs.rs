@@ -271,8 +271,8 @@ impl Filesystem for Yigfs {
     }
 
     fn write(&mut self, req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite){
-        println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, data_size: {}, flags: {}",
-        req.uid(), req.gid(), ino, fh, offset, data.len(), flags);
+        //println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, data_size: {}, flags: {}",
+        //req.uid(), req.gid(), ino, fh, offset, data.len(), flags);
         // get the file leader ip.
         let leader: String;
         let ret = self.handle_cacher.get_handle_info(ino);
