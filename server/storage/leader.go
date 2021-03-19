@@ -116,7 +116,7 @@ func(yigFs *YigFsStorage) GetFileLeader(ctx context.Context, leader *types.GetLe
 	return
 }
 
-func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
+func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (isExisted int, err error) {
 	// get segment leader
 	segLeader := &types.GetSegLeaderReq {
 		ZoneId: segment.ZoneId,
@@ -149,13 +149,15 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 			err = ErrYigFsMachineNotMatchLeader
 		}
 
+		isExisted = types.NotExisted
 		return
 	case nil:
 		// if segment leader exist, check request machine match leader or not
 		if getSegLeaderResp.ZoneId != segment.ZoneId || getSegLeaderResp.Leader != segment.Machine {
 			err = ErrYigFsMachineNotMatchLeader
 		}
-
+		
+		isExisted = types.Existed
 		return
 	default:
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment leader, zone_id: %s, region: %s, bucket: %s, seg_id0: %d, seg_id1: %d, err: %v",

@@ -30,3 +30,11 @@ func(m *Meta) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq) (err 
 func(m *Meta) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error) {
 	return m.Client.SetFileAttr(ctx, file)
 }
+
+func(m *Meta) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq, size uint64, blocksNum uint32) (err error) {
+	return m.Client.UpdateFileSizeAndBlocksNum(ctx, file, size, blocksNum)
+}
+
+func(m *Meta) GetFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq) (size uint64, blocksNum uint32, err error) {
+	return m.Client.GetFileSizeAndBlocksNum(ctx, file)
+}

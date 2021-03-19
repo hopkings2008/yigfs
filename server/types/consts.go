@@ -38,3 +38,8 @@ const (
 	NotDeleted = iota
 	Deleted
 )
+
+const (
+	NotExisted = iota + 1
+	Existed
+)

@@ -65,6 +65,7 @@ CREATE TABLE `segment_leader` (
   `seg_id0` bigint(20) UNSIGNED DEFAULT 0,
   `seg_id1` bigint(20) UNSIGNED DEFAULT 0,
   `leader` varchar(255) DEFAULT NULL,
+  `max_size` int(11) DEFAULT 0,
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT 0,
@@ -90,6 +91,8 @@ CREATE TABLE `block` (
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT 0,
+   index list_start_key (seg_start_addr),
+   index list_end_key (seg_end_addr),
    UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id0`, `seg_id1`, `block_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

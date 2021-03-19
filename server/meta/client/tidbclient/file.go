@@ -421,3 +421,38 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to set file attr to tidb, sqltext: %v", sqltext))
 	return
 }
+
+func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq, size uint64, blocksNum uint32) (err error) {
+	// update file size and blocks
+	now := time.Now().UTC()
+
+	sqltext := UpdateFileSizeAndBlocksSql()
+	_, err = t.Client.Exec(sqltext, size, now, blocksNum, file.Region, file.BucketName, file.Ino, file.Generation)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	
+	helper.Logger.Info(ctx, "Succeed to update file size and blocks number to tidb")
+	return
+}
+
+func(t *TidbClient) GetFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq) (size uint64, blocksNum uint32, err error) {
+	sqltext := GetFileSizeAndBlocksSql()
+	row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino, file.Generation)
+	err = row.Scan(
+		&size,
+		&blocksNum)
+		
+	if err == sql.ErrNoRows {
+		err = ErrYigFsNoSuchFile
+		return
+	} else if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the file size and blocks number, err: %v", err))
+		err = ErrYIgFsInternalErr
+	}
+	
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get file size and blocks number from tidb, size: %v, blocks number: %v", size, blocksNum))
+	return
+}

@@ -22,6 +22,7 @@ type GetLeaderResp struct {
 type LeaderInfo struct {
 	ZoneId string `json:"zone"`
 	Leader string `json:"leader"`
+	MaxSize int `json:"max_size,omitempty"`
 }
 
 type GetSegLeaderReq struct {

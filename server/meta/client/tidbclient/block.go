@@ -19,9 +19,21 @@ func GetBlockInfoSql() (sqltext string) {
 	return sqltext
 }
 
-func GetBlocksInfoSql() (sqltext string) {
-	sqltext = "select size, offset, block_id from block where region=? and bucket_name=?" +
-		" and ino=? and generation=? and seg_id0=? and seg_id1=? and is_deleted=?;"
+func GetCoveredBlocksInfoSql() (sqltext string) {
+	sqltext = "select size, block_id, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=?" + 
+		" and generation=? and seg_id0=? and seg_id1=? and is_deleted=? and seg_start_addr >= ? and seg_end_addr <= ?;"
+	return sqltext
+}
+
+func GetCoverBlocksInfoSql() (sqltext string) {
+	sqltext = "select block_id, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=?" + 
+		" and generation=? and seg_id0=? and seg_id1=? and is_deleted=? and seg_start_addr <= ? and seg_end_addr > ?;"
+	return sqltext
+}
+
+func GetTargetBlockSql() (sqltext string) {
+	sqltext = "select block_id, size from block where region=? and bucket_name=? and ino=? and generation=?" + 
+		" and seg_id0=? and seg_id1=? and is_deleted=? and seg_end_addr = ?;"
 	return sqltext
 }
 
@@ -31,52 +43,113 @@ func DeleteBlockSql() (sqltext string) {
 	return sqltext
 }
 
-func GetBlocksSizeSql() (sqltext string) {
-	sqltext = "select size from block where region=? and bucket_name=? and ino=? and generation=? and is_deleted=?"
+func MergeBlockSql() (sqltext string) {
+	sqltext = "update block set seg_end_addr=?, size=?, mtime=? where region=? and bucket_name=? and ino=?" +
+	" and generation=? and seg_id0=? and seg_id1=? and block_id=?"
 	return sqltext
 }
 
-func GetBlocks(seg *types.CreateSegmentReq, t *TidbClient) (blockMap map[int64][]int64, err error){
-	blockMap = make(map[int64][]int64)
+func(t *TidbClient) DeleteBlock(ctx context.Context, seg *types.CreateSegmentReq, blockId int64) (err error) {
+	sqltext := DeleteBlockSql()
+	_, err = t.Client.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
+		seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete block from tidb, blockId: %d, err: %v", blockId, err))
+		return
+	}
 
-	sqltext := GetBlocksInfoSql()
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the block, seg_id0: %d, seg_id1: %d, block_id: %d", 
+		seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId))
+	return
+}
+
+func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr int64) (blocks map[int64][]int64, err error) {
+	blocks = make(map[int64][]int64)
+
+	sqltext := GetCoveredBlocksInfoSql()
 	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted)
+		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted, startAddr, endAddr)
 	if err != nil && err != sql.ErrNoRows {
-		helper.Logger.Error(nil, fmt.Sprintf("Failed to get blocks, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 	defer rows.Close()
 	
 	var size int
-	var offset int64
 	var block_id int64
+	var seg_start_addr int64
+	var seg_end_addr int64
 
 	for rows.Next() {
 		err = rows.Scan (
 			&size,
-			&offset,
 			&block_id,
+			&seg_start_addr,
+			&seg_end_addr,
 		)
 		if err != nil {
-			helper.Logger.Error(nil, fmt.Sprintf("Failed to get block in row, err: %v", err))
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get block in row, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
 
-		blockMap[block_id] = append(blockMap[block_id], int64(offset))
-		blockMap[block_id] = append(blockMap[block_id], int64(size))
+		blocks[block_id] = append(blocks[block_id], seg_start_addr)
+		blocks[block_id] = append(blocks[block_id], seg_end_addr)
+		blocks[block_id] = append(blocks[block_id], int64(size))
 	}
 	
 	err = rows.Err()
 	if err != nil {
-		helper.Logger.Error(nil, fmt.Sprintf("Failed to get blocks in rows, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks in rows, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	return blockMap, nil
+	return blocks, nil
+}
+
+func(t *TidbClient) GetCoverBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr int64) (blocks map[int64][]int64, err error) {
+	blocks = make(map[int64][]int64)
+
+	sqltext := GetCoverBlocksInfoSql()
+	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
+		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted, startAddr, endAddr)
+	if err != nil && err != sql.ErrNoRows {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get contain blocks, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	defer rows.Close()
+	
+	var block_id int64
+	var seg_start_addr int64
+	var seg_end_addr int64
+
+	for rows.Next() {
+		err = rows.Scan (
+			&block_id,
+			&seg_start_addr,
+			&seg_end_addr,
+		)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get contain block in row, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		blocks[block_id] = append(blocks[block_id], seg_start_addr)
+		blocks[block_id] = append(blocks[block_id], seg_end_addr)
+	}
+	
+	err = rows.Err()
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks in rows, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	return blocks, nil
 }
 
 func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
@@ -172,11 +245,12 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 			segment.Blocks = append(segment.Blocks, block)
 		}
 		
-		// get segment leader
+		// get segment leader and max_size
 		sqltext = GetSegmentLeaderSql()
 		row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
 		err = row.Scan (
 			&segment.Leader,
+			&segment.MaxSize,
 		)
 
 		if err != nil {
@@ -191,8 +265,9 @@ func (t *TidbClient) GetFileSegmentInfo(ctx context.Context, seg *types.GetSegme
 	return
 }
 
-func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error) {
-	now := time.Now().UTC()
+func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (mergeNumber int, err error) {
+	var blockId int64
+	var blockSize int
 	
 	var tx interface{}
 	var sqlTx *sql.Tx
@@ -223,150 +298,63 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 			err = ErrYIgFsInternalErr
 		}
 	}()
-	
-	// get existed blocks
-	blockMap, err := GetBlocks(seg, t)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to get the segment blocks, err: %v", err))
-		return ErrYIgFsInternalErr
-	}
 
-	// deleted covered existed blocks
-	var lastInsertOffset int64 = 0
-	var lastInsertSize int64 = 0
-	var lastInsertBlockId int64 = 0
+	now := time.Now().UTC()
 
 	for i, block := range seg.Segment.Blocks {
-		for blockId, blockInfo := range blockMap {
-			
-			if (block.Offset <= blockInfo[0] && block.Offset + int64(block.Size) - int64(1) >= blockInfo[0] + int64(block.Size) - int64(1)) {
-				// if covered existed block, delete existed block.
-				sqltext = DeleteBlockSql()
-				_, err = sqlTx.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
-				if err != nil {
-					helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to delete segment to tidb, err: %v", err))
-					return ErrYIgFsInternalErr
-				}
+		// if the block start addr == the existed block end addr, merge it.
 	
-				helper.Logger.Info(ctx, fmt.Sprintf("Deleted covered block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-					seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId))
-
-				// deleted map keys
-				delete(blockMap, blockId)
-			} 
-		}
-
-		// Determine if the last uploaded block has been overwritten.
-		deleteLastBlock := false
-		if i != 0 {
-			if (block.Offset <= lastInsertOffset && block.Offset + int64(block.Size) - int64(1) >= lastInsertOffset + lastInsertSize - int64(1)) {
-				deleteLastBlock = true
-			}
-		}
-
-		// if deleteLastBlock is true, deleted last insert block.
-		if deleteLastBlock {
-			sqltext = DeleteBlockSql()
-			_, err = sqlTx.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId)
-			if err != nil {
-				helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to delete lastInsertBlockId to tidb, err: %v", err))
-				return ErrYIgFsInternalErr
-			}
-
-			helper.Logger.Info(ctx, fmt.Sprintf("Deleted last insert block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-				seg.Segment.SegmentId0, seg.Segment.SegmentId1, lastInsertBlockId))
-		}
-
-		// upload block
-		node, err := snowflake.NewNode(int64(i%10))
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
-			return ErrYIgFsInternalErr
-		}
-		blockId := node.Generate()
-
-		_, err = stmt.Exec(seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, 
-			blockId, block.Size, block.Offset, block.SegStartAddr, block.SegEndAddr, now, now, types.NotDeleted)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment to tidb, err: %v", err))
-			return ErrYIgFsInternalErr
-		}
-
-		lastInsertOffset = block.Offset
-		lastInsertSize = int64(block.Size)
-		lastInsertBlockId = int64(blockId)
-	}
-
-	// get the target file's all blocks
-	sqltext = GetBlocksSizeSql()
-	rows, err := sqlTx.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted)
-	if err != nil && err != sql.ErrNoRows {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks size, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-	defer rows.Close()
-	
-	var size int
-	var allFileSize uint64 = 0
-	var allBlocksNumber uint32 = 0
-
-	for rows.Next() {
-		err = rows.Scan (
-			&size,
+		sqltext = GetTargetBlockSql()
+		row := sqlTx.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
+			seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted, block.SegStartAddr)
+		err = row.Scan(
+			&blockId,
+			&blockSize,
 		)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get block size in row, err: %v", err))
-			err = ErrYIgFsInternalErr
-			return
-		}
 
-		allFileSize += uint64(size)
-		allBlocksNumber ++
-	}
+		switch err {
+		case sql.ErrNoRows:
+			// if not find it, upload it.
+			node, createBlockErr := snowflake.NewNode(int64(i%10))
+			if createBlockErr != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+			blockId := node.Generate()
 	
-	err = rows.Err()
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks size in rows, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
+			_, err = stmt.Exec(seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, 
+				blockId, block.Size, block.Offset, block.SegStartAddr, block.SegEndAddr, now, now, types.NotDeleted)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment to tidb, err: %v", err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+			
+			helper.Logger.Info(ctx, fmt.Sprintf("Successed to upload block, blockId: %v", blockId))
 
+		case nil:
+			// if found it , merge it.
+			newEndAddr := block.SegStartAddr + int64(block.Size)
+			blockSize += block.Size
+			sqltext = MergeBlockSql()
+			_, err = sqlTx.Exec(sqltext, newEndAddr, blockSize, now, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
+				seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to merge segment to tidb, err: %v", err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+			mergeNumber ++
 
-	// update file size and blocks
-	sqltext = UpdateFileSizeAndBlocksSql()
-	_, err = sqlTx.Exec(sqltext, allFileSize, now, allBlocksNumber, seg.Region, seg.BucketName, seg.Ino, seg.Generation)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
+			helper.Logger.Info(ctx, fmt.Sprintf("Successed to merge block, blockId: %v", blockId))
 
-	// if segment leader not exist, create it.
-	var leader string
-	sqltext = GetSegmentLeaderSql()
-	row := sqlTx.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0, seg.Segment.SegmentId1)
-	err = row.Scan (
-		&leader,
-	)
-
-	if err == sql.ErrNoRows {
-		sqltext = CreateSegmentLeaderSql()
-		_, err = sqlTx.Exec(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Segment.SegmentId0,
-			seg.Segment.SegmentId1, seg.Machine, now, now, types.NotDeleted)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to create segment leader, err: %v", err))
+		default:
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the file size and blocks number, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to get the segment leader, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
 	}
 
-	helper.Logger.Info(ctx, "Succeed to create segment to tidb")
 	return
 }

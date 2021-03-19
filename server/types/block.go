@@ -25,6 +25,7 @@ type SegmentInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
 	Leader string `json:"leader"`
+	MaxSize int `json:"max_size,omitempty"`
 	Blocks []BlockInfo `json:"blocks"`
 }
 
@@ -49,5 +50,6 @@ type CreateSegmentReq struct {
 type CreateBlocksInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
+	MaxSize int `json:"max_size"`
 	Blocks []BlockInfo `json:"blocks"`
 }
