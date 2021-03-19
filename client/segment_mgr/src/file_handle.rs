@@ -331,6 +331,7 @@ impl HandleMgr {
             let mut offset: u64 = 0;
             for s in &h.segments {
                 if s.blocks.is_empty() {
+                    found = true;
                     break;
                 }
                 for b in &s.blocks {
