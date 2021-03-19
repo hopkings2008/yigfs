@@ -11,3 +11,5 @@ common = {path="../common"}
 metaservice_mgr = {path = "../metaservice_mgr"}
 io_engine = {path = "../io_engine"}
 tokio = { version = "1", features = ["full"] }
+hash_ring = "0.2.0"
+crossbeam-channel = "0.4"

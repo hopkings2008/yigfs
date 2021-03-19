@@ -1,5 +1,6 @@
 mod options;
 
+use std::rc::Rc;
 use filesystem_mgr::{FilesystemMgr, MountOptions};
 use common::parse_config;
 use common::runtime::Executor;
@@ -23,12 +24,10 @@ fn main() {
         }
     }
 
-    let mut dirs:Vec<String> = Vec::new();
-    dirs.push(String::from("/data/yigfs"));
     let exec = Executor::create();
     let meta_service = new_metaserver_mgr(&cfg, &exec).unwrap();
-    let segment_mgr = SegmentMgr::create(dirs, &meta_service, &exec);
-    let filesystem = FilesystemMgr::create(&meta_service, &segment_mgr);
+    let segment_mgr = Rc::new(SegmentMgr::create(&cfg, meta_service.clone()));
+    let filesystem = FilesystemMgr::create(meta_service.clone(), segment_mgr.clone(), &exec);
     let mount_options = MountOptions{
         mnt: cfg.mount_config.mnt.clone(),
     };

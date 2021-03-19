@@ -1,12 +1,14 @@
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use common::runtime::Executor;
 
-use crate::leader::Leader;
+use crate::{leader::Leader, segment_mgr::SegmentMgr};
 use crate::leader_local::LeaderLocal;
 use crate::leader_not_support::LeaderNotSupport;
 
+#[derive(Debug)]
 enum LeaderType {
     Local = 0,
     Peer = 1,
@@ -18,19 +20,28 @@ pub struct LeaderMgr {
 }
 
 impl LeaderMgr {
-    pub fn new(machine: &String, thr_num: u32, exec: &Executor) -> Self {
+    pub fn new(machine: &String, thr_num: u32, exec: &Executor, seg_mgr: Rc<SegmentMgr>) -> Self {
         let mut leaders = HashMap::<u8, Box<dyn Leader>>::new();
         leaders.insert(LeaderType::Unknown as u8, Box::new(LeaderNotSupport::new()));
-        leaders.insert(LeaderType::Local as u8, Box::new(LeaderLocal::new(thr_num, exec)));
+        leaders.insert(LeaderType::Local as u8, Box::new(LeaderLocal::new(machine, thr_num, exec, seg_mgr)));
         LeaderMgr{
             machine: machine.clone(),
             leaders: leaders,
         }
     }
+    pub fn stop(&mut self){
+        for (k, l) in &mut self.leaders {
+            l.release();
+            println!("leader of {:?} is stopped.", k);
+        }
+        self.leaders.clear();
+    }
     pub fn get_leader(&self, leader: &String) -> &Box<dyn Leader> {
         let mut leader_type = LeaderType::Unknown as u8;
         if *leader == self.machine {
             leader_type = LeaderType::Local as u8;
+        } else if !leader.is_empty(){// peer is not supported yet.
+            leader_type = LeaderType::Peer as u8;
         }
 
         // will not crash here, because unknown is always in the hashmap.

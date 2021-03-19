@@ -3,29 +3,30 @@ extern crate libc;
 extern crate time;
 
 use std::ffi::OsStr;
-use libc::{ENOENT, _PC_MAX_CANON, c_int};
+use std::rc::Rc;
+use libc::{ENOENT, c_int};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
-    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen, ReplyWrite};
+    ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen, ReplyWrite, ReplyEmpty};
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
-use segment_mgr::{segment_mgr::SegmentMgr, types::Segment};
-use common::uuid;
-use crate::{file_handle::FileHandleMgr, types::FileHandle};
+use segment_mgr::{segment_mgr::SegmentMgr, leader_mgr::LeaderMgr};
+use common::{runtime::Executor, uuid};
+use crate::handle::{FileHandleInfo, FileHandleInfoMgr};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
 const HELLO_TXT_CONTENT: &'static str = "Hello World!\n";
 
 
-pub struct Yigfs<'a>{
-    pub meta_service_mgr: &'a Box<dyn MetaServiceMgr>,
-    pub segment_mgr: &'a Box<SegmentMgr<'a>>,
+pub struct Yigfs{
+    meta_service_mgr: Rc<dyn MetaServiceMgr>,
+    leader_mgr: LeaderMgr,
+    handle_cacher: FileHandleInfoMgr,
     // fsid for this mounted yigfs instance
     fsid: String,
-    handle_mgr: FileHandleMgr,
 }
 
-impl<'a> Filesystem for Yigfs<'a> {
+impl Filesystem for Yigfs {
     fn init(&mut self, req: &Request) -> Result<(), c_int> {
         println!("init: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
         let ret = self.meta_service_mgr.mount(req.uid(), req.gid());
@@ -41,7 +42,8 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
     fn destroy(&mut self, req: &Request) {
         println!("destroy: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
-        self.handle_mgr.stop();
+        self.leader_mgr.stop();
+        self.handle_cacher.stop();
     }
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         let name_str: String;
@@ -85,7 +87,7 @@ impl<'a> Filesystem for Yigfs<'a> {
         }
     }
 
-    fn setattr(&mut self, req: &Request, ino: u64, mode: Option<u32>, uid: Option<u32>, gid: Option<u32>, size: Option<u64>, atime: Option<Timespec>, mtime: Option<Timespec>, fh: Option<u64>, _crtime: Option<Timespec>, _chgtime: Option<Timespec>, _bkuptime: Option<Timespec>, _flags: Option<u32>, reply: ReplyAttr){
+    fn setattr(&mut self, req: &Request, ino: u64, mode: Option<u32>, uid: Option<u32>, gid: Option<u32>, size: Option<u64>, atime: Option<Timespec>, mtime: Option<Timespec>, _fh: Option<u64>, _crtime: Option<Timespec>, _chgtime: Option<Timespec>, _bkuptime: Option<Timespec>, _flags: Option<u32>, reply: ReplyAttr){
         let mut set_attr = SetFileAttr{
             ino: ino,
             size: size,
@@ -211,39 +213,20 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return;
             }
         }
-        let segments : Vec<Segment>;
-        let ret = self.segment_mgr.get_file_segments(file_info.attr
-            .ino, &file_info.leader_info.leader);
-        match ret {
-            Ok(ret) => {
-                segments = ret;
-            }
-            Err(err) => {
-                println!("create: failed to get segments for ino: {}, err: {:?}",
-                file_info.attr.ino, err);
-                reply.error(libc::EIO);
-                return;
-            }
-        }
-        // open the segments.
-        for s in &segments {
-            let ret = self.segment_mgr.open_segment(s);
-            if !ret.is_success() {
-                println!("create: failed to open segment({:?})", s);
-                reply.error(libc::EIO);
-                return;
-            }
-        }
-        // cache ino->FileHandle.
-        let h = FileHandle{
+        let ret = self.handle_cacher.add_handle_info(FileHandleInfo{
             ino: file_info.attr.ino,
             leader: file_info.leader_info.leader.clone(),
-            segments: segments,
-        };
-        let ret = self.handle_mgr.add(&h);
-        if !ret.is_success() {
-            println!("failed to cache handle for ino: {}", h.ino);
-            reply.error(libc::EBADF);
+        });
+        if !ret.is_success(){
+            println!("create: failed to add handle cache for name: {}, ino: {}", name, file_info.attr.ino);
+            reply.error(libc::EIO);
+            return;
+        }
+        let leader_io = self.leader_mgr.get_leader(&file_info.leader_info.leader);
+        let ret = leader_io.open(file_info.attr.ino);
+        if !ret.is_success(){
+            println!("create: failed to open name: {}, ino: {}", name, file_info.attr.ino);
+            reply.error(libc::EIO);
             return;
         }
         // will check flags and set this later.
@@ -252,15 +235,14 @@ impl<'a> Filesystem for Yigfs<'a> {
     }
 
     fn open(&mut self, req: &Request, ino: u64, flags: u32, reply: ReplyOpen){
-        let segments : Vec<Segment>;
-        let leader : FileLeader;
+        let file_leader_info : FileLeader;
         println!("open: uid: {}, gid: {}, ino: {}, flags: {}",
         req.uid(), req.gid(), ino, flags);
         let ret = self.meta_service_mgr.get_file_leader(ino);
         match ret {
             Ok(ret) => {
-                leader = ret;
-                println!("got file leader {:?} for ino: {}", leader, ino);
+                file_leader_info = ret;
+                println!("got file leader {:?} for ino: {}", file_leader_info.leader, ino);
             }
             Err(err) => {
                 println!("failed to get_file_leader for ino: {}, err: {:?}", ino, err);
@@ -268,101 +250,91 @@ impl<'a> Filesystem for Yigfs<'a> {
                 return;
             }
         }
-        
-        let ret = self.segment_mgr.get_file_segments(ino, &leader.leader);
-        match ret {
-            Ok(ret) => {
-                segments = ret;
-            }
-            Err(err) => {
-                println!("failed to get segments for ino: {}, err: {:?}", ino, err);
-                reply.error(libc::ENOENT);
-                return;
-            }
-        }
-        // open the segments.
-        for s in &segments {
-            let ret = self.segment_mgr.open_segment(s);
-            if !ret.is_success() {
-                println!("create: failed to open segment({:?})", s);
-                reply.error(libc::EIO);
-                return;
-            }
-        }
-        //cache the segments for the ino.
-        let h = FileHandle{
+        let leader = self.leader_mgr.get_leader(&file_leader_info.leader);
+        let ret = self.handle_cacher.add_handle_info(FileHandleInfo{
             ino: ino,
-            leader: leader.leader.clone(),
-            segments: segments,
-        };
-        let ret = self.handle_mgr.add(&h);
+            leader: file_leader_info.leader.clone(),
+        });
         if !ret.is_success() {
-            println!("failed to cache file handle for ino: {}", ino);
+            println!("open: failed to add handle cache for ino: {}, leader: {}", ino, file_leader_info.leader);
             reply.error(libc::EBADF);
             return;
         }
-        reply.opened(ino, flags);
+        let ret = leader.open(ino);
+        if ret.is_success() {
+            reply.opened(ino, flags);
+            return;
+        }
+        println!("open: failed to open ino: {}, err: {:?}", ino, ret);
+        reply.error(libc::EIO);
+        return;        
     }
 
     fn write(&mut self, req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite){
         println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, data_size: {}, flags: {}",
         req.uid(), req.gid(), ino, fh, offset, data.len(), flags);
-        //we must check the leader and use leader's write.
-        let machine = self.meta_service_mgr.get_machine_id();
-        let mut handle : FileHandle;
-        let ret = self.handle_mgr.get(ino);
+        // get the file leader ip.
+        let leader: String;
+        let ret = self.handle_cacher.get_handle_info(ino);
         match ret {
             Ok(ret) => {
-                handle = ret;
+                leader = ret.leader;
             }
             Err(err) => {
-                println!("failed to get file handle for ino: {}, err: {:?}", ino, err);
+                println!("write: file ino: {} is not opened yet, err: {:?}.", ino, err);
                 reply.error(libc::EBADF);
                 return;
             }
         }
-        //currently just return err if not leader.
-        if *machine != handle.leader {
-            println!("current machine: {} is not the leader for ino:{}, the real leader is {}",
-            machine, ino, handle.leader);
-            reply.error(libc::EBADF);
-            return;
-        }
-        // get the corrent segment for the offset.
-        // find the segment whose usage is smallest.
-        let mut min_usage : u64 = u64::MAX;
-        let mut min_idx : usize = 0;
-        let l = handle.segments.len();
-        let mut i = 0;
-        while i < l {
-            if handle.segments[i].usage() < min_usage {
-                min_usage = handle.segments[i].usage();
-                min_idx = i;
-            }
-            i += 1;
-        }
-        // write the data to the segments.
-        let ret = self.segment_mgr.write_segment(&mut handle.segments[min_idx], ino, offset as u64, data);
+        // get the leader.
+        let leader_io = self.leader_mgr.get_leader(&leader);
+        let ret = leader_io.write(ino, offset as u64, data);
         match ret {
             Ok(ret) => {
-                reply.written(ret);
+                reply.written(ret.size);
+                return;
             }
             Err(err) => {
-                println!("write: failed to write segment({:?}) for ino: {}, offset: {}, err: {:?}",
-                handle.segments[min_idx], ino, offset, err);
+                println!("write: failed to write ino: {}, offset: {}, err: {:?}",
+                ino, offset, err);
                 reply.error(libc::EIO);
+                return;
             }
         }
     }
+
+    fn release(&mut self, req: &Request, ino: u64, fh: u64, flags: u32, lock_owner: u64, flush: bool, reply: ReplyEmpty) {
+        println!("release: uid: {}, gid: {}, ino: {}, fh: {}, flags: {}, lock_owner: {}, flush: {}", 
+        req.uid(), req.gid(), ino, fh, flags, lock_owner, flush);
+        let ret = self.handle_cacher.get_handle_info(ino);
+        match ret {
+            Ok(ret) => {
+                let leader = self.leader_mgr.get_leader(&ret.leader);
+                let err = leader.close(ino);
+                if !err.is_success(){
+                    println!("release: failed to close ino: {}, err: {:?}", ino, err);
+                }
+            }
+            Err(err) => {
+                println!("release: failed to get handle for ino: {}, err: {:?}", ino, err);
+            }
+        }
+        let err = self.handle_cacher.del_handle_info(ino);
+        if !err.is_success() {
+            println!("release: failed to del handle for ino: {}, err: {:?}", ino, err);
+        }
+        reply.ok();
+    }
 }
 
-impl<'a> Yigfs<'a>{
-    pub fn create(meta: &'a Box<dyn MetaServiceMgr>, seg: &'a Box<SegmentMgr>)-> Yigfs<'a>{
+impl Yigfs{
+    pub fn create(meta: Rc<dyn MetaServiceMgr>, seg: Rc<SegmentMgr>, exec: &Executor)-> Yigfs{
+        let machine = meta.get_machine_id();
         Yigfs{
             meta_service_mgr: meta,
-            segment_mgr: seg,
+            leader_mgr: LeaderMgr::new(&machine, 2, exec, seg),
+            handle_cacher: FileHandleInfoMgr::new(),
             fsid: uuid::uuid_string(),
-            handle_mgr: FileHandleMgr::create(),
         }
     }
     fn to_usefs_attr(&self, attr: &metaservice_mgr::types::FileAttr) -> FileAttr {

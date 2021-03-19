@@ -26,6 +26,7 @@ impl MsgFileOpenOp{
 pub struct MsgFileDelOp {
     pub id0: u64,
     pub id1: u64,
+    pub dir: String,
     pub resp_sender: Sender<Errno>,
 }
 
@@ -44,8 +45,13 @@ pub struct MsgFileWriteResp {
 
 #[derive(Debug)]
 pub struct MsgFileWriteOp {
+    // segment ids.
     pub id0: u64,
     pub id1: u64,
+    pub dir: String,
+    // maximum size of this segment
+    pub max_size: u64,
+    // file offset, not the offset in the segment.
     pub offset: u64,
     pub data: Vec<u8>,
     pub resp_sender: Sender<MsgFileWriteResp>,
@@ -74,6 +80,7 @@ pub struct MsgFileReadData {
 pub struct MsgFileReadOp {
     pub id0: u64,
     pub id1: u64,
+    pub dir: String,
     pub offset: u64,
     pub size: u32,
     pub data_sender: Sender<MsgFileReadData>,

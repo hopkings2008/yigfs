@@ -99,6 +99,7 @@ pub struct SetFileAttr {
 pub struct Segment {
     pub seg_id0: u64,
     pub seg_id1: u64,
+    pub max_size: u64,
     pub leader: String,
     pub blocks: Vec<Block>,
 }

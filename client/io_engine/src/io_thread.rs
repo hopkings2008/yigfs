@@ -23,11 +23,7 @@ impl IoThread  {
     pub fn create(name: &String, exec: &Executor)->Self {
         let (tx, rx) = mpsc::channel::<MsgFileOp>(1000);
         let(stop_tx, stop_rx) = mpsc::channel::<u8>(1);
-        let mut worker = IoThreadWorker{
-            handles: HashMap::<u128, File>::new(),
-            op_rx: rx,
-            stop_rx: stop_rx,
-        };
+        let mut worker = IoThreadWorker::new(rx, stop_rx);
         let mut thr = IoThread {
             thr: Thread::create(name),
             op_tx: tx,
@@ -162,6 +158,24 @@ impl IoThreadWorker {
             nwrite: 0,
             err: Errno::Enotf,
         };
+        // open the file first.
+        if !self.handles.contains_key(&d) {
+            let d = NumberOp::to_u128(msg.id0, msg.id1);
+            let name = self.to_file_name(d, &msg.dir);
+            let ret = OpenOptions::new().create(true).read(true).append(true).open(&name).await;
+            match ret {
+                Ok(f) => {
+                    self.handles.insert(d, f);
+                }
+                Err(err) => {
+                    println!("do_write: failed to open({}), err: {}", name, err);
+                    resp_msg.err = Errno::Eintr;
+                    msg.response(resp_msg).await;
+                    return;
+                }
+            }
+        }
+
         if let Some(h) = self.handles.get_mut(&d) {
             // should we seek to end before write?
             let ret = h.seek(SeekFrom::End(0)).await;
@@ -172,6 +186,17 @@ impl IoThreadWorker {
                 Err(err) => {
                     println!("do_write: failed to seek to end for msg({:?}, err: {}", msg, err);
                     resp_msg.err = Errno::Eseek;
+                    msg.response(resp_msg).await;
+                    return;
+                }
+            }
+            // check whether segment has enough space for this write.
+            if msg.max_size > resp_msg.offset {
+                let left_space = msg.max_size - resp_msg.offset;
+                if left_space < msg.data.len() as u64 {
+                    println!("do_write: there is no space left of the segment: id0: {}, id1: {}, current offset: {}, left: {}",
+                    msg.id0, msg.id1, resp_msg.offset, left_space);
+                    resp_msg.err = Errno::Enospc;
                     msg.response(resp_msg).await;
                     return;
                 }
@@ -192,6 +217,8 @@ impl IoThreadWorker {
                 }
             }
         }
+       
+        // below line cannot be executed since if file is failed to open, we will return before.
         println!("no file handle for id0: {}, id1: {}", msg.id0, msg.id1);
         resp_msg.err = Errno::Enotf;
         msg.response(resp_msg).await;
@@ -199,6 +226,27 @@ impl IoThreadWorker {
 
     async fn do_read(&mut self, msg: &MsgFileReadOp) {
         let d = NumberOp::to_u128(msg.id0, msg.id1);
+        // open the file first.
+        if !self.handles.contains_key(&d) {
+            let d = NumberOp::to_u128(msg.id0, msg.id1);
+            let name = self.to_file_name(d, &msg.dir);
+            let ret = OpenOptions::new().create(true).read(true).append(true).open(&name).await;
+            match ret {
+                Ok(f) => {
+                    self.handles.insert(d, f);
+                }
+                Err(err) => {
+                    println!("do_write: failed to open({}), err: {}", name, err);
+                    let mut resp_msg = MsgFileReadData{
+                        data: None,
+                        err: Errno::Eintr,
+                    };
+                    resp_msg.err = Errno::Eintr;
+                    msg.response(resp_msg).await;
+                    return;
+                }
+            }
+        }
         if let Some(h) = self.handles.get_mut(&d) {
             let ret = h.seek(SeekFrom::Start(msg.offset)).await;
             match ret {

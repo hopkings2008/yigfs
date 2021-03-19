@@ -16,6 +16,8 @@ pub enum Errno{
     Enotf = 6,
     // not support
     Enotsupp = 7,
+    // not space left
+    Enospc = 28,
 }
 
 impl Errno {
@@ -55,6 +57,17 @@ impl Errno {
     pub fn is_eof(&self) -> bool {
         match *self {
             Errno::Eeof => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
+
+    pub fn is_enospc(&self) -> bool {
+        match *self {
+            Errno::Enospc => {
                 true
             }
             _ => {

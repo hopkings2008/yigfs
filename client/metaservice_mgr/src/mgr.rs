@@ -11,6 +11,6 @@ pub trait MetaServiceMgr {
     fn new_ino_leader(&self, parent: u64, name: &String, uid: u32, gid: u32, perm: u32) -> Result<NewFileInfo, Errno>;
     fn get_file_leader(&self, ino: u64) -> Result<FileLeader, Errno>;
     fn get_file_segments(&self, ino: u64, offset: Option<u64>, size: Option<i64>) -> Result<Vec<Segment>, Errno>;
-    fn get_machine_id(&self) -> &String;
+    fn get_machine_id(&self) -> String;
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno;
 }

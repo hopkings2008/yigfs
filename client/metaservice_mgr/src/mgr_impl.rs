@@ -19,7 +19,6 @@ pub struct MetaServiceMgrImpl{
     bucket: String,
     zone: String,
     machine: String,
-    exec: Executor,
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
@@ -377,6 +376,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             let mut segment : Segment = Default::default();
             segment.seg_id0 = s.seg_id0;
             segment.seg_id1 = s.seg_id1;
+            segment.max_size = s.max_size;
             segment.leader = s.leader;
             for b in s.blocks {
                 let block = Block{
@@ -392,14 +392,15 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         Ok(segments)
     }
 
-    fn get_machine_id(&self) -> &String {
-        &self.machine
+    fn get_machine_id(&self) -> String {
+        self.machine.clone()
     }
 
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno {
         let mut s = MsgSegment{
             seg_id0: seg.seg_id0,
             seg_id1: seg.seg_id1,
+            max_size: seg.max_size,
             leader: seg.leader.clone(),
             blocks: Vec::new(),
         };
@@ -485,7 +486,6 @@ impl MetaServiceMgrImpl {
             bucket: meta_cfg.s3_config.bucket.clone(),
             zone: meta_cfg.zone_config.zone.clone(),
             machine: meta_cfg.zone_config.machine.clone(),
-            exec: exec.clone(),
         })
     }
 

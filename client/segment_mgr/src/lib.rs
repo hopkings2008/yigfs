@@ -1,6 +1,7 @@
 pub mod types;
 pub mod segment_mgr;
-mod leader;
+pub mod leader_mgr;
+pub mod leader;
+mod file_handle;
 mod leader_local;
 mod leader_not_support;
-mod leader_mgr;

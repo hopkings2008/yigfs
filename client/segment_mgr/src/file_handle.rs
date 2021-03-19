@@ -3,10 +3,10 @@ extern crate crossbeam_channel;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
-use crate::types::{FileHandle, MsgQueryHandle, MsgFileHandleOp};
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
+use crate::types::{Block, FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle, Segment};
 
 pub struct FileHandleMgr {
     //for update file handle.
@@ -73,6 +73,46 @@ impl FileHandleMgr {
         }
     }
 
+    pub fn add_segment(&self, ino: u64, seg: &Segment) -> Errno {
+        let msg_add_segment = MsgAddSegment{
+            ino: ino,
+            seg: seg.copy(),
+        };
+        let msg = MsgFileHandleOp::AddSegment(msg_add_segment);
+        let ret = self.handle_op_tx.send(msg);
+        match ret {
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                println!("failed to add segment(id0: {}, id1: {}) for ino: {}, err: {}",
+                seg.seg_id0, seg.seg_id1, ino, err);
+                return Errno::Eintr;
+            }
+        }
+    }
+
+    pub fn add_block(&self, ino: u64, id0: u64, id1: u64, b: &Block) -> Errno {
+        let msg_add_block = MsgAddBlock{
+            ino: ino,
+            id0: id0,
+            id1: id1,
+            block: b.copy(),
+        };
+        let msg = MsgFileHandleOp::AddBlock(msg_add_block);
+        let ret = self.handle_op_tx.send(msg);
+        match ret {
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                println!("failed to add_block for ino: {}, seg_id0: {}, seg_id1: {}, err: {}",
+                ino, id0, id1, err);
+                return Errno::Eintr;
+            }
+        }
+    }
+
     pub fn del(&self, ino: u64) -> Errno {
         let msg = MsgFileHandleOp::Del(ino);
         let ret = self.handle_op_tx.send(msg);
@@ -83,6 +123,38 @@ impl FileHandleMgr {
             Err(err) => {
                 println!("failed to del handle for ino: {}, err: {}", ino, err);
                 return Errno::Eintr;
+            }
+        }
+    }
+
+    // Vec[0]: id0; Vec[1]: id1; Vec[2]: max_size of segment.
+    pub fn get_last_segment(&self, ino: u64) -> Result<Vec<u64>, Errno> {
+        let (tx, rx) = bounded::<Vec<u64>>(1);
+        let query = MsgGetLastSegment{
+            ino: ino,
+            tx: tx,
+        };
+        defer!{
+            let rxc = rx.clone();
+            drop(rxc);
+        };
+        let ret = self.handle_op_tx.send(MsgFileHandleOp::GetLastSegment(query));
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                println!("get_last_segment: failed to get last segment for ino: {}, err: {}", ino, err);
+                return Err(Errno::Eintr);
+            }
+        }
+        let ret = rx.recv();
+        match ret {
+            Ok(ret) => {
+                return Ok(ret);
+            }
+            Err(err) => {
+                println!("get_last_segment: failed to recv response for get last segment for ino: {}, err: {}",
+                ino, err);
+                return Err(Errno::Eintr);
             }
         }
     }
@@ -182,12 +254,21 @@ impl HandleMgr {
                         MsgFileHandleOp::Add(h) => {
                             self.add(h);
                         }
+                        MsgFileHandleOp::AddBlock(m) => {
+                            self.add_block(&m);
+                        }
+                        MsgFileHandleOp::AddSegment(m) => {
+                            self.add_segment(&m);
+                        }
                         MsgFileHandleOp::Del(ino) => {
                             self.del(ino);
                         }
                         MsgFileHandleOp::Get(m) => {
                             self.get(m);
                         }
+                        MsgFileHandleOp::GetLastSegment(m) => {
+                            self.get_last_segment(&m);
+                        }                        
                     }
                 },
                 recv(self.stop_rx) -> msg => {
@@ -214,8 +295,71 @@ impl HandleMgr {
         self.handles.insert(handle.ino, handle);
     }
 
+    fn add_segment(&mut self, msg: &MsgAddSegment) {
+        if let Some(h) = self.handles.get_mut(&msg.ino) {
+           h.segments.push(msg.seg.copy());
+           return;
+        }
+    }
+
+    fn add_block(&mut self, msg: &MsgAddBlock) {
+        if let Some(h) = self.handles.get_mut(&msg.ino) {
+            for s in &mut h.segments {
+                if s.seg_id0 != msg.id0 || s.seg_id1 != msg.id1 {
+                    continue;
+                }
+                s.add_block(msg.ino, msg.block.offset, msg.block.seg_start_addr, msg.block.size);
+            }
+        }
+    }
+
     fn del(&mut self, ino: u64) {
         self.handles.remove(&ino);
+    }
+    
+    fn get_last_segment(&self, msg: &MsgGetLastSegment) {
+        let mut v : Vec<u64> = Vec::new();
+        let mut found = false;
+        let mut id0: u64 = 0;
+        let mut id1: u64 = 0;
+        let mut max_size: u64 = 0;
+        let tx = msg.tx.clone();
+        defer! {
+            drop(tx);
+        };
+        if let Some(h) = self.handles.get(&msg.ino) {
+            let mut offset: u64 = 0;
+            for s in &h.segments {
+                if s.blocks.is_empty() {
+                    break;
+                }
+                for b in &s.blocks {
+                    if b.offset >= offset {
+                        found = true;
+                        offset = b.offset;
+                        id0 = s.seg_id0;
+                        id1 = s.seg_id1;
+                        max_size = s.max_size;
+                    }
+                }
+            }
+        }
+        if found {
+            v.push(id0);
+            v.push(id1);
+            v.push(max_size);
+        }
+        let ret = msg.tx.send(v);
+        match ret {
+            Ok(_) => {
+                return;
+            }
+            Err(err) => {
+                println!("get_last_segment: failed to send segment id0: {}, id1: {} for ino: {}, err: {}",
+                id0, id1, msg.ino, err);
+                return;
+            }
+        }
     }
 
     fn get(&mut self, msg: MsgQueryHandle){

@@ -1,5 +1,5 @@
-use filesystem_mgr::file_handle::FileHandleMgr;
-use filesystem_mgr::types::{FileHandle, Segment};
+use segment_mgr::file_handle::FileHandleMgr;
+use segment_mgr::types::{FileHandle, Segment};
 
 #[test]
 fn test_file_handle_mgr_start()->Result<(), String> {
