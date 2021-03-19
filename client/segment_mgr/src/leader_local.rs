@@ -97,7 +97,7 @@ impl Leader for LeaderLocal {
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
         loop {
-            println!("write: seg(id0: {}, id1: {}, max_size: {})", id0, id1, seg_max_size);
+            //println!("write: seg(id0: {}, id1: {}, max_size: {})", id0, id1, seg_max_size);
             let worker = self.io_pool.get_worker(id0, id1);
             let seg_dir = self.segment_mgr.get_segment_dir(id0, id1);
             let (tx, mut rx) = mpsc::channel::<MsgFileWriteResp>(1);

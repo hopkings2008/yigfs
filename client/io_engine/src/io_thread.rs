@@ -200,6 +200,12 @@ impl IoThreadWorker {
                     msg.response(resp_msg).await;
                     return;
                 }
+            } else {
+                println!("do_write: there is no space left of the segment: id0: {}, id1: {}, current offset: {}, seg_max_size:{}",
+                    msg.id0, msg.id1, resp_msg.offset, msg.max_size);
+                resp_msg.err = Errno::Enospc;
+                msg.response(resp_msg).await;
+                return;
             }
             let ret = h.write(msg.data.as_slice()).await;
             match ret {

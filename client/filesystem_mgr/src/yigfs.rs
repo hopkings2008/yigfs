@@ -270,7 +270,7 @@ impl Filesystem for Yigfs {
         return;        
     }
 
-    fn write(&mut self, req: &Request, ino: u64, fh: u64, offset: i64, data: &[u8], flags: u32, reply: ReplyWrite){
+    fn write(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, data: &[u8], _flags: u32, reply: ReplyWrite){
         //println!("write: uid: {}, gid: {}, ino: {}, fh: {}, offset: {}, data_size: {}, flags: {}",
         //req.uid(), req.gid(), ino, fh, offset, data.len(), flags);
         // get the file leader ip.
