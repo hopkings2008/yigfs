@@ -332,6 +332,9 @@ impl HandleMgr {
             for s in &h.segments {
                 if s.blocks.is_empty() {
                     found = true;
+                    id0 = s.seg_id0;
+                    id1 = s.seg_id1;
+                    max_size = s.max_size;
                     break;
                 }
                 for b in &s.blocks {
