@@ -143,11 +143,21 @@ impl HttpClient{
                 }
                 let body = hyper::body::aggregate(resp).await;
                 match body {
-                    Ok(body) => {
+                    Ok(mut body) => {
+                        let mut data: Vec<u8> = Vec::new();
+                        while body.remaining() > 0 {
+                            let s: usize;
+                            {
+                                let d = body.chunk();
+                                data.append(&mut d.to_vec());
+                                s = d.len();
+                            }
+                            body.advance(s);
+                        }
                         let result = Resp{
                             status: status,
                             headers: headers,
-                            body: body.chunk().to_vec(),
+                            body: data,
                         };
                         return Ok(result);
                     }
