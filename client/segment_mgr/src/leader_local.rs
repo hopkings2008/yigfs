@@ -143,8 +143,13 @@ impl Leader for LeaderLocal {
                     size: r.nwrite as i64,
                 };
                 let ret = self.handle_mgr.add_block(ino, id0, id1, &b);
-                if ret.is_success() {
-                    // return the BlockIo
+                if !ret.is_success() {
+                    println!("write: failed to add_block{:?} for ino: {}, err: {:?}", b, ino, ret);
+                    return Err(ret);
+                }
+                // upload the block to meta server.
+                let ret = self.segment_mgr.upload_block(ino, id0, id1, &b);
+                if ret.is_success(){
                     return Ok(BlockIo{
                         id0: id0,
                         id1: id1,
@@ -152,7 +157,7 @@ impl Leader for LeaderLocal {
                         size: r.nwrite,
                     });
                 }
-                println!("write: failed to add block{:?} for ino: {}, err: {:?}", b, ino, ret);
+                println!("write: failed to upload block{:?} for ino: {}, err: {:?}", b, ino, ret);
                 return Err(ret);
             }
             println!("write: got invalid response for seg(id0: {}, id1: {}) of ino: {}", 

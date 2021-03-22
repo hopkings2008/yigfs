@@ -96,6 +96,15 @@ impl SegmentMgr {
         }
     }
 
+    pub fn upload_block(&self, ino: u64, seg_id0: u64, seg_id1: u64, b: &Block)->Errno {
+        let idx = self.get_segment_dir_idx(seg_id0, seg_id1);
+        let data_dir = &self.data_dirs[idx];
+        let mut seg = Segment::rich_new(seg_id0, seg_id1, data_dir.size, self.meta_service_mgr.get_machine_id());
+        seg.add_block(ino, b.offset,b.seg_start_addr, b.size);
+        let ret = self.meta_service_mgr.add_file_block(ino, &seg.to_meta_segment());
+        return ret;
+    }
+
     pub fn get_segment_dir(&self, id0: u64, id1: u64) -> String {
         let idx = self.get_segment_dir_idx(id0, id1);
         self.data_dirs[idx].dir.clone()

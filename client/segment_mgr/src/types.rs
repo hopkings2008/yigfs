@@ -50,6 +50,17 @@ impl Segment {
         }
     }
 
+    pub fn rich_new(id0: u64, id1: u64, max_size: u64, leader: String) -> Self{
+        Segment{
+            seg_id0: id0,
+            seg_id1: id1,
+            max_size: max_size,
+            leader: leader,
+            blocks: Vec::<Block>::new(),
+            file_largest_offsets: HashMap::new(),
+        }
+    }
+
     pub fn copy(&self) -> Self{
         let mut s = Segment{
             seg_id0: self.seg_id0,
