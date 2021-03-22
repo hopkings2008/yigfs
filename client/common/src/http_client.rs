@@ -3,12 +3,11 @@ extern crate hyper_tls;
 extern crate tokio;
 
 use std::collections::HashMap;
-use std::io::Read;
+
+use bytes::Buf;
 use hyper::{Client, Request, Body};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
-use bytes::Buf as _;
-use crate::runtime::Executor;
 
 pub enum HttpMethod{
     Get,
@@ -27,27 +26,25 @@ pub struct HttpClient{
     pub retry_times: u32,
     http_client: Client<HttpConnector, hyper::Body>,
     https_client: Client<hyper_tls::HttpsConnector<HttpConnector>, hyper::Body>,
-    exec: Executor,
 }
 
 struct Resp{
     pub status: u16,
     pub headers: HashMap<String, String>,
-    pub body: Box<dyn Read>,
+    pub body: Vec<u8>,
 }
 
 impl HttpClient{
-    pub fn new(retry_times: u32, exec: &Executor) -> HttpClient{
+    pub fn new(retry_times: u32) -> HttpClient{
         let https = HttpsConnector::new();
         HttpClient{
             retry_times: retry_times,
             http_client: Client::new(),
             https_client: Client::builder().build::<_, hyper::Body>(https),
-            exec: exec.clone(),
         }
     }
 
-    pub fn request(&self, url: &String, body: &String, method: &HttpMethod) -> Result<RespText, String>{
+    pub async fn request(&self, url: &String, body: &String, method: &HttpMethod) -> Result<RespText, String>{
         let mut count = self.retry_times;
         while count > 0 {
             count -= 1;
@@ -67,8 +64,8 @@ impl HttpClient{
                     return Err(format!("failed to create request from url: {}, body: {}, err: {}", url.clone(), body.clone(), error)); 
                 }
             }
-            let mut resp : Resp;
-            let result = self.exec.get_runtime().block_on(self.send(req));
+            let resp : Resp;
+            let result = self.send(req).await;
             match result {
                 Ok(result) => {
                     resp = result;
@@ -78,27 +75,19 @@ impl HttpClient{
                     continue;
                 }
             }
-            let mut buf = Vec::<u8>::new();
-            let ret = std::io::copy(resp.body.as_mut(), &mut buf);
-            match ret {
-                Ok(_n) => {
-                    let bstr = String::from_utf8(buf);
-                    match bstr {
-                        Ok(bstr) => {
-                            let rtext = RespText{
-                                status: resp.status,
-                                headers: resp.headers,
-                                body: bstr,
-                            };
-                            return Ok(rtext);
-                        }
-                        Err(error) => {
-                            return Err(format!("got invalid body with error: {}", error));
-                        }
-                    } 
+            
+            let bstr = String::from_utf8(resp.body);
+            match bstr {
+                Ok(bstr) => {
+                    let rtext = RespText{
+                        status: resp.status,
+                        headers: resp.headers,
+                        body: bstr,
+                    };
+                    return Ok(rtext);
                 }
                 Err(error) => {
-                    return Err(format!("failed to read body from {}, err: {}", url.clone(), error)); 
+                    return Err(format!("got invalid body with error: {}", error));
                 }
             }
         }
@@ -158,7 +147,7 @@ impl HttpClient{
                         let result = Resp{
                             status: status,
                             headers: headers,
-                            body: Box::new(body.reader()),
+                            body: body.chunk().to_vec(),
                         };
                         return Ok(result);
                     }

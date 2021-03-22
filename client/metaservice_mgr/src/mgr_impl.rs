@@ -1,6 +1,8 @@
+extern crate tokio;
 #[path="./message.rs"]
 mod message;
 
+use std::sync::Arc;
 use crate::{mgr, types::{Block, FileLeader, NewFileInfo, Segment, SetFileAttr}};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
@@ -13,12 +15,13 @@ use common::http_client::HttpMethod;
 use common::runtime::Executor;
 use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespReadDir, RespSetFileAttr};
 pub struct MetaServiceMgrImpl{
-    http_client: Box<http_client::HttpClient>,
+    http_client: Arc<http_client::HttpClient>,
     meta_server_url: String,
     region: String,
     bucket: String,
     zone: String,
     machine: String,
+    exec: Executor,
 }
 
 impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
@@ -46,7 +49,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/dir", self.meta_server_url);
         let resp : RespText;
-        let ret = self.http_client.request(&url, &req_json, &HttpMethod::Put);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_json, &HttpMethod::Put));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -142,7 +145,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/file/attr", self.meta_server_url);
         let resp_text : RespText;
-        let ret = self.http_client.request(&url, &req_str, &HttpMethod::Put);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_str, &HttpMethod::Put));
         match ret {
             Ok(ret) => {
                 resp_text = ret;
@@ -215,7 +218,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/file/leader", self.meta_server_url);
         let resp : RespText;
-        let ret = self.http_client.request(&url, &body,&HttpMethod::Get);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body,&HttpMethod::Get));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -277,7 +280,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/dir/file", self.meta_server_url);
         let resp: RespText;
-        let ret = self.http_client.request(&url, &body, &HttpMethod::Put);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body, &HttpMethod::Put));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -341,7 +344,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/file/segments", self.meta_server_url);
         let resp_text: RespText;
-        let ret = self.http_client.request(&url, &body, &HttpMethod::Get);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body, &HttpMethod::Get));
         match ret  {
             Ok(ret) => {
                 resp_text = ret;
@@ -438,7 +441,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/file/block", self.meta_server_url);
         let resp_text: RespText;
-        let ret = self.http_client.request(&url, &body, &HttpMethod::Put);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body, &HttpMethod::Put));
         match ret {
             Ok(ret) => {
                 resp_text = ret;
@@ -478,7 +481,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
 impl MetaServiceMgrImpl {
     pub fn new(meta_cfg: &Config, exec: &Executor) -> Result<MetaServiceMgrImpl, String> {
-        let http_client = Box::new(http_client::HttpClient::new(3, exec));
+        let http_client = Arc::new(http_client::HttpClient::new(3));
         Ok(MetaServiceMgrImpl{
             http_client: http_client,
             meta_server_url: meta_cfg.metaserver_config.meta_server.clone(),
@@ -486,6 +489,7 @@ impl MetaServiceMgrImpl {
             bucket: meta_cfg.s3_config.bucket.clone(),
             zone: meta_cfg.zone_config.zone.clone(),
             machine: meta_cfg.zone_config.machine.clone(),
+            exec: exec.clone(),
         })
     }
 
@@ -526,7 +530,7 @@ impl MetaServiceMgrImpl {
         }
         let resp : RespText;
         let url = format!("{}/v1/file/attr", self.meta_server_url);
-        let ret = self.http_client.request(&url, &req_body, &HttpMethod::Get);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body, &HttpMethod::Get));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -576,7 +580,7 @@ impl MetaServiceMgrImpl {
         }
         let resp_text : RespText;
         let url = format!("{}/v1/dir/file/attr", self.meta_server_url);
-        let ret = self.http_client.request(&url, &req_child_file_attr_json, &HttpMethod::Get);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_child_file_attr_json, &HttpMethod::Get));
         match ret {
             Ok(resp) => {
                 resp_text = resp;
@@ -626,7 +630,7 @@ impl MetaServiceMgrImpl {
 
         let resp_body :String;
         let url = format!("{}/v1/dir/files", self.meta_server_url);
-        let ret = self.http_client.request(&url, &req_read_dir_json, &HttpMethod::Get);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_read_dir_json, &HttpMethod::Get));
         match ret {
             Ok(text) => {
                 if text.status >= 300 {
