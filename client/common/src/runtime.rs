@@ -1,17 +1,17 @@
 extern crate tokio;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 #[derive(Debug, Clone)]
 pub struct Executor {
-    runtime: Rc<Runtime>,
+    runtime: Arc<Runtime>,
 }
 
 impl Executor{
     pub fn create() -> Self {
         Executor {
-            runtime: Rc::new(Runtime::new().expect("runtime new successfully.")),
+            runtime: Arc::new(Runtime::new().expect("runtime new successfully.")),
         }
     }
 

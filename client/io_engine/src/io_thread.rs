@@ -7,7 +7,6 @@ use common::numbers::NumberOp;
 use common::error::Errno;
 use common::runtime::Executor;
 use tokio::{fs::{File, OpenOptions}, io::AsyncWriteExt, io::AsyncSeekExt, io::AsyncReadExt};
-use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Sender, Receiver};
 use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
@@ -30,9 +29,9 @@ impl IoThread  {
             stop_tx: stop_tx,
             exec: exec.clone(),
         };
+        let exe = exec.clone();
         thr.thr.run(move ||{
-            let runtime = Runtime::new().expect("create runtime for iothread");
-            runtime.block_on(worker.start());
+            exe.get_runtime().block_on(worker.start());
         });
         return thr;
     }
