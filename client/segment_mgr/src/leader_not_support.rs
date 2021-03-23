@@ -10,6 +10,10 @@ impl Leader for LeaderNotSupport {
         Errno::Enotsupp
     }
 
+    fn read(&self, _ino: u64, _offset: u64, _size: u32) -> Result<Vec<u8>, Errno>{
+        Err(Errno::Enotsupp)
+    }
+
     fn write(&self, _ino: u64, _offset: u64, _data: &[u8]) -> Result<BlockIo, Errno> {
         Err(Errno::Enotsupp)
     }

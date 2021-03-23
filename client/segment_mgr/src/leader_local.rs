@@ -2,7 +2,7 @@ use std::rc::Rc;
 use tokio::sync::mpsc;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::io_thread_pool::IoThreadPool;
+use io_engine::{io_thread_pool::IoThreadPool, types::{MsgFileReadData, MsgFileReadOp}};
 use io_engine::types::{MsgFileOpenOp, MsgFileOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::leader::Leader;
 use crate::file_handle::FileHandleMgr;
@@ -79,6 +79,79 @@ impl Leader for LeaderLocal {
         self.handle_mgr.add(&file_handle);
 
         return Errno::Esucc;
+    }
+
+    fn read(&self, ino: u64, offset: u64, size: u32) -> Result<Vec<u8>, Errno> {
+        let file_handle : FileHandle;
+        let ret = self.handle_mgr.get(ino);
+        match ret{
+            Ok(ret) => {
+                file_handle = ret;
+            }
+            Err(err) => {
+                println!("read: failed to get file_handle for ino: {}, err: {:?}", ino, err);
+                return Err(err);
+            }
+        }
+        let mut start = offset;
+        let mut total_read = size;
+        let mut data = Vec::<u8>::new();
+        for s in &file_handle.segments {
+            for b in &s.blocks {
+                if b.offset <= start && start <= (b.offset + b.size as u64) {
+                    let mut to_read = total_read;
+                    if to_read >= b.size as u32 {
+                        to_read = b.size as u32;
+                    }
+                    // read the data.
+                    let seg_dir = self.segment_mgr.get_segment_dir(s.seg_id0, s.seg_id1);
+                    let (tx, mut rx) = mpsc::channel::<MsgFileReadData>(1);
+                    let msg = MsgFileReadOp{
+                        id0: s.seg_id0,
+                        id1: s.seg_id1,
+                        dir: seg_dir,
+                        offset: start,
+                        size: to_read,
+                        data_sender: tx,
+                    };
+                    let worker = self.io_pool.get_worker(s.seg_id0, s.seg_id1);
+                    let ret = worker.send_disk_io(MsgFileOp::OpRead(msg));
+                    if !ret.is_success(){
+                        println!("read: failed to read data for ino: {}, offset: {}, err: {:?}", ino, start, ret);
+                        return Err(ret);
+                    }
+                    let ret = self.exec.get_runtime().block_on(rx.recv());
+                    match ret {
+                        Some(ret) => {
+                            if ret.err.is_success() {
+                                if let Some(d) = ret.data{
+                                    let l = d.len() as u32;
+                                    total_read -= l as u32;
+                                    start += l as u64;
+                                    data.extend(d);
+                                }
+                            } else if ret.err.is_eof() {
+                                println!("read: got eof for ino: {}, offset: {}, start: {}", ino, offset, start);
+                                return Ok(data);
+                            } else {
+                                println!("read: got error when read data for ino: {}, offset: {}, start: {}, err: {:?}",
+                                ino, offset, start, ret.err);
+                                return Err(ret.err);
+                            }
+                        }
+                        None => {
+                            println!("read: got invalid response for ino: {}, offset: {}, start: {}", 
+                            ino, offset, start);
+                        }
+                    }
+                    if total_read == 0 {
+                        println!("read: finished for ino: {}, offset: {}", ino, offset);
+                        return Ok(data);
+                    }
+                }
+            }
+        }
+        return Ok(data);
     }
 
     fn write(&self, ino: u64, offset: u64, data: &[u8]) -> Result<BlockIo, Errno> {
