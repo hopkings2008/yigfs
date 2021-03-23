@@ -15,8 +15,6 @@ use crate::handle::{FileHandleInfo, FileHandleInfoMgr};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
-const HELLO_TXT_CONTENT: &'static str = "Hello World!\n";
-
 
 pub struct Yigfs{
     meta_service_mgr: Rc<dyn MetaServiceMgr>,
@@ -142,11 +140,32 @@ impl Filesystem for Yigfs {
         reply.attr(&TTL, &self.to_usefs_attr(&file_attr));
     }
 
-    fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, _size: u32, reply: ReplyData) {
-        if ino == 2 {
-            reply.data(&HELLO_TXT_CONTENT.as_bytes()[offset as usize..]);
-        } else {
-            reply.error(ENOENT);
+    fn read(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, size: u32, reply: ReplyData) {
+        let leader: String;
+        let ret = self.handle_cacher.get_handle_info(ino);
+        match ret {
+            Ok(ret) => {
+                leader = ret.leader;
+            }
+            Err(err) => {
+                println!("read: file ino: {} is not opened yet, err: {:?}.", ino, err);
+                reply.error(libc::EBADF);
+                return;
+            }
+        }
+        // get the leader.
+        let leader_io = self.leader_mgr.get_leader(&leader);
+        let ret = leader_io.read(ino, offset as u64, size);
+        match ret {
+            Ok(ret) => {
+                reply.data(ret.as_slice());
+                return;
+            }
+            Err(err) => {
+                println!("read: failed to read ino: {}, offset: {}, err: {:?}", ino, offset, err);
+                reply.error(libc::EIO);
+                return;
+            }
         }
     }
 
