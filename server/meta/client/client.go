@@ -39,9 +39,9 @@ type Client interface {
 	// create segment leader
 	CreateSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error)
 	// get covered existed blocks by blocks to be uploaded
-	GetCoveredExistedBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr int64) (blocks map[int64][]int64, err error)
+	GetCoveredExistedBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr, tag int64) (blocks map[int64][]int64, err error)
 	// get covered blocks to be uploaded
-	GetCoverBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr int64) (blocks map[int64][]int64, err error)
+	GetCoverBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr, tag int64) (blocks map[int64][]int64, err error)
 	// delete the block
 	DeleteBlock(ctx context.Context, seg *types.CreateSegmentReq, blockId int64) (err error)
 	// update the target file size and blocks number

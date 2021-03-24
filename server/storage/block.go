@@ -8,6 +8,7 @@ import (
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/types"
+	"github.com/bwmarrin/snowflake"
 )
 
 
@@ -88,6 +89,14 @@ func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.Crea
 
 	// 1. Find the min and max value of the start address and the end address of the blocks to be uploaded.
 	// all the blocks size and blocks number marked as increased.
+	node, createBlockErr := snowflake.NewNode(1)
+	if createBlockErr != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	tag := int64(node.Generate())
+
 	if len(seg.Segment.Blocks) == 0 {
 		helper.Logger.Warn(ctx, "No blocks to upload")
 		return
@@ -129,7 +138,7 @@ func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.Crea
 	// 2. Find already existed blocks contained by the block to be uploaded, deleted it, and mark the blocks size and blocks number as decreased.
 	waitgroup.Add(1)
 	go func() {
-		err = foundCoveredBlocksAndDeleted(ctx, seg, yigFs, minStart, maxEnd, &coveredExistedBlocks)
+		err = foundCoveredBlocksAndDeleted(ctx, seg, yigFs, minStart, maxEnd, tag, &coveredExistedBlocks)
 		if err != nil {
 			return
 		}
@@ -138,7 +147,7 @@ func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.Crea
 	// 3. Find already existed blocks that contained the block to be uploaded, this blocks to be uploaded's size and blocks number marked as decreased.
 	waitgroup.Add(1)
 	go func() {
-		err = foundCoveredUploadingBlocks(ctx, seg, yigFs, maxStart, minEnd, &coveredUploadingBlocks)
+		err = foundCoveredUploadingBlocks(ctx, seg, yigFs, maxStart, minEnd, tag, &coveredUploadingBlocks)
 		if err != nil {
 			return
 		}
@@ -199,9 +208,10 @@ func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.Crea
 	return
 }
 
-func foundCoveredUploadingBlocks(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage, maxStart, minEnd int64, coveredUploadingBlocks *[]uint64) (err error) {
+func foundCoveredUploadingBlocks(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage, 
+		maxStart, minEnd, tag int64, coveredUploadingBlocks *[]uint64) (err error) {
 	defer waitgroup.Done()
-	containBlocks, err := yigFs.MetaStorage.Client.GetCoverBlocks(ctx, seg, maxStart, minEnd)
+	containBlocks, err := yigFs.MetaStorage.Client.GetCoverBlocks(ctx, seg, maxStart, minEnd, tag)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the contain segment blocks, err: %v", err))
 		return
@@ -221,9 +231,10 @@ func foundCoveredUploadingBlocks(ctx context.Context, seg *types.CreateSegmentRe
 	return
 }
 
-func foundCoveredBlocksAndDeleted(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage, minStart, maxEnd int64, coveredExistedBlocks *[]uint64) (err error) {
+func foundCoveredBlocksAndDeleted(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage, 
+		minStart, maxEnd, tag int64, coveredExistedBlocks *[]uint64) (err error) {
 	defer waitgroup.Done()
-	existedBlocks, err := yigFs.MetaStorage.Client.GetCoveredExistedBlocks(ctx, seg, minStart, maxEnd)
+	existedBlocks, err := yigFs.MetaStorage.Client.GetCoveredExistedBlocks(ctx, seg, minStart, maxEnd, tag)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to get the covered segment blocks, err: %v", err))
 		return
