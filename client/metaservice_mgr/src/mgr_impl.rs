@@ -49,7 +49,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/dir", self.meta_server_url);
         let resp : RespText;
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_json, &HttpMethod::Put));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_json.as_bytes(), &HttpMethod::Put, false));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -145,7 +145,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/file/attr", self.meta_server_url);
         let resp_text : RespText;
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_str, &HttpMethod::Put));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_str.as_bytes(), &HttpMethod::Put, false));
         match ret {
             Ok(ret) => {
                 resp_text = ret;
@@ -218,7 +218,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/file/leader", self.meta_server_url);
         let resp : RespText;
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body,&HttpMethod::Get));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body.as_bytes(), &HttpMethod::Get, false));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -280,7 +280,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/dir/file", self.meta_server_url);
         let resp: RespText;
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body, &HttpMethod::Put));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body.as_bytes(), &HttpMethod::Put, false));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -344,7 +344,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/file/segments", self.meta_server_url);
         let resp_text: RespText;
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body, &HttpMethod::Get));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body.as_bytes(), &HttpMethod::Get, false));
         match ret  {
             Ok(ret) => {
                 resp_text = ret;
@@ -441,7 +441,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let url = format!("{}/v1/file/block", self.meta_server_url);
         let resp_text: RespText;
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body, &HttpMethod::Put));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body.as_bytes(), &HttpMethod::Put, false));
         match ret {
             Ok(ret) => {
                 resp_text = ret;
@@ -530,7 +530,7 @@ impl MetaServiceMgrImpl {
         }
         let resp : RespText;
         let url = format!("{}/v1/file/attr", self.meta_server_url);
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body, &HttpMethod::Get));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body.as_bytes(), &HttpMethod::Get, false));
         match ret {
             Ok(ret) => {
                 resp = ret;
@@ -580,7 +580,7 @@ impl MetaServiceMgrImpl {
         }
         let resp_text : RespText;
         let url = format!("{}/v1/dir/file/attr", self.meta_server_url);
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_child_file_attr_json, &HttpMethod::Get));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_child_file_attr_json.as_bytes(), &HttpMethod::Get, false));
         match ret {
             Ok(resp) => {
                 resp_text = resp;
@@ -630,7 +630,7 @@ impl MetaServiceMgrImpl {
 
         let resp_body :String;
         let url = format!("{}/v1/dir/files", self.meta_server_url);
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_read_dir_json, &HttpMethod::Get));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_read_dir_json.as_bytes(), &HttpMethod::Get, false));
         match ret {
             Ok(text) => {
                 if text.status >= 300 {

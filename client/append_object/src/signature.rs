@@ -1,7 +1,6 @@
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::str;
-use std::vec;
 use chrono::{DateTime, Utc, NaiveDate};
 use digest::Digest;
 use hex;
@@ -225,7 +224,7 @@ pub struct SignedRequest {
     /// The AWS hostname
     pub hostname: String,
     /// The HTTP Content
-    pub payload: Option<&'static vec::Vec<u8>>,
+    pub payload: Option<&'static Vec<u8>>,
     // The Standardised query string
     pub canonical_query_string: String,
     /// The Standardised URI
@@ -318,7 +317,7 @@ impl SignedRequest {
     }
 
     /// Signs the request using Amazon Signature v4 to verify identity.
-    pub fn sign(&mut self, creds: &AwsCredentials, payload: &vec::Vec<u8>) {
+    pub fn sign(&mut self, creds: &AwsCredentials, payload: &[u8]) {
         self.complement();
         let date = Utc::now();
         self.remove_header("x-amz-date");

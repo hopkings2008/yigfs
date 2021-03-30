@@ -6,7 +6,7 @@ fn test_http_client_get()->Result<(), String> {
     let retry_times = 3;
     let exec = Executor::create();
     let client = http_client::HttpClient::new(retry_times);
-    let resp = exec.get_runtime().block_on(client.request(&url, &String::from("hello world"), &http_client::HttpMethod::Get))?;
+    let resp = exec.get_runtime().block_on(client.request(&url, &String::from("hello world").as_bytes(), &http_client::HttpMethod::Get, false))?;
     if resp.status >= 300 {
         return Err(format!("got invalid status {}", resp.status));
     }
@@ -23,7 +23,7 @@ fn test_https_client_get()->Result<(), String> {
     let retry_times = 3;
     let exec = Executor::create();
     let client = http_client::HttpClient::new(retry_times);
-    let resp = exec.get_runtime().block_on(client.request(&url, &String::from("hello world"), &http_client::HttpMethod::Get))?;
+    let resp = exec.get_runtime().block_on(client.request(&url, &String::from("hello world").as_bytes(), &http_client::HttpMethod::Get, false))?;
     if resp.status >= 300 {
         return Err(format!("got invalid status {}", resp.status));
     }

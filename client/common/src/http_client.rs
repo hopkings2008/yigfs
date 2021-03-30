@@ -3,11 +3,15 @@ extern crate hyper_tls;
 extern crate tokio;
 
 use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use bytes::Buf;
+use bytes::Bytes;
 use hyper::{Client, Request, Body};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use http::header::{HeaderName, HeaderValue};
+
 
 pub enum HttpMethod{
     Get,
@@ -26,6 +30,7 @@ pub struct HttpClient{
     pub retry_times: u32,
     http_client: Client<HttpConnector, hyper::Body>,
     https_client: Client<hyper_tls::HttpsConnector<HttpConnector>, hyper::Body>,
+    pub headers: BTreeMap<String, Vec<Vec<u8>>>,
 }
 
 struct Resp{
@@ -41,27 +46,62 @@ impl HttpClient{
             retry_times: retry_times,
             http_client: Client::new(),
             https_client: Client::builder().build::<_, hyper::Body>(https),
+            headers: BTreeMap::new(),
         }
     }
 
-    pub async fn request(&self, url: &String, body: &String, method: &HttpMethod) -> Result<RespText, String>{
+    pub fn set_headers(&mut self, headers: BTreeMap<String, Vec<Vec<u8>>>) {
+        self.headers = headers
+    }
+
+    pub async fn request(&self, url: &String, body: &[u8], method: &HttpMethod, is_v4: bool) -> Result<RespText, String>
+    {
         let mut count = self.retry_times;
         while count > 0 {
             count -= 1;
-            let req : Request<Body>;
+            let mut req : Request<Body>;
             let ret = hyper::Request::builder().
                         method(self.get_http_method(method)).
                         header("Content-Type", "application/json").
                         uri(url.clone()).
-                        body(hyper::Body::from(body.clone()));
+                        body(hyper::Body::from(Bytes::copy_from_slice(body)));
             match ret {
                 Ok(ret) => {
                     req = ret;
                     // use http2
                     //*(req.version_mut()) = hyper::Version::HTTP_2;
+                    if is_v4 {
+                        if self.headers.is_empty() {
+                            return Err(format!("V4 request headers is not None"));
+                        }
+
+                        for h in self.headers.iter() {
+                            // add header
+                            let header_name = match h.0.parse::<HeaderName>() {
+                                Ok(name) => name,
+                                Err(err) => {
+                                    return Err(format!("error parsing header name: {}", err));
+                                }
+                            };
+
+                            for v in h.1.iter() {
+                                let header_value = match HeaderValue::from_bytes(v) {
+                                    Ok(value) => value,
+                                    Err(err) => {
+                                        return Err(format!("error parsing header value: {}", err));
+                                    }
+                                };
+
+                                req.headers_mut().insert(&header_name, header_value);
+                            }
+                        }
+                    } else {
+                        let header_value = HeaderValue::from_bytes(b"application/json").unwrap();
+                        req.headers_mut().insert("Content-Type", header_value);
+                    }
                 }
                 Err(error) => {
-                    return Err(format!("failed to create request from url: {}, body: {}, err: {}", url.clone(), body.clone(), error)); 
+                    return Err(format!("failed to create request from url: {}, body: {:?}, err: {}", url.clone(), body.clone(), error)); 
                 }
             }
             let resp : Resp;
@@ -92,7 +132,7 @@ impl HttpClient{
             }
         }
 
-        return Err(format!("failed to send request to url {} with body {} in {} times", url.clone(), body.clone(), self.retry_times));
+        return Err(format!("failed to send request to url {} with body {:?} in {} times", url.clone(), body.clone(), self.retry_times));
     }
 
     fn get_http_method(&self, m: &HttpMethod) -> hyper::Method {
