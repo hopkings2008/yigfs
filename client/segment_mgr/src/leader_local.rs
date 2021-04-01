@@ -2,7 +2,7 @@ use std::rc::Rc;
 use tokio::sync::mpsc;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::{io_thread_pool::IoThreadPool, types::{MsgFileReadData, MsgFileReadOp}};
+use io_engine::{io_thread_pool::IoThreadPool, types::{MsgFileCloseOp, MsgFileReadData, MsgFileReadOp}};
 use io_engine::types::{MsgFileOpenOp, MsgFileOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::leader::Leader;
 use crate::file_handle::FileHandleMgr;
@@ -240,6 +240,33 @@ impl Leader for LeaderLocal {
     }
 
     fn close(&self, ino: u64) -> Errno {
+        // first we should close all the file handles for the ino.
+        let handle: FileHandle;
+        let ret = self.handle_mgr.get(ino);
+        match ret {
+            Ok(ret) => {
+                handle = ret;
+            }
+            Err(err) => {
+                println!("failed to get file handle for ino: {}, err: {:?}", ino, err);
+                return err;
+            }
+        }
+        for s in &handle.segments {
+            //close the segment.
+            let worker = self.io_pool.get_worker(s.seg_id0, s.seg_id1);
+            let msg = MsgFileCloseOp{
+                id0: s.seg_id0,
+                id1: s.seg_id1,
+            };
+            let ret = worker.send_disk_io(MsgFileOp::OpClose(msg));
+            if !ret.is_success(){
+                println!("failed to close seg: id0: {}, id1: {} for ino: {}, err: {:?}", 
+                    s.seg_id0, s.seg_id1, ino, ret);
+                return ret;
+            }
+        }
+
         let err = self.handle_mgr.del(ino);
         return err;
     }
