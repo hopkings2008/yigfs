@@ -13,4 +13,5 @@ pub trait MetaServiceMgr {
     fn get_file_segments(&self, ino: u64, offset: Option<u64>, size: Option<i64>) -> Result<Vec<Segment>, Errno>;
     fn get_machine_id(&self) -> String;
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno;
+    fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno;
 }

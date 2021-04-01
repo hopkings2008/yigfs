@@ -14,6 +14,8 @@ use common::error::Errno;
 use common::http_client::HttpMethod;
 use common::runtime::Executor;
 use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespReadDir, RespSetFileAttr};
+
+use self::message::{ReqUpdateSegments, RespUpdateSegments};
 pub struct MetaServiceMgrImpl{
     http_client: Arc<http_client::HttpClient>,
     meta_server_url: String,
@@ -477,6 +479,73 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         return Errno::Esucc;
     }
+
+    fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno{
+        let mut vs: Vec<MsgSegment> = Vec::new();
+        for s in segs {
+            vs.push(MetaServiceMgrImpl::to_msg_segment(s));
+        }
+
+        let req_update_seg = ReqUpdateSegments {
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            zone: self.zone.clone(),
+            ino: ino,
+            generation: 0,
+            segments: vs,
+        };
+
+        let body: String;
+        let ret = json::encode_to_str::<ReqUpdateSegments>(&req_update_seg);
+        match ret {
+            Ok(ret) => {
+                body = ret;
+            }
+            Err(err) => {
+                println!("update_file_segments: failed to encode req: {:?}, err: {}", req_update_seg, err);
+                return Errno::Eintr;
+            }
+        }
+
+        let url = format!("{}/v1/file/segments", self.meta_server_url);
+        let resp_text: RespText;
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body.as_bytes(), &HttpMethod::Put, false));
+        match ret {
+            Ok(ret) => {
+                resp_text = ret;
+            }
+            Err(err) => {
+                println!("update_file_segments: failed to send req to {} with body: {}, err: {}",
+                url, body, err);
+                return Errno::Eintr;
+            }
+        }
+
+        if resp_text.status >=300 {
+            println!("update_file_segments: failed to add block for {}, got status: {}",
+            body, resp_text.status);
+            return Errno::Eintr;
+        }
+
+        let resp : RespUpdateSegments;
+        let ret = json::decode_from_str::<RespUpdateSegments>(&resp_text.body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                println!("update_file_segments: failed to decode body: {}, err: {}", resp_text.body, err);
+                return Errno::Eintr;
+            }
+        }
+
+        if resp.result.err_code != 0 {
+            println!("update_file_segments: failed to add file block for {}, err: {}", body, resp.result.err_msg);
+            return Errno::Eintr;
+        }
+
+        return Errno::Esucc;
+    }
 }
 
 impl MetaServiceMgrImpl {
@@ -491,6 +560,29 @@ impl MetaServiceMgrImpl {
             machine: meta_cfg.zone_config.machine.clone(),
             exec: exec.clone(),
         })
+    }
+
+    fn to_msg_block(b: &Block) -> MsgBlock {
+        MsgBlock{
+            offset: b.offset,
+            seg_start_addr: b.seg_start_addr,
+            seg_end_addr: b.seg_end_addr,
+            size: b.size,
+        }
+    }
+
+    fn to_msg_segment(s: &Segment) -> MsgSegment {
+        let mut m = MsgSegment {
+            seg_id0: s.seg_id0,
+            seg_id1: s.seg_id1,
+            max_size: s.max_size,
+            leader: s.leader.clone(),
+            blocks: Vec::new(),
+        };
+        for b in &s.blocks {
+            m.blocks.push(MetaServiceMgrImpl::to_msg_block(b));
+        }
+        return m;
     }
 
     fn to_file_attr(&self, msg_attr: &MsgFileAttr) -> FileAttr {
