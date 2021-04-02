@@ -9,7 +9,9 @@ use common::runtime::Executor;
 use tokio::{fs::{File, OpenOptions}, io::AsyncWriteExt, io::AsyncSeekExt, io::AsyncReadExt};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Sender, Receiver};
-use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
+use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, 
+    MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
+use crate::file_handle_ref::FileHandleRef;
 
 pub struct IoThread {
     thr: Thread,
@@ -64,7 +66,7 @@ impl IoThread  {
 
 struct IoThreadWorker {
     //id0&id1 -> File
-    handles: HashMap<u128, File>,
+    handles: HashMap<u128, FileHandleRef>,
     op_rx: Receiver<MsgFileOp>,
     stop_rx: Receiver<u8>,
 }
@@ -72,7 +74,7 @@ struct IoThreadWorker {
 impl IoThreadWorker {
     pub fn new(op_rx: Receiver<MsgFileOp>, stop_rx: Receiver<u8>) -> Self {
         IoThreadWorker{
-            handles: HashMap::<u128, File>::new(),
+            handles: HashMap::<u128, FileHandleRef>::new(),
             op_rx: op_rx,
             stop_rx: stop_rx,
         }
@@ -130,7 +132,8 @@ impl IoThreadWorker {
         let name = self.to_file_name(d, &msg.dir);
         let f: File;
         // check wether the handle already opened
-        if self.handles.contains_key(&d) {
+        if let Some(rh) = self.handles.get_mut(&d) {
+            rh.get();
             msg.response(Errno::Esucc).await;
             return;
         }
@@ -145,7 +148,7 @@ impl IoThreadWorker {
                 return;
             }
         }
-        self.handles.insert(d, f);
+        self.handles.insert(d, FileHandleRef::new(f));
         msg.response(Errno::Esucc).await;
         return;
     }
@@ -164,7 +167,7 @@ impl IoThreadWorker {
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name).await;
             match ret {
                 Ok(f) => {
-                    self.handles.insert(d, f);
+                    self.handles.insert(d, FileHandleRef::new(f));
                 }
                 Err(err) => {
                     println!("do_write: failed to open({}), err: {}", name, err);
@@ -175,9 +178,9 @@ impl IoThreadWorker {
             }
         }
 
-        if let Some(h) = self.handles.get_mut(&d) {
+        if let Some(rf) = self.handles.get_mut(&d) {
             // should we seek to end before write?
-            let ret = h.seek(SeekFrom::End(0)).await;
+            let ret = rf.file.seek(SeekFrom::End(0)).await;
             match ret {
                 Ok(ret) => {
                     resp_msg.offset = ret;
@@ -206,7 +209,7 @@ impl IoThreadWorker {
                 msg.response(resp_msg).await;
                 return;
             }
-            let ret = h.write(msg.data.as_slice()).await;
+            let ret = rf.file.write(msg.data.as_slice()).await;
             match ret {
                 Ok(ret) => {
                     resp_msg.nwrite = ret as u32;
@@ -238,7 +241,7 @@ impl IoThreadWorker {
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name).await;
             match ret {
                 Ok(f) => {
-                    self.handles.insert(d, f);
+                    self.handles.insert(d, FileHandleRef::new(f));
                 }
                 Err(err) => {
                     println!("do_write: failed to open({}), err: {}", name, err);
@@ -253,7 +256,7 @@ impl IoThreadWorker {
             }
         }
         if let Some(h) = self.handles.get_mut(&d) {
-            let ret = h.seek(SeekFrom::Start(msg.offset)).await;
+            let ret = h.file.seek(SeekFrom::Start(msg.offset)).await;
             match ret {
                 Ok(ret) => {
                     println!("do_read: succeed to seek to {} for {:?}", ret, msg);
@@ -276,7 +279,7 @@ impl IoThreadWorker {
                 //On a successful read, the number of read bytes is returned. 
                 //If the supplied buffer is not empty and the function returns Ok(0),
                 //then the source has reached an "end-of-file" event.
-                let ret = h.read(&mut data[..]).await;
+                let ret = h.file.read(&mut data[..]).await;
                 match ret {
                     Ok(ret) => {
                         if ret == 0 {
@@ -325,10 +328,12 @@ impl IoThreadWorker {
     async fn do_close(&mut self, msg: &MsgFileCloseOp){
         let id = NumberOp::to_u128(msg.id0, msg.id1);
         if let Some(f) = self.handles.get_mut(&id) {
-            let ret = f.flush().await;
+            let ret = f.file.flush().await;
             match ret {
                 Ok(_) => {
-                    self.handles.remove(&id);
+                    if f.put() {
+                        self.handles.remove(&id);
+                    }
                 }
                 Err(err) => {
                     println!("failed to flush File(id0: {}, id1: {}), err: {}", msg.id0, msg.id1, err);
@@ -339,7 +344,7 @@ impl IoThreadWorker {
 
     async fn exists(&mut self) {
         for (k,v) in &mut self.handles {
-            let ret = v.flush().await;
+            let ret = v.file.flush().await;
             match ret {
                 Ok(_) =>{}
                 Err(err) => {
