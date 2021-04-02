@@ -193,8 +193,8 @@ impl Leader for LeaderLocal {
             if let Some(r) = ret {
                 if !r.err.is_success() {
                     if r.err.is_enospc() {
-                        println!("write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {}",
-                        id0, id1, seg_dir, ino);
+                        println!("write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {} with offset: {}",
+                        id0, id1, seg_dir, ino, offset);
                         let seg = self.segment_mgr.new_segment(&String::from(""));
                         self.handle_mgr.add_segment(ino, &seg);
                         id0 = seg.seg_id0;
@@ -202,8 +202,8 @@ impl Leader for LeaderLocal {
                         seg_max_size = seg.max_size;
                         continue;
                     }
-                    println!("write: failed to write segment(id0: {}, id1: {}) for ino: {}, err: {:?}",
-                    id0, id1, ino, r.err);
+                    println!("write: failed to write segment(id0: {}, id1: {}) for ino: {} with offset: {}, err: {:?}",
+                    id0, id1, ino, offset, r.err);
                     return Err(r.err);
                 }
                 // write block success.
@@ -217,7 +217,7 @@ impl Leader for LeaderLocal {
                 };
                 let ret = self.handle_mgr.add_block(ino, id0, id1, &b);
                 if !ret.is_success() {
-                    println!("write: failed to add_block{:?} for ino: {}, err: {:?}", b, ino, ret);
+                    println!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
                     return Err(ret);
                 }
                 return Ok(BlockIo{
@@ -240,8 +240,8 @@ impl Leader for LeaderLocal {
                 println!("write: failed to upload block{:?} for ino: {}, err: {:?}", b, ino, ret);
                 return Err(ret);*/
             }
-            println!("write: got invalid response for seg(id0: {}, id1: {}) of ino: {}", 
-            id0, id1, ino);
+            println!("write: got invalid response for seg(id0: {}, id1: {}) of ino: {} with offset: {}", 
+            id0, id1, ino, offset);
             return Err(Errno::Eintr);
         }
     }
