@@ -215,7 +215,7 @@ impl Leader for LeaderLocal {
                     seg_end_addr: r.offset + r.nwrite as u64,
                     size: r.nwrite as i64,
                 };
-                let ret = self.handle_mgr.add_block(ino, id0, id1, &b);
+                let ret = self.handle_mgr.add_block(ino, id0, id1, seg_max_size, self.machine.clone(), &b);
                 if !ret.is_success() {
                     println!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
                     return Err(ret);

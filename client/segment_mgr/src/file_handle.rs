@@ -92,11 +92,13 @@ impl FileHandleMgr {
         }
     }
 
-    pub fn add_block(&self, ino: u64, id0: u64, id1: u64, b: &Block) -> Errno {
+    pub fn add_block(&self, ino: u64, id0: u64, id1: u64, seg_max_size: u64, leader: String, b: &Block) -> Errno {
         let msg_add_block = MsgAddBlock{
             ino: ino,
             id0: id0,
             id1: id1,
+            seg_max_size: seg_max_size,
+            leader: leader,
             block: b.copy(),
         };
         let msg = MsgFileHandleOp::AddBlock(msg_add_block);
@@ -309,7 +311,11 @@ impl HandleMgr {
                     continue;
                 }
                 s.add_block(msg.ino, msg.block.offset, msg.block.seg_start_addr, msg.block.size);
+                return;
             }
+            // new segment.
+            let s = Segment::rich_new(msg.id0, msg.id1, msg.seg_max_size, msg.leader.clone());
+            h.segments.push(s);
         }
     }
 

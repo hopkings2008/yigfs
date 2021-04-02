@@ -264,6 +264,8 @@ pub struct MsgAddBlock{
     pub ino: u64,
     pub id0: u64,
     pub id1: u64,
+    pub seg_max_size: u64,
+    pub leader: String,
     pub block: Block,
 }
 
