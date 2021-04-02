@@ -266,6 +266,7 @@ impl Leader for LeaderLocal {
             println!("close: failed to update segments for ino: {}, err: {:?}", ino, ret);
             return ret;
         }
+        // close the segments file handles.
         for s in &handle.segments {
             //close the segment.
             let worker = self.io_pool.get_worker(s.seg_id0, s.seg_id1);
