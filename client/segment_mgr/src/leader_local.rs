@@ -261,10 +261,12 @@ impl Leader for LeaderLocal {
             }
         }
         // update the segments into meta server.
-        let ret = self.segment_mgr.update_segments(ino, &handle.segments);
-        if !ret.is_success(){
-            println!("close: failed to update segments for ino: {}, err: {:?}", ino, ret);
-            return ret;
+        if !handle.segments.is_empty() {
+            let ret = self.segment_mgr.update_segments(ino, &handle.segments);
+            if !ret.is_success(){
+                println!("close: failed to update segments for ino: {}, err: {:?}", ino, ret);
+                return ret;
+            }
         }
         // close the segments file handles.
         for s in &handle.segments {
