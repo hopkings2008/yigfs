@@ -351,7 +351,7 @@ impl Yigfs{
         let machine = meta.get_machine_id();
         Yigfs{
             meta_service_mgr: meta,
-            leader_mgr: LeaderMgr::new(&machine, 2, exec, seg),
+            leader_mgr: LeaderMgr::new(&machine, 6, exec, seg),
             handle_cacher: FileHandleInfoMgr::new(),
             fsid: uuid::uuid_string(),
         }
