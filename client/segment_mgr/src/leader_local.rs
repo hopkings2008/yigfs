@@ -220,8 +220,15 @@ impl Leader for LeaderLocal {
                     println!("write: failed to add_block{:?} for ino: {}, err: {:?}", b, ino, ret);
                     return Err(ret);
                 }
+                return Ok(BlockIo{
+                    id0: id0,
+                    id1: id1,
+                    offset: r.offset,
+                    size: r.nwrite,
+                });
+                // currently, will update the segments in close api.
                 // upload the block to meta server.
-                let ret = self.segment_mgr.upload_block(ino, id0, id1, &b);
+                /*let ret = self.segment_mgr.upload_block(ino, id0, id1, &b);
                 if ret.is_success(){
                     return Ok(BlockIo{
                         id0: id0,
@@ -231,7 +238,7 @@ impl Leader for LeaderLocal {
                     });
                 }
                 println!("write: failed to upload block{:?} for ino: {}, err: {:?}", b, ino, ret);
-                return Err(ret);
+                return Err(ret);*/
             }
             println!("write: got invalid response for seg(id0: {}, id1: {}) of ino: {}", 
             id0, id1, ino);
@@ -240,7 +247,8 @@ impl Leader for LeaderLocal {
     }
 
     fn close(&self, ino: u64) -> Errno {
-        // first we should close all the file handles for the ino.
+        // first we should update the segments into meta server.
+        // second we should close all the file handles for the ino.
         let handle: FileHandle;
         let ret = self.handle_mgr.get(ino);
         match ret {
@@ -248,9 +256,15 @@ impl Leader for LeaderLocal {
                 handle = ret;
             }
             Err(err) => {
-                println!("failed to get file handle for ino: {}, err: {:?}", ino, err);
+                println!("close: failed to get file handle for ino: {}, err: {:?}", ino, err);
                 return err;
             }
+        }
+        // update the segments into meta server.
+        let ret = self.segment_mgr.update_segments(ino, &handle.segments);
+        if !ret.is_success(){
+            println!("close: failed to update segments for ino: {}, err: {:?}", ino, ret);
+            return ret;
         }
         for s in &handle.segments {
             //close the segment.

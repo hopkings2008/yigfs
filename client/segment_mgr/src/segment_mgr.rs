@@ -6,6 +6,7 @@ use crate::types::{Block, Segment, DataDir};
 use common::{error::Errno, numbers::NumberOp};
 use common::config::Config;
 use metaservice_mgr::mgr::MetaServiceMgr;
+use metaservice_mgr::types::Segment as MetaSegment;
 use hash_ring::HashRing;
 
 pub struct SegmentMgr {
@@ -108,6 +109,19 @@ impl SegmentMgr {
     pub fn get_segment_dir(&self, id0: u64, id1: u64) -> String {
         let idx = self.get_segment_dir_idx(id0, id1);
         self.data_dirs[idx].dir.clone()
+    }
+
+    pub fn update_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno {
+        let mut ms = Vec::<MetaSegment>::new();
+        for s in segs {
+            ms.push(s.to_meta_segment());
+        }
+        let ret = self.meta_service_mgr.update_file_segments(ino, &ms);
+        if !ret.is_success() {
+            println!("update_segments: failed to update segments for ino: {}, err: {:?}", ino, ret);
+            return ret;
+        }
+        return ret;
     }
 
     // private member functions.
