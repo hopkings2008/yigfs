@@ -162,7 +162,6 @@ impl IoThreadWorker {
         };
         // open the file first.
         if !self.handles.contains_key(&d) {
-            let d = NumberOp::to_u128(msg.id0, msg.id1);
             let name = self.to_file_name(d, &msg.dir);
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name).await;
             match ret {
@@ -196,15 +195,15 @@ impl IoThreadWorker {
             if msg.max_size > resp_msg.offset {
                 let left_space = msg.max_size - resp_msg.offset;
                 if left_space < msg.data.len() as u64 {
-                    println!("do_write: there is no space left of the segment: id0: {}, id1: {}, current offset: {}, left: {}",
-                    msg.id0, msg.id1, resp_msg.offset, left_space);
+                    println!("do_write: there is no space left of the segment: id0: {}, id1: {}, id: {}, current offset: {}, left: {}",
+                    msg.id0, msg.id1, d, resp_msg.offset, left_space);
                     resp_msg.err = Errno::Enospc;
                     msg.response(resp_msg).await;
                     return;
                 }
             } else {
-                println!("do_write: there is no space left of the segment: id0: {}, id1: {}, current offset: {}, seg_max_size:{}",
-                    msg.id0, msg.id1, resp_msg.offset, msg.max_size);
+                println!("do_write: there is no space left of the segment: id0: {}, id1: {}, id: {}, current offset: {}, seg_max_size:{}",
+                    msg.id0, msg.id1, d, resp_msg.offset, msg.max_size);
                 resp_msg.err = Errno::Enospc;
                 msg.response(resp_msg).await;
                 return;
