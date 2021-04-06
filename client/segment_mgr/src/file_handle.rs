@@ -314,7 +314,8 @@ impl HandleMgr {
                 return;
             }
             // new segment.
-            let s = Segment::rich_new(msg.id0, msg.id1, msg.seg_max_size, msg.leader.clone());
+            let mut s = Segment::rich_new(msg.id0, msg.id1, msg.seg_max_size, msg.leader.clone());
+            s.add_block(msg.ino, msg.block.offset, msg.block.seg_start_addr, msg.block.size);
             h.segments.push(s);
         }
     }
