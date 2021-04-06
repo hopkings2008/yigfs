@@ -203,6 +203,20 @@ impl Leader for LeaderLocal {
                         seg_max_size = seg.max_size;
                         println!("write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
                     id0, id1, ino, offset);
+                        let ch = self.handle_mgr.get_last_segment(ino);
+                        match ch {
+                            Ok(ch) => {
+                                if ch[0] != id0 || ch[1] != id1 {
+                                    println!("write: failed to get the last newly added segment for ino: {}, offset: {}, id0: {}, id1: {}",
+                                    ino, offset, id0, id1);
+                                    return Err(Errno::Eintr);
+                                }
+                            }
+                            Err(err) => {
+                                println!("write: failed to get last newly added segment for ino: {}, offset: {}", ino, offset);
+                                return Err(err);
+                            }
+                        }
                         continue;
                     }
                     println!("write: failed to write segment(id0: {}, id1: {}) for ino: {} with offset: {}, err: {:?}",

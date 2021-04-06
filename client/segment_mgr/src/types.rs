@@ -88,11 +88,11 @@ impl Segment {
             seg_end_addr: seg_start_offset+nwrite as u64,
             size: nwrite,
         };
-        for b in &mut self.blocks {
+        for bb in &mut self.blocks {
             // original offset keeps the same, but we concatenate the two consecutive blocks.
-            if b.seg_end_addr == seg_start_offset {
-                b.seg_end_addr = seg_start_offset + nwrite as u64;
-                b.size += nwrite;
+            if bb.seg_end_addr == seg_start_offset {
+                bb.seg_end_addr = seg_start_offset + nwrite as u64;
+                bb.size += nwrite;
                 return;
             }
         }
