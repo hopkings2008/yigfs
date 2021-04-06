@@ -166,10 +166,14 @@ impl Leader for LeaderLocal {
                 return Err(err);
             }
         }
+        if last_segment.is_empty() {
+            println!("write: failed to get_last_segment for ino: {}, no segments found.", ino);
+            return Err(Errno::Enoent);
+        }
         let mut id0 = last_segment[0];
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
-        println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
+        //println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
         loop {
             //println!("write: seg(id0: {}, id1: {}, max_size: {})", id0, id1, seg_max_size);
             let worker = self.io_pool.get_worker(id0, id1);
@@ -180,7 +184,7 @@ impl Leader for LeaderLocal {
                 id1: id1,
                 max_size: seg_max_size,
                 dir: seg_dir.clone(),
-                offset: 0, // the file offset is not used currently.
+                offset: offset, // the file offset is not used currently.
                 data: data.to_vec(),
                 resp_sender: tx,
             };
@@ -203,20 +207,6 @@ impl Leader for LeaderLocal {
                         seg_max_size = seg.max_size;
                         println!("write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
                     id0, id1, ino, offset);
-                        let ch = self.handle_mgr.get_last_segment(ino);
-                        match ch {
-                            Ok(ch) => {
-                                if ch[0] != id0 || ch[1] != id1 {
-                                    println!("write: failed to get the last newly added segment for ino: {}, offset: {}, id0: {}, id1: {}",
-                                    ino, offset, id0, id1);
-                                    return Err(Errno::Eintr);
-                                }
-                            }
-                            Err(err) => {
-                                println!("write: failed to get last newly added segment for ino: {}, offset: {}", ino, offset);
-                                return Err(err);
-                            }
-                        }
                         continue;
                     }
                     println!("write: failed to write segment(id0: {}, id1: {}) for ino: {} with offset: {}, err: {:?}",
@@ -232,7 +222,7 @@ impl Leader for LeaderLocal {
                     seg_end_addr: r.offset + r.nwrite as u64,
                     size: r.nwrite as i64,
                 };
-                let ret = self.handle_mgr.add_block(ino, id0, id1, seg_max_size, self.machine.clone(), &b);
+                let ret = self.handle_mgr.add_block(ino, id0, id1, &b);
                 if !ret.is_success() {
                     println!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
                     return Err(ret);
