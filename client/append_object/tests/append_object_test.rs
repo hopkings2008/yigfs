@@ -1,3 +1,5 @@
+use common::runtime::Executor;
+
 #[test]
 fn test_append_object_by_path()->Result<(), String> {
     let region = String::from("cn-bj-1");
@@ -8,9 +10,10 @@ fn test_append_object_by_path()->Result<(), String> {
     let target_object = String::from("test-object-1");
     let object_path = String::from("/home/test_object");
     let append_position: u128 = 0;
+    let exec = Executor::create();
 
-    let s3_client = append_object::S3Client::new(&region, &endpoint, &target_bucket, &target_object, &ak, &sk);
-    let resp = s3_client.append_object_by_path(&object_path, &append_position)?;
+    let s3_client = append_object::S3Client::new(&region, &endpoint, &ak, &sk);
+    let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&object_path, &target_bucket, &target_object, &append_position))?;
     if resp.status >= 300 {
         return Err(format!("Failed to append object, got invalid status {}", resp.status));
     }
@@ -29,9 +32,10 @@ fn test_append_object()->Result<(), String> {
     let target_object = String::from("test-object-2");
     let append_position: u128 = 0;
     let data: Vec<u8> = "Hello, World!".into();
+    let exec = Executor::create();
 
-    let s3_client = append_object::S3Client::new(&region, &endpoint, &target_bucket, &target_object, &ak, &sk);
-    let resp = s3_client.append_object(&data, &append_position)?;
+    let s3_client = append_object::S3Client::new(&region, &endpoint, &ak, &sk);
+    let resp = exec.get_runtime().block_on(s3_client.append_object(&data, &target_bucket, &target_object, &append_position))?;
     if resp.status >= 300 {
         return Err(format!("Failed to append object, got invalid status {}", resp.status));
     }
