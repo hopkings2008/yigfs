@@ -227,32 +227,7 @@ impl Leader for LeaderLocal {
                     println!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
                     return Err(ret);
                 }
-                let ret = self.handle_mgr.get_last_segment(ino);
-                match ret {
-                    Ok(ret) => {
-                        if ret[0] != id0 || ret[1] != id1 {
-                            println!("write: failed to get last segment for ino: {} with offset: {}, want id0: {}, id1: {}, got: id0: {}, id1: {}",
-                            ino, offset, id0, id1, ret[0], ret[1]);
-                            let ret = self.handle_mgr.get(ino);
-                            match ret {
-                                Ok(ret) => {
-                                    for s in &ret.segments{
-                                        for b in &s.blocks {
-                                            println!("seg: id0: {}, id1: {}, block: offset: {}, size: {}",
-                                        s.seg_id0, s.seg_id1, b.offset, b.size);
-                                        }
-                                    }
-                                }
-                                Err(_) => {}
-                            }
-                            return Err(Errno::Eintr);
-                        }
-                    }
-                    Err(_err) => {
-                        println!("write: failed to get last segment after add block for ino: {} with offset: {}", ino, offset);
-                        return Err(Errno::Eintr);
-                    }
-                }
+                
                 return Ok(BlockIo{
                     id0: id0,
                     id1: id1,
