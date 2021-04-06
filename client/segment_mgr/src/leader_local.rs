@@ -169,6 +169,7 @@ impl Leader for LeaderLocal {
         let mut id0 = last_segment[0];
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
+        println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
         loop {
             //println!("write: seg(id0: {}, id1: {}, max_size: {})", id0, id1, seg_max_size);
             let worker = self.io_pool.get_worker(id0, id1);
@@ -200,6 +201,8 @@ impl Leader for LeaderLocal {
                         id0 = seg.seg_id0;
                         id1 = seg.seg_id1;
                         seg_max_size = seg.max_size;
+                        println!("write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
+                    id0, id1, ino, offset);
                         continue;
                     }
                     println!("write: failed to write segment(id0: {}, id1: {}) for ino: {} with offset: {}, err: {:?}",
