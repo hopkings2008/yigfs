@@ -329,24 +329,12 @@ impl HandleMgr {
             drop(tx);
         };
         if let Some(h) = self.handles.get(&msg.ino) {
-            let mut offset: u64 = 0;
-            for s in &h.segments {
-                if s.blocks.is_empty() {
-                    found = true;
-                    id0 = s.seg_id0;
-                    id1 = s.seg_id1;
-                    max_size = s.max_size;
-                    break;
-                }
-                for b in &s.blocks {
-                    if b.offset >= offset {
-                        found = true;
-                        offset = b.offset;
-                        id0 = s.seg_id0;
-                        id1 = s.seg_id1;
-                        max_size = s.max_size;
-                    }
-                }
+            // get the last entry for the last segment.
+            if let Some(l) = h.segments.last() {
+                found = true;
+                id0 = l.seg_id0;
+                id1 = l.seg_id1;
+                max_size = l.max_size;
             }
         }
         if found {
