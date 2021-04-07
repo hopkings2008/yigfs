@@ -99,7 +99,7 @@ func Test_CreateFiles(t *testing.T) {
 		BucketName: BucketName,
 		ParentIno:  FileParentIno,
 		FileName:   FileName,
-		Size:       Size,
+		Size:       CreateFileSize,
 		Type:       types.COMMON_FILE,
 		Perm:       types.FILE_PERM,
 		Nlink:      Nlink,
@@ -234,7 +234,7 @@ func Test_WriteFile(t *testing.T) {
 	segment := &types.CreateBlocksInfo {
 		SegmentId0: SegmentId0,
 		SegmentId1: SegmentId1,
-		MaxSize: 1073741824,
+		MaxSize: SegMaxSize,
 	}
 
 	offset := Offset
@@ -460,6 +460,71 @@ func Test_GetFileAttr(t *testing.T) {
 		t.Fatalf("Failed to get file attr, resp code: %d, err: %v", getFileAttrResp.Result.ErrCode, getFileAttrResp.Result.ErrMsg)
 	} else {
 		t.Logf("Succeed to get file attr using ino, getFileAttrResp: %s", getFileAttrInfo)
+	}
+}
+
+func Test_UpdateSegments(t *testing.T) {
+	// get target file
+	file := &types.GetDirFileInfoReq{
+		Region: Region,
+		BucketName: BucketName,
+		ParentIno: FileParentIno,
+		FileName: FileName,
+	}
+
+	getDirFileResp, getDirFileInfo, err := GetDirFileAttr(file)
+	if err != nil {
+		t.Fatalf("Test_UpdateSegments: Failed to get dir file attr, err:%v", err)
+	} else if getDirFileResp.Result.ErrCode != 0 {
+		t.Fatalf("Test_UpdateSegments: Failed to get dir file attr, resp code: %d, err: %v", getDirFileResp.Result.ErrCode, getDirFileResp.Result.ErrMsg)
+	} else {
+		t.Logf("Test_UpdateSegments Succeed to get dir file attr, resp: %s", getDirFileInfo)
+	}
+
+	// upload segments
+	updateSegmentsReq := &types.UpdateSegmentsReq {
+		Region: Region,
+		BucketName: BucketName,
+		ZoneId: ZoneId,
+		Ino: getDirFileResp.File.Ino,
+	}
+
+	var segId0 uint64 = SegmentId0
+	var segId1 uint64 = SegmentId1
+	offset := UpdateOffset
+	startAddr := SegStartAddr
+	endAddr := SegEndAddr
+
+
+	for i := 0; i < 100; i++ {
+		segment := &types.CreateBlocksInfo {
+			SegmentId0: segId0,
+			SegmentId1: segId1,
+			Leader: Machine,
+			MaxSize: SegMaxSize,
+		}
+
+		block := types.BlockInfo {
+			Offset: int64(offset) + int64(i * 10),
+			SegStartAddr: int64(startAddr),
+			SegEndAddr: int64(endAddr),
+			Size: Size,
+		}
+
+		segId0++
+		segId1++
+
+		segment.Blocks = append(segment.Blocks, block)
+		updateSegmentsReq.Segments = append(updateSegmentsReq.Segments, segment)
+	}
+
+	updateSegsResp, updateSegsInfo, err := PutSegmentsInfo(updateSegmentsReq)
+	if err != nil {
+		t.Fatalf("Failed to upload block, err: %v", err)
+	} else if updateSegsResp.Result.ErrCode != 0 {
+		t.Fatalf("Failed to upload block, resp code: %d, err: %v", updateSegsResp.Result.ErrCode, updateSegsResp.Result.ErrMsg)
+	} else {
+		t.Logf("Succeed to upload block, resp: %s", updateSegsInfo)
 	}
 }
 

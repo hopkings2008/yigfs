@@ -26,13 +26,16 @@ const (
 	FileParentIno = 2
 	FileName = "test.txt"
 	Size = 128
+	CreateFileSize = 0
 	Nlink = 1
 	Offset = 0
+	UpdateOffset = 3000
 	SegStartAddr = 0
 	SegEndAddr = 128
 	SegmentId0 = 1
 	SegmentId1 = 1
 	Machine2 = "172.20.13.156"
+	SegMaxSize = 1073741824
 )
 
 func SendHttpToYigFs(method string, newServer string, client *http.Client, reqStr []byte) (result io.ReadCloser, err error) {

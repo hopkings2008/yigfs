@@ -117,7 +117,7 @@ func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.Crea
 	// 3. Find already existed blocks that contained the block to be uploaded, this blocks to be uploaded's size and blocks number marked as decreased.
 	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
 	// 5. if the segment does not have leader, create it.
-	// 6. get teh file size and calculate new file size and blocks number.
+	// 6. get the file size and calculate new file size and blocks number.
 	// 7. finally update the file size and blocks number.
 
 	if len(seg.Segment.Blocks) == 0 {
@@ -173,7 +173,7 @@ func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.Crea
 		}
 	}
 	
-	// 6. get teh file size and calculate new file size and blocks number.
+	// 6. get the file size and calculate new file size and blocks number.
 	getFileSize, getFileNumber, err := yigFs.MetaStorage.Client.GetFileSizeAndBlocksNum(ctx, seg)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get file size and blocks number, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
@@ -276,5 +276,119 @@ func createSegLeader(ctx context.Context, seg *types.CreateSegmentReq, yigFs *Yi
 		return
 	}
 	
+	return
+}
+
+func(yigFs *YigFsStorage) UpdateSegment(ctx context.Context, seg *types.CreateSegmentReq, isExisted int) (updateSegResp *types.UpdateSegResp, err error) {
+	// 1. Find the min and max index for the blocks to be uploaded, update the increased number and size.
+	// 2. Find already existed blocks contained by the block to be uploaded, then deleted them, and update the decreased size and number.
+	// 3. Find already existed blocks that contained the block to be uploaded, and update the decreased size and number.
+	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
+	// 5. if the segment does not have leader, create it.
+	// 6. finally return the decreased and increased size/number.
+	if len(seg.Segment.Blocks) == 0 {
+		helper.Logger.Warn(ctx, "No blocks to upload")
+		return
+	}
+
+	node, createBlockErr := snowflake.NewNode(1)
+	if createBlockErr != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	tag := int64(node.Generate())
+
+	updateSegResp = &types.UpdateSegResp{}
+
+	// 1. Find the min and max index for the blocks to be uploaded, update the increased number and size.
+	minStart, maxStart, minEnd, maxEnd, increasedSize, increasedNumber := findCheckIndex(ctx, seg)
+
+	// 2. Find already existed blocks contained by the block to be uploaded, then deleted them, and mark the blocks size and blocks number as decreased.
+	var coveredExistedBlocks = make([]uint64, 0)
+	waitgroup.Add(1)
+	go func() {
+		err = foundCoveredExistedBlocksAndDeleted(ctx, seg, yigFs, minStart, maxEnd, tag, &coveredExistedBlocks)
+		if err != nil {
+			return
+		}
+	}()
+
+	// 3. Find already existed blocks that contained the block to be uploaded, this blocks to be uploaded's size and blocks number marked as decreased.
+	var coveredUploadingBlocks = make([]uint64, 0)
+	waitgroup.Add(1)
+	go func() {
+		err = foundCoveredUploadingBlocks(ctx, seg, yigFs, maxStart, minEnd, tag, &coveredUploadingBlocks)
+		if err != nil {
+			return
+		}
+	}()
+
+	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
+	mergeNumber, err := yigFs.MetaStorage.Client.CreateFileSegment(ctx, seg)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d, err: %v",
+			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, err))
+		return
+	}
+
+	// 5. if the segment does not have leader, create it.
+	if isExisted == types.NotExisted {
+		err = createSegLeader(ctx, seg, yigFs)
+		if err != nil {
+			return
+		}
+	}
+
+	// 6. finally return the decreased and increased size/number.
+	waitgroup.Wait()
+
+	var decreasedSize uint64 = 0
+	var decreasedNumber uint32 = 0
+
+	coveredExistedBlocksLength := len(coveredExistedBlocks)
+	if coveredExistedBlocksLength > 0 {
+		for _, size := range coveredExistedBlocks {
+			decreasedSize += size
+		}
+	}
+
+	coveredUploadingBlocksLength := len(coveredUploadingBlocks)
+	if coveredUploadingBlocksLength > 0 {
+		for _, size := range coveredUploadingBlocks {
+			decreasedSize += size
+		}
+	}
+
+	decreasedNumber += uint32(coveredExistedBlocksLength) + uint32(coveredUploadingBlocksLength) + uint32(mergeNumber)
+	
+	updateSegResp = &types.UpdateSegResp {
+		IncreasedSize: increasedSize,
+		DecreasedSize: decreasedSize,
+		IncreasedNumber: increasedNumber,
+		DecreasedNumber: decreasedNumber,
+	}
+
+	return
+}
+
+func(yigFs *YigFsStorage) GetFileSizeAndBlocksNum(ctx context.Context, seg *types.CreateSegmentReq) (size uint64, number uint32, err error) {
+	size, number, err = yigFs.MetaStorage.Client.GetFileSizeAndBlocksNum(ctx, seg)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get file size and blocks number, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
+			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1))
+		return
+	}
+
+	return size, number, nil
+}
+
+func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNum(ctx context.Context, seg *types.CreateSegmentReq, allBlocksSize uint64, allBlocksNumber uint32) (err error) {
+	err = yigFs.MetaStorage.Client.UpdateFileSizeAndBlocksNum(ctx, seg, allBlocksSize, allBlocksNumber)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update file size and blocks number, err: %v", err))
+		return
+	}
+
 	return
 }
