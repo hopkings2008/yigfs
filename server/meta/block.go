@@ -23,6 +23,6 @@ func(m *Meta) DeleteBlock(ctx context.Context, seg *types.CreateSegmentReq, bloc
 	return m.Client.DeleteBlock(ctx, seg, blockId)
 }
 
-func(m *Meta) GetCoverBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr, tag int64) (blocks map[int64][]int64, err error) {
-	return m.Client.GetCoverBlocks(ctx, seg, startAddr, endAddr, tag)
+func(m *Meta) GetCoveredUploadingBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr, tag int64) (blocks map[int64][]int64, err error) {
+	return m.Client.GetCoveredUploadingBlocks(ctx, seg, startAddr, endAddr, tag)
 }

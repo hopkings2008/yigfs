@@ -44,6 +44,7 @@ type CreateSegmentReq struct {
 	Machine string `json:"machine"`
 	Ino uint64 `json:"ino"`
 	Generation uint64 `json:"generation"`
+	CoveredBlockOffset int64 `json:"covered_block_offset,omitempty"`
 	Segment CreateBlocksInfo `json:"segment"`
 }
 
