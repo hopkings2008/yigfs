@@ -20,14 +20,14 @@ func GetBlockInfoSql() (sqltext string) {
 }
 
 func GetCoveredBlocksInfoSql() (sqltext string) {
-	sqltext = "select size, block_id, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and seg_id0=? and seg_id1=? and is_deleted=? and seg_start_addr >= ? and seg_end_addr <= ? and block_id < ?;"
+	sqltext = "select size, block_id, offset from block where region=? and bucket_name=? and ino=?" + 
+		" and generation=? and is_deleted=? and offset >= ? and offset + size <= ? and block_id < ?;"
 	return sqltext
 }
 
 func GetCoverBlocksInfoSql() (sqltext string) {
-	sqltext = "select block_id, seg_start_addr, seg_end_addr from block where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and seg_id0=? and seg_id1=? and is_deleted=? and seg_start_addr <= ? and seg_end_addr > ? and block_id < ?;"
+	sqltext = "select size, block_id, offset from block where region=? and bucket_name=? and ino=?" + 
+		" and generation=? and is_deleted=? and offset <= ? and offset + size > ? and block_id < ?;"
 	return sqltext
 }
 
@@ -38,8 +38,7 @@ func GetTargetBlockSql() (sqltext string) {
 }
 
 func DeleteBlockSql() (sqltext string) {
-	sqltext = "update block set is_deleted=? where region=? and bucket_name=? and ino=?" +
-		" and generation=? and seg_id0=? and seg_id1=? and block_id=?;"
+	sqltext = "update block set is_deleted=? where region=? and bucket_name=? and ino=? and generation=? and offset=? and block_id=?;"
 	return sqltext
 }
 
@@ -51,15 +50,13 @@ func MergeBlockSql() (sqltext string) {
 
 func(t *TidbClient) DeleteBlock(ctx context.Context, seg *types.CreateSegmentReq, blockId int64) (err error) {
 	sqltext := DeleteBlockSql()
-	_, err = t.Client.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-		seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId)
+	_, err = t.Client.Exec(sqltext, types.Deleted, seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.CoveredBlockOffset, blockId)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete block from tidb, blockId: %d, err: %v", blockId, err))
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the block, seg_id0: %d, seg_id1: %d, block_id: %d", 
-		seg.Segment.SegmentId0, seg.Segment.SegmentId1, blockId))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the block, offset: %d, block_id: %d", seg.CoveredBlockOffset, blockId))
 	return
 }
 
@@ -67,8 +64,7 @@ func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, seg *types.Crea
 	blocks = make(map[int64][]int64)
 
 	sqltext := GetCoveredBlocksInfoSql()
-	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted, startAddr, endAddr, tag)
+	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted, startAddr, endAddr, tag)
 	if err != nil && err != sql.ErrNoRows {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks, err: %v", err))
 		err = ErrYIgFsInternalErr
@@ -78,15 +74,13 @@ func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, seg *types.Crea
 	
 	var size int
 	var block_id int64
-	var seg_start_addr int64
-	var seg_end_addr int64
+	var offset int64
 
 	for rows.Next() {
 		err = rows.Scan (
 			&size,
 			&block_id,
-			&seg_start_addr,
-			&seg_end_addr,
+			&offset,
 		)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get block in row, err: %v", err))
@@ -94,8 +88,7 @@ func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, seg *types.Crea
 			return
 		}
 
-		blocks[block_id] = append(blocks[block_id], seg_start_addr)
-		blocks[block_id] = append(blocks[block_id], seg_end_addr)
+		blocks[block_id] = append(blocks[block_id], offset)
 		blocks[block_id] = append(blocks[block_id], int64(size))
 	}
 	
@@ -109,12 +102,11 @@ func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, seg *types.Crea
 	return blocks, nil
 }
 
-func(t *TidbClient) GetCoverBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr, tag int64) (blocks map[int64][]int64, err error) {
+func(t *TidbClient) GetCoveredUploadingBlocks(ctx context.Context, seg *types.CreateSegmentReq, startAddr, endAddr, tag int64) (blocks map[int64][]int64, err error) {
 	blocks = make(map[int64][]int64)
 
 	sqltext := GetCoverBlocksInfoSql()
-	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
-		seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted, startAddr, endAddr, tag)
+	rows, err := t.Client.Query(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted, startAddr, endAddr, tag)
 	if err != nil && err != sql.ErrNoRows {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get contain blocks, err: %v", err))
 		err = ErrYIgFsInternalErr
@@ -122,15 +114,15 @@ func(t *TidbClient) GetCoverBlocks(ctx context.Context, seg *types.CreateSegment
 	}
 	defer rows.Close()
 	
+	var size int
 	var block_id int64
-	var seg_start_addr int64
-	var seg_end_addr int64
+	var offset int64
 
 	for rows.Next() {
 		err = rows.Scan (
+			&size,
 			&block_id,
-			&seg_start_addr,
-			&seg_end_addr,
+			&offset,
 		)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get contain block in row, err: %v", err))
@@ -138,8 +130,8 @@ func(t *TidbClient) GetCoverBlocks(ctx context.Context, seg *types.CreateSegment
 			return
 		}
 
-		blocks[block_id] = append(blocks[block_id], seg_start_addr)
-		blocks[block_id] = append(blocks[block_id], seg_end_addr)
+		blocks[block_id] = append(blocks[block_id], offset)
+		blocks[block_id] = append(blocks[block_id], int64(size))
 	}
 	
 	err = rows.Err()
@@ -303,7 +295,6 @@ func (t *TidbClient) CreateFileSegment(ctx context.Context, seg *types.CreateSeg
 
 	for i, block := range seg.Segment.Blocks {
 		// if the block start addr == the existed block end addr, merge it.
-	
 		sqltext = GetTargetBlockSql()
 		row := sqlTx.QueryRow(sqltext, seg.Region, seg.BucketName, seg.Ino, seg.Generation, 
 			seg.Segment.SegmentId0, seg.Segment.SegmentId1, types.NotDeleted, block.SegStartAddr)

@@ -434,7 +434,7 @@ func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.
 		return
 	}
 	
-	helper.Logger.Info(ctx, "Succeed to update file size and blocks number to tidb")
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number to tidb, size: %v, number: %v", size, blocksNum))
 	return
 }
 

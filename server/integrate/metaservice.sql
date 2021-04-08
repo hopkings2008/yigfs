@@ -91,8 +91,7 @@ CREATE TABLE `block` (
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT 0,
-   index list_start_key (seg_start_addr),
-   index list_end_key (seg_end_addr),
-   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id0`, `seg_id1`, `block_id`)
+   index list_key (seg_id0, seg_id1, seg_start_addr, seg_end_addr),
+   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `offset`, `block_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

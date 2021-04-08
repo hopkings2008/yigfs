@@ -44,12 +44,31 @@ type CreateSegmentReq struct {
 	Machine string `json:"machine"`
 	Ino uint64 `json:"ino"`
 	Generation uint64 `json:"generation"`
+	CoveredBlockOffset int64 `json:"covered_block_offset,omitempty"`
 	Segment CreateBlocksInfo `json:"segment"`
 }
 
 type CreateBlocksInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
+	Leader string `json:"leader,omitempty"`
 	MaxSize int `json:"max_size"`
 	Blocks []BlockInfo `json:"blocks"`
+}
+
+type UpdateSegResp struct {
+	IncreasedSize uint64 `json:"increased_size"`
+	DecreasedSize uint64 `json:"decreased_size"`
+	IncreasedNumber uint32 `json:"increased_number"`
+	DecreasedNumber uint32 `json:"decreased_number"`
+}
+
+type UpdateSegmentsReq struct {
+	Ctx context.Context `json:"-"`
+	Region string `json:"region"`
+	BucketName string `json:"bucket"`
+	ZoneId string `json:"zone"`
+	Ino uint64 `json:"ino"`
+	Generation uint64 `json:"generation"`
+	Segments []*CreateBlocksInfo `json:"segments"`
 }

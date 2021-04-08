@@ -64,3 +64,31 @@ func GetSegmentInfo(getSegmentReq *types.GetSegmentReq) (getSegmentInfoResp *typ
 
 	return getSegmentInfoResp, string(getSegInfo), nil
 }
+
+func PutSegmentsInfo(updateSegmentsReq *types.UpdateSegmentsReq) (updateSegsResp *types.NonBodyResp, result string, err error) {
+	updateSegsResp = &types.NonBodyResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/file/segments"
+
+	reqStr, err := json.Marshal(updateSegmentsReq)
+	if err != nil {
+		return updateSegsResp, "", err
+	}
+
+	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+		return updateSegsResp, "", err
+	}
+	defer resp.Close()
+
+	updateSegsInfo, err := ioutil.ReadAll(resp)
+	if err != nil {
+		return updateSegsResp, "", err
+	}
+
+	if err = json.Unmarshal(updateSegsInfo, &updateSegsResp); err != nil {
+		return updateSegsResp, "", err
+	}
+
+	return updateSegsResp, string(updateSegsInfo), nil
+}

@@ -52,6 +52,8 @@ func main() {
 	app.Get("/v1/file/segments", apiHandlers.GetSegmentHandler)
 	// CreateSegment
 	app.Put("/v1/file/block", apiHandlers.CreateSegmentHandler)
+	// UpdateSegments
+	app.Put("/v1/file/segments", apiHandlers.UpdateSegmentsHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
         err := app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile))

@@ -39,6 +39,8 @@ const (
 	ErrYigFsNoTargetSegment
 	ErrYigFsFileAlreadyExist
 	ErrYigFsMachineNotMatchLeader
+	ErrYigFsMissingSegmentLeader
+	ErrYigFsNoVaildSegments
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -111,6 +113,16 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsMachineNotMatchLeader",
 		Description:    "The request machine does not match segment leader.",
 		HttpStatusCode: 40012,
+	},
+	ErrYigFsMissingSegmentLeader: {
+		AwsErrorCode:   "ErrYigFsMissingSegmentLeader",
+		Description:    "Missing necessary parameter segment leader.",
+		HttpStatusCode: 40013,
+	},
+	ErrYigFsNoVaildSegments: {
+		AwsErrorCode:   "ErrYigFsNoVaildSegments",
+		Description:    "No vaild segments to upload.",
+		HttpStatusCode: 40014,
 	},
 }
 
