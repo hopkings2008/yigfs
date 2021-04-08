@@ -90,7 +90,7 @@ impl Segment {
         };
         for bb in &mut self.blocks {
             // original offset keeps the same, but we concatenate the two consecutive blocks.
-            if bb.seg_end_addr == seg_start_offset {
+            if bb.offset + bb.size as u64 == offset && bb.seg_end_addr == seg_start_offset {
                 bb.seg_end_addr = seg_start_offset + nwrite as u64;
                 bb.size += nwrite;
                 return;

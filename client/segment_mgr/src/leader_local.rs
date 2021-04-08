@@ -278,6 +278,10 @@ impl Leader for LeaderLocal {
         }
         // close the segments file handles.
         for s in &handle.segments {
+            for b in &s.blocks {
+                println!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
+                ino, s.seg_id0, s.seg_id1, b.offset, b.size);
+            }
             //close the segment.
             let worker = self.io_pool.get_worker(s.seg_id0, s.seg_id1);
             let msg = MsgFileCloseOp{
