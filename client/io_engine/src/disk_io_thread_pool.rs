@@ -12,7 +12,7 @@ impl DiskIoThreadPool {
             pool: Vec::new(),
         };
         for i in 0..num {
-            let thr = DiskIoThread::create(&format!("IoThread{}", i+1), exec);
+            let thr = DiskIoThread::create(&format!("DiskIoThread{}", i+1), exec);
             pool.pool.push(thr);
         }
         return pool;

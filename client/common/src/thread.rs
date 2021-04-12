@@ -17,6 +17,10 @@ impl Thread {
         }
     }
 
+    pub fn name(&self)->String {
+        self.name.clone()
+    }
+
     pub fn run<F>(&mut self, f: F)
     where F: FnOnce(),
     F: Send + 'static {

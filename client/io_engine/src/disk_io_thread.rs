@@ -24,7 +24,7 @@ impl DiskIoThread  {
     pub fn create(name: &String, exec: &Executor)->Self {
         let (tx, rx) = mpsc::channel::<MsgFileOp>(1000);
         let(stop_tx, stop_rx) = mpsc::channel::<u8>(1);
-        let mut worker = IoThreadWorker::new(rx, stop_rx);
+        let mut worker = DiskIoThreadWorker::new(rx, stop_rx);
         let mut thr = DiskIoThread {
             thr: Thread::create(name),
             op_tx: tx,
@@ -64,16 +64,16 @@ impl DiskIoThread  {
     }
 }
 
-struct IoThreadWorker {
+struct DiskIoThreadWorker {
     //id0&id1 -> File
     handles: HashMap<u128, FileHandleRef>,
     op_rx: Receiver<MsgFileOp>,
     stop_rx: Receiver<u8>,
 }
 
-impl IoThreadWorker {
+impl DiskIoThreadWorker {
     pub fn new(op_rx: Receiver<MsgFileOp>, stop_rx: Receiver<u8>) -> Self {
-        IoThreadWorker{
+        DiskIoThreadWorker{
             handles: HashMap::<u128, FileHandleRef>::new(),
             op_rx: op_rx,
             stop_rx: stop_rx,
