@@ -1,18 +1,18 @@
-use crate::io_thread::IoThread;
+use crate::io_thread::DiskIoThread;
 use common::runtime::Executor;
 use common::numbers::NumberOp;
 
-pub struct IoThreadPool {
-    pool: Vec<IoThread>,
+pub struct DiskIoThreadPool {
+    pool: Vec<DiskIoThread>,
 }
 
-impl IoThreadPool {
+impl DiskIoThreadPool {
     pub fn new(num: u32, exec: &Executor)->Self {
-        let mut pool = IoThreadPool{
+        let mut pool = DiskIoThreadPool{
             pool: Vec::new(),
         };
         for i in 0..num {
-            let thr = IoThread::create(&format!("IoThread{}", i+1), exec);
+            let thr = DiskIoThread::create(&format!("IoThread{}", i+1), exec);
             pool.pool.push(thr);
         }
         return pool;
@@ -29,7 +29,7 @@ impl IoThreadPool {
         self.pool.clear();
     }
 
-    pub fn get_worker(&self, id0: u64, id1: u64) -> &IoThread {
+    pub fn get_worker(&self, id0: u64, id1: u64) -> &DiskIoThread {
         let size = self.pool.len() as u32;
         let id = NumberOp::to_u128(id0, id1);
         // enhance the hash algo here later.

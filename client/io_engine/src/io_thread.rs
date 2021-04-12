@@ -13,19 +13,19 @@ use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp,
     MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::file_handle_ref::FileHandleRef;
 
-pub struct IoThread {
+pub struct DiskIoThread {
     thr: Thread,
     op_tx: Sender<MsgFileOp>,
     stop_tx: Sender<u8>,
     exec: Executor,
 }
 
-impl IoThread  {
+impl DiskIoThread  {
     pub fn create(name: &String, exec: &Executor)->Self {
         let (tx, rx) = mpsc::channel::<MsgFileOp>(1000);
         let(stop_tx, stop_rx) = mpsc::channel::<u8>(1);
         let mut worker = IoThreadWorker::new(rx, stop_rx);
-        let mut thr = IoThread {
+        let mut thr = DiskIoThread {
             thr: Thread::create(name),
             op_tx: tx,
             stop_tx: stop_tx,

@@ -2,7 +2,7 @@ use std::rc::Rc;
 use tokio::sync::mpsc;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::{io_thread_pool::IoThreadPool, types::{MsgFileCloseOp, MsgFileReadData, MsgFileReadOp}};
+use io_engine::{io_thread_pool::DiskIoThreadPool, types::{MsgFileCloseOp, MsgFileReadData, MsgFileReadOp}};
 use io_engine::types::{MsgFileOpenOp, MsgFileOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::leader::Leader;
 use crate::file_handle::FileHandleMgr;
@@ -11,7 +11,7 @@ use crate::segment_mgr::SegmentMgr;
 
 pub struct LeaderLocal {
     machine: String,
-    io_pool: IoThreadPool,
+    io_pool: DiskIoThreadPool,
     exec: Executor,
     segment_mgr: Rc<SegmentMgr>,
     handle_mgr: FileHandleMgr,
@@ -309,7 +309,7 @@ impl LeaderLocal {
     pub fn new(machine: &String, thr_num: u32, exec: &Executor, mgr: Rc<SegmentMgr>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
-            io_pool: IoThreadPool::new(thr_num, exec),
+            io_pool: DiskIoThreadPool::new(thr_num, exec),
             exec: exec.clone(),
             segment_mgr: mgr,
             handle_mgr: FileHandleMgr::create(),
