@@ -2,7 +2,7 @@ use std::rc::Rc;
 use tokio::sync::mpsc;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::{io_thread_pool::DiskIoThreadPool, types::{MsgFileCloseOp, MsgFileReadData, MsgFileReadOp}};
+use io_engine::{disk_io_thread_pool::DiskIoThreadPool, types::{MsgFileCloseOp, MsgFileReadData, MsgFileReadOp}};
 use io_engine::types::{MsgFileOpenOp, MsgFileOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::leader::Leader;
 use crate::file_handle::FileHandleMgr;

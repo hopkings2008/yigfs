@@ -1,4 +1,4 @@
-use crate::io_thread::DiskIoThread;
+use crate::disk_io_thread::DiskIoThread;
 use common::runtime::Executor;
 use common::numbers::NumberOp;
 
