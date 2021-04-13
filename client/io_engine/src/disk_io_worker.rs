@@ -44,7 +44,7 @@ impl IoWorker for DiskIoWorker{
                             println!("DiskIoWorker: stop_rx recved err: {}, stopping...", err);
                         }
                     }
-                    self.exists();
+                    self.exits();
                     break;
                 }
             }
@@ -292,7 +292,7 @@ impl DiskIoWorker {
         }
     }
 
-    fn exists(&mut self) {
+    fn exits(&mut self) {
         for (k,v) in &mut self.handles {
             let ret = v.file.sync_all();
             match ret {
