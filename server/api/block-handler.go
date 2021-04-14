@@ -169,7 +169,7 @@ func(yigFs MetaAPIHandlers) GetSegmentsHandler(ctx iris.Context) {
 	defer GetSpendTime("GetSegmentHandler")()
 
 	r := ctx.Request()
-    reqContext := r.Context()
+	reqContext := r.Context()
 
 	// get req
 	segReq := &types.GetSegmentReq{}
@@ -216,7 +216,7 @@ func(yigFs MetaAPIHandlers) UpdateSegBlockInfoHandler(ctx iris.Context) {
 	defer GetSpendTime("UpdateSegBlockInfoHandler")()
 
 	r := ctx.Request()
-    reqContext := r.Context()
+	reqContext := r.Context()
 
 	// get req
 	segReq := &types.UpdateSegBlockInfoReq{}
