@@ -3,7 +3,6 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"time"
 	"fmt"
 
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -17,7 +16,7 @@ func GetSegmentLeaderSql() (sqltext string) {
 }
 
 func CreateSegmentInfoSql() (sqltext string) {
-	sqltext = "insert into segment_info values(?,?,?,?,?,?,?,?,?,?,?)"
+	sqltext = "insert into segment_info(zone_id, region, bucket_name, seg_id0, seg_id1, leader, max_size, is_deleted) values(?,?,?,?,?,?,?,?)"
 	return sqltext
 }
 
@@ -46,11 +45,9 @@ func (t *TidbClient) GetSegmentInfo(ctx context.Context, segment *types.GetSegLe
 }
 
 func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
-	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-	latestOffset := 0
 	sqltext := CreateSegmentInfoSql()
 	args := []interface{}{segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0,
-		segment.Segment.SegmentId1, segment.Machine, segment.Segment.MaxSize, latestOffset, now, now, types.NotDeleted}
+		segment.Segment.SegmentId1, segment.Machine, segment.Segment.MaxSize, types.NotDeleted}
 		
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
@@ -64,9 +61,8 @@ func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.Creat
 }
 
 func (t *TidbClient) UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
-	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-	sqltext := "update segment_info set latest_offset=?, mtime=? where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-	_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.LatestOffset, now, seg.ZoneId, seg.Region, seg.BucketName, 
+	sqltext := "update segment_info set latest_offset=? where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.LatestOffset, seg.ZoneId, seg.Region, seg.BucketName, 
 		seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update seg block info to tidb, err: %v", err))

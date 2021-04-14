@@ -67,8 +67,8 @@ CREATE TABLE `segment_info` (
   `leader` varchar(255) DEFAULT NULL,
   `max_size` int(11) DEFAULT 0,
   `latest_offset` int(11) DEFAULT 0,
-  `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`zone_id`, `region`, `bucket_name`, `seg_id0`, `seg_id1`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
