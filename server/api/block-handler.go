@@ -208,3 +208,50 @@ func(yigFs MetaAPIHandlers) GetSegmentsHandler(ctx iris.Context) {
 	ctx.JSON(resp)
 	return
 }
+
+func(yigFs MetaAPIHandlers) UpdateSegBlockInfoHandler(ctx iris.Context) {
+	resp := &types.NonBodyResp {
+		Result: types.YigFsMetaError{},
+	}
+	defer GetSpendTime("UpdateSegBlockInfoHandler")()
+
+	r := ctx.Request()
+    reqContext := r.Context()
+
+	// get req
+	segReq := &types.UpdateSegBlockInfoReq{}
+	if err := ctx.ReadJSON(&segReq); err != nil {
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read UpdateSegBlockInfoReq from body, err: %v", err))
+		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	// check request params
+	if segReq.BucketName == "" || segReq.ZoneId == "" {
+		helper.Logger.Error(reqContext, "Some UpdateSegBlockInfo required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	if segReq.Region == "" {
+		segReq.Region = "cn-bj-1"
+	}
+
+	uuidStr := uuid.New()
+	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// update seg block info to tidb
+	err := yigFs.YigFsAPI.UpdateSegBlockInfo(reqContext, segReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+	
+	resp.Result = GetErrInfo(NoYigFsErr)
+
+	ctx.JSON(resp)
+	return
+}

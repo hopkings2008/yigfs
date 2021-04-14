@@ -126,7 +126,7 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 		SegmentId1: segment.Segment.SegmentId1,
 	}
 
-	getSegLeaderResp, err := yigFs.MetaStorage.Client.GetSegmentLeaderInfo(ctx, segLeader)
+	getSegLeaderResp, err := yigFs.MetaStorage.Client.GetSegmentInfo(ctx, segLeader)
 	switch err {
 	case ErrYigFsNoSuchLeader:
 		// if not segment leader, get file leader

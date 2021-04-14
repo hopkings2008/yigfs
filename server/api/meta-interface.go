@@ -19,4 +19,5 @@ type YigFsLayer interface {
 	CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq, isLeaderExisted int) (err error)
 	UpdateFileSizeAndBlock(ctx context.Context, file *types.GetFileInfoReq) (err error)
 	GetFileSegmentsInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)
+	UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 }

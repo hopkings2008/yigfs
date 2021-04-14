@@ -362,6 +362,30 @@ func Test_WriteFile(t *testing.T) {
     }
 }
 
+func Test_UpdateSegBlockInfo(t *testing.T) {
+	block := &types.UpdateSegBlockInfo {
+		SegmentId0: SegmentId0,
+		SegmentId1: SegmentId1,
+		LatestOffset: LatestedOffset,
+	}
+
+	segReq := &types.UpdateSegBlockInfoReq {
+		ZoneId: ZoneId,
+		Region: Region,
+		BucketName: BucketName,
+		SegBlockInfo: block,
+	}
+
+	updateResp, updateInfo, err := UpdateSegBlockInfo(segReq)
+	if err != nil {
+		t.Fatalf("Test_UpdateSegBlockInfo: Failed to update segment block info, err:%v", err)
+	} else if updateResp.Result.ErrCode != 0 {
+		t.Fatalf("Test_UpdateSegBlockInfo: Failed to update segment block info, resp code: %d, err: %v", updateResp.Result.ErrCode, updateResp.Result.ErrMsg)
+	} else {
+		t.Logf("Test_UpdateSegBlockInfo: Succeed to update segment block info, resp: %s", updateInfo)
+	}
+}
+
 func Test_SetFileAttr(t *testing.T) {
 	// get target file
 	getFile := &types.GetDirFileInfoReq {

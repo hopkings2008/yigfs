@@ -35,7 +35,8 @@ const (
 	SegmentId0 = 1
 	SegmentId1 = 1
 	Machine2 = "172.20.13.156"
-	SegMaxSize = 1073741824
+	SegMaxSize = 64 * 1024 * 1024
+	LatestedOffset = 256
 )
 
 func SendHttpToYigFs(method string, newServer string, client *http.Client, reqStr []byte) (result io.ReadCloser, err error) {
