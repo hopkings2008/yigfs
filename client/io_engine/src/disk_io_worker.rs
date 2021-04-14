@@ -80,7 +80,7 @@ impl DiskIoWorker {
 
     fn do_open(&mut self, msg: &MsgFileOpenOp){
         let d = NumberOp::to_u128(msg.id0, msg.id1);
-        let name = self.to_file_name(d, &msg.dir);
+        let name = self.to_file_name(msg.id0, msg.id1, &msg.dir);
         let f: File;
         // check wether the handle already opened
         if let Some(rh) = self.handles.get_mut(&d) {
@@ -113,7 +113,7 @@ impl DiskIoWorker {
         };
         // open the file first.
         if !self.handles.contains_key(&d) {
-            let name = self.to_file_name(d, &msg.dir);
+            let name = self.to_file_name(msg.id0, msg.id1, &msg.dir);
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name);
             match ret {
                 Ok(f) => {
@@ -186,8 +186,7 @@ impl DiskIoWorker {
         let d = NumberOp::to_u128(msg.id0, msg.id1);
         // open the file first.
         if !self.handles.contains_key(&d) {
-            let d = NumberOp::to_u128(msg.id0, msg.id1);
-            let name = self.to_file_name(d, &msg.dir);
+            let name = self.to_file_name(msg.id0, msg.id1, &msg.dir);
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name);
             match ret {
                 Ok(f) => {
@@ -306,8 +305,8 @@ impl DiskIoWorker {
         self.handles.clear();
     }
 
-    fn to_file_name(&self, id: u128, dir: &String) -> String {
-        format!("{}/{}.seg", dir, id)
+    fn to_file_name(&self, id0: u64, id1: u64, dir: &String) -> String {
+        format!("{}/{}.{}.seg", dir, id0, id1)
     }
 }
 
