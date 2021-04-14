@@ -1,5 +1,7 @@
-use tokio::sync::mpsc::{Sender};
+extern crate crossbeam_channel;
+
 use common::error::Errno;
+use crossbeam_channel::Sender;
 
 #[derive(Debug)]
 pub struct MsgFileOpenOp {
@@ -10,8 +12,8 @@ pub struct MsgFileOpenOp {
 }
 
 impl MsgFileOpenOp{
-    pub async fn response(&self, err: Errno){
-        let ret = self.resp_sender.send(err).await;
+    pub fn response(&self, err: Errno){
+        let ret = self.resp_sender.send(err);
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -58,8 +60,8 @@ pub struct MsgFileWriteOp {
 }
 
 impl MsgFileWriteOp {
-    pub async fn response(&self, msg: MsgFileWriteResp){
-        let ret = self.resp_sender.send(msg).await;
+    pub fn response(&self, msg: MsgFileWriteResp){
+        let ret = self.resp_sender.send(msg);
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -87,8 +89,8 @@ pub struct MsgFileReadOp {
 }
 
 impl MsgFileReadOp {
-    pub async fn response(&self, msg: MsgFileReadData) {
-        let ret = self.data_sender.send(msg).await;
+    pub fn response(&self, msg: MsgFileReadData) {
+        let ret = self.data_sender.send(msg);
         match ret {
             Ok(_) => {}
             Err(err) => {

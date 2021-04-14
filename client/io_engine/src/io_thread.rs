@@ -18,7 +18,7 @@ impl IoThread {
     pub fn create(name: &String, exec: &Executor, worker_factory: &Box<dyn IoWorkerFactory>) -> Self {
         let (op_tx, op_rx) = unbounded::<MsgFileOp>();
         let(stop_tx, stop_rx) = bounded::<u8>(1);
-        let worker = worker_factory.new_worker(exec, op_rx,stop_rx);
+        let mut worker = worker_factory.new_worker(exec, op_rx,stop_rx);
         
         let mut thr = IoThread{
             thr: Thread::create(name),
