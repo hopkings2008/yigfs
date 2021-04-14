@@ -1,14 +1,14 @@
-pub mod signature;
-
 use std::io::prelude::*;
 use std::fs::File;
 use std::io::BufReader;
-use signature::AwsCredentials;
-use signature::SignedRequest;
+use crate::signature::AwsCredentials;
+use crate::signature::SignedRequest;
+use crate::types::S3ObjectInfo;
 
 use common::http_client::RespText;
 use common::http_client::HttpClient;
 use common::http_client::HttpMethod;
+use common::error::Errno;
 
 pub struct S3Client {
     // region
@@ -29,6 +29,10 @@ impl S3Client {
             ak : ak.to_string(),
             sk: sk.to_string(),
         }
+    }
+
+    pub async fn head_object(&self, bucket: &String, object: &String) -> Result<S3ObjectInfo, Errno>{
+        Err(Errno::Enotsupp)
     }
 
     pub async fn append_object_by_path(&self, object_path: &str, bucket: &str, object: &str, append_position: &u128) -> Result<RespText, String> {
@@ -91,4 +95,3 @@ impl S3Client {
         return resp
     }
 }
-

@@ -1,4 +1,5 @@
 use common::runtime::Executor;
+use append_object::s3_client::S3Client;
 
 #[test]
 fn test_append_object_by_path()->Result<(), String> {
@@ -12,7 +13,7 @@ fn test_append_object_by_path()->Result<(), String> {
     let append_position: u128 = 0;
     let exec = Executor::create();
 
-    let s3_client = append_object::S3Client::new(&region, &endpoint, &ak, &sk);
+    let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
     let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&object_path, &target_bucket, &target_object, &append_position))?;
     if resp.status >= 300 {
         return Err(format!("Failed to append object, got invalid status {}", resp.status));
@@ -34,7 +35,7 @@ fn test_append_object()->Result<(), String> {
     let data: Vec<u8> = "Hello, World!".into();
     let exec = Executor::create();
 
-    let s3_client = append_object::S3Client::new(&region, &endpoint, &ak, &sk);
+    let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
     let resp = exec.get_runtime().block_on(s3_client.append_object(&data, &target_bucket, &target_object, &append_position))?;
     if resp.status >= 300 {
         return Err(format!("Failed to append object, got invalid status {}", resp.status));
