@@ -73,10 +73,10 @@ CREATE TABLE `segment_leader` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
-DROP TABLE IF EXISTS `block`;
+DROP TABLE IF EXISTS `file_blocks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `block` (
+CREATE TABLE `file_blocks` (
   `region` varchar(255) DEFAULT "cn-bj-1",
   `bucket_name` varchar(255) DEFAULT NULL,
   `ino` bigint(20) UNSIGNED DEFAULT 0,
@@ -86,12 +86,27 @@ CREATE TABLE `block` (
   `block_id` bigint(20) DEFAULT 0,
   `size` int(11) DEFAULT 0,
   `offset` bigint(20) DEFAULT 0,
-  `seg_start_addr` bigint(20) DEFAULT 0,
-  `seg_end_addr` bigint(20) DEFAULT 0,
+  `end_addr` bigint(20) DEFAULT 0,
   `ctime` datetime DEFAULT NULL,
   `mtime` datetime DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT 0,
-   index list_key (seg_id0, seg_id1, seg_start_addr, seg_end_addr),
-   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `offset`, `block_id`)
+   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id0`, `seg_id1`, `block_id`, `offset`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+DROP TABLE IF EXISTS `segment_blocks`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `segment_blocks` (
+  `seg_id0` bigint(20) UNSIGNED DEFAULT 0,
+  `seg_id1` bigint(20) UNSIGNED DEFAULT 0,
+  `block_id` bigint(20) DEFAULT 0,
+  `seg_start_addr` bigint(20) DEFAULT 0,
+  `seg_end_addr` bigint(20) DEFAULT 0,
+  `size` int(11) DEFAULT 0,
+  `ctime` datetime DEFAULT NULL,
+  `mtime` datetime DEFAULT NULL,
+  `is_deleted` tinyint(1) DEFAULT 0,
+   UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`, `seg_start_addr`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

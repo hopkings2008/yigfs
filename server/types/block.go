@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"time"
 )
 
 
@@ -26,7 +27,7 @@ type SegmentInfo struct {
 	SegmentId1 uint64 `json:"seg_id1"`
 	Leader string `json:"leader"`
 	MaxSize int `json:"max_size,omitempty"`
-	Blocks []BlockInfo `json:"blocks"`
+	Blocks []*BlockInfo `json:"blocks"`
 }
 
 type BlockInfo struct {
@@ -34,6 +35,8 @@ type BlockInfo struct {
 	SegStartAddr int64 `json:"seg_start_addr"`
 	SegEndAddr int64 `json:"seg_end_addr"`
 	Size int `json:"size"`
+	BlockId int64 `json:"block_id,omitempty"`
+	FileBlockEndAddr int64 `json:"file_block_end_addr,omitempty"`
 }
 
 type CreateSegmentReq struct {
@@ -44,7 +47,6 @@ type CreateSegmentReq struct {
 	Machine string `json:"machine"`
 	Ino uint64 `json:"ino"`
 	Generation uint64 `json:"generation"`
-	CoveredBlockOffset int64 `json:"covered_block_offset,omitempty"`
 	Segment CreateBlocksInfo `json:"segment"`
 }
 
@@ -53,7 +55,7 @@ type CreateBlocksInfo struct {
 	SegmentId1 uint64 `json:"seg_id1"`
 	Leader string `json:"leader,omitempty"`
 	MaxSize int `json:"max_size"`
-	Blocks []BlockInfo `json:"blocks"`
+	Blocks []*BlockInfo `json:"blocks"`
 }
 
 type UpdateSegResp struct {
@@ -71,4 +73,39 @@ type UpdateSegmentsReq struct {
 	Ino uint64 `json:"ino"`
 	Generation uint64 `json:"generation"`
 	Segments []*CreateBlocksInfo `json:"segments"`
+}
+
+type FileBlockInfo struct {
+	Region string `json:"region,omitempty"`
+	BucketName string `json:"bucket,omitempty"`
+	Ino uint64 `json:"ino,omitempty"`
+	Generation uint64 `json:"generation,omitempty"`
+	SegmentId0 uint64 `json:"seg_id0"`
+	SegmentId1 uint64 `json:"seg_id1"`
+	BlockId int64 `json:"block_id"`
+	SegStartAddr int64 `json:"seg_start_addr"`
+	SegEndAddr int64 `json:"seg_end_addr"`
+	FileBlockEndAddr int64 `json:"file_block_end_addr,omitempty"`
+	Size int `json:"size"`
+	Offset int64 `json:"offset,omitempty"`
+	Ctime time.Time `json:"ctime,omitempty"`
+}
+
+type UpdateBlocks struct {
+	Region string `json:"region,omitempty"`
+	BucketName string `json:"bucket,omitempty"`
+	Ino uint64 `json:"ino,omitempty"`
+	Generation uint64 `json:"generation,omitempty"`
+	SegmentId0 uint64 `json:"seg_id0,omitempty"`
+	SegmentId1 uint64 `json:"seg_id1,omitempty"`
+	Blocks []*BlockInfo `json:"blocks,omitempty"`
+}
+
+type DescriptBlockInfo struct {
+	Region string `json:"region,omitempty"`
+	BucketName string `json:"bucket,omitempty"`
+	Ino uint64 `json:"ino,omitempty"`
+	Generation uint64 `json:"generation,omitempty"`
+	SegmentId0 uint64 `json:"seg_id0,omitempty"`
+	SegmentId1 uint64 `json:"seg_id1,omitempty"`
 }

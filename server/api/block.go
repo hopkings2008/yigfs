@@ -34,4 +34,3 @@ func CheckUpdateSegmentsParams(ctx context.Context, segsReq *types.UpdateSegment
 
 	return
 }
-
