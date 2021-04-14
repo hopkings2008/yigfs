@@ -1,5 +1,5 @@
 use common::runtime::Executor;
-use append_object::s3_client::S3Client;
+use s3::s3_client::S3Client;
 
 #[test]
 fn test_append_object_by_path()->Result<(), String> {
