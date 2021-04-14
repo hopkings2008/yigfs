@@ -366,7 +366,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	go func() {
 		defer waitgroup.Done()
 		if isLeaderExisted == types.NotExisted {
-			err = yigFs.MetaStorage.Client.CreateSegmentLeader(ctx, seg)
+			err = yigFs.MetaStorage.Client.CreateSegmentInfo(ctx, seg)
 			if err != nil {
 				return
 			}

@@ -30,10 +30,10 @@ type Client interface {
 	GetMachineInfo(ctx context.Context, zone *types.GetLeaderReq) (resp *types.GetMachineInfoResp, err error)
 	// Set file attr
 	SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error)
-	// get segment leader
-	GetSegmentLeaderInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error)
-	// create segment leader
-	CreateSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error)
+	// get segment info
+	GetSegmentInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error)
+	// create segment info
+	CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error)
 	// get covered blocks
 	GetCoveredExistedBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (blocks []*types.BlockInfo, err error)
 	// deleted blocks
@@ -64,5 +64,7 @@ type Client interface {
 	GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error)
 	// get segments block info
 	GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segmentMap map[interface{}][]int64, offsetMap map[int64]int64) (resp *types.GetSegmentResp, err error)
+	// update segment block info
+	UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 }
 

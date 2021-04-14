@@ -13,7 +13,7 @@ import (
 
 func(yigFs MetaAPIHandlers) GetFileLeaderHandler(ctx iris.Context) {
 	r := ctx.Request()
-    reqContext := r.Context()
+	reqContext := r.Context()
 
 	resp := &types.GetLeaderResp {
 		Result: types.YigFsMetaError{},
@@ -34,12 +34,12 @@ func(yigFs MetaAPIHandlers) GetFileLeaderHandler(ctx iris.Context) {
 		helper.Logger.Error(reqContext, "Some geFileLeader required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
-        return
-    }
+        	return
+    	}	
 
-    if leaderReq.Region == "" {
+    	if leaderReq.Region == "" {
 		leaderReq.Region = "cn-bj-1"
-    }
+    	}
 
 	uuidStr := uuid.New()
 	leaderReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)

@@ -55,10 +55,10 @@ CREATE TABLE `file_leader` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
-DROP TABLE IF EXISTS `segment_leader`;
+DROP TABLE IF EXISTS `segment_info`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `segment_leader` (
+CREATE TABLE `segment_info` (
   `zone_id` varchar(255) DEFAULT NULL,
   `region` varchar(255) DEFAULT "cn-bj-1",
   `bucket_name` varchar(255) DEFAULT NULL,
@@ -66,8 +66,9 @@ CREATE TABLE `segment_leader` (
   `seg_id1` bigint(20) UNSIGNED DEFAULT 0,
   `leader` varchar(255) DEFAULT NULL,
   `max_size` int(11) DEFAULT 0,
-  `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `latest_offset` int(11) DEFAULT 0,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`zone_id`, `region`, `bucket_name`, `seg_id0`, `seg_id1`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
