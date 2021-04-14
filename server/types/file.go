@@ -92,6 +92,7 @@ type GetFileInfoReq struct {
 	Region string `json:"region"`
 	BucketName string `json:"bucket"`
 	Ino uint64 `json:"ino"`
+	Generation uint64 `json:"generation,omitempty"`
 }
 
 type SetFileAttrInfo struct {

@@ -8,385 +8,440 @@ import (
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/types"
-	"github.com/bwmarrin/snowflake"
 )
-
 
 var (
 	waitgroup sync.WaitGroup
 )
 
-func(yigFs *YigFsStorage) GetFileSegmentInfo(ctx context.Context, file *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)  {
-	resp = &types.GetSegmentResp {
-		Segments: []*types.SegmentInfo{},
-	}
-	var  startBlockId int
-
-	getSegInfoResp, err := yigFs.MetaStorage.Client.GetFileSegmentInfo(ctx, file)
+func getIncludeOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64, 
+	yigFs *YigFsStorage) (segmentsMap map[interface{}][]int64, offsetMap map[int64]int64, err error) {
+	segmentsMap, offsetMap, err = yigFs.MetaStorage.Client.GetIncludeOffsetIndexSegs(ctx, seg, checkOffset)
 	if err != nil && err != ErrYigFsNoTargetSegment {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
-			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size))
-		return resp, err
-	} else if err == ErrYigFsNoTargetSegment || len(getSegInfoResp.Segments) == 0 {
-		return resp, nil
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to getIncludeOffsetIndexSegs, region: %s, bucket: %s, ino: %d, generation: %d, checkOffset: %d",
+			seg.Region, seg.BucketName, seg.Ino, seg.Generation, checkOffset))
+		return segmentsMap, offsetMap, err
+	} else if err == ErrYigFsNoTargetSegment || len(segmentsMap) == 0 {
+		return segmentsMap, offsetMap, nil
 	}
 
-	if file.Offset > 0 {
-		fileSize := file.Offset
-		
-		if file.Size > 0 {
-			fileSize = file.Offset + int64(file.Size)
-		}
-		
-		segments := getSegInfoResp.Segments
-		for _, seg := range segments {
-			blocks := seg.Blocks
-			for key, block := range blocks {
-				startBlockId = -1
-				if block.SegStartAddr < fileSize && block.SegEndAddr >= fileSize {
-					startBlockId = key
-					break
-				} else if block.SegStartAddr >= fileSize {
-					startBlockId = key
-					break
-				}
-			}
-
-			if startBlockId != -1 {
-				segment := &types.SegmentInfo {
-					Blocks: []types.BlockInfo{},
-				}
-
-				segment.SegmentId0 = seg.SegmentId0
-				segment.SegmentId1 = seg.SegmentId1
-				segment.Leader = seg.Leader
-				segment.MaxSize = seg.MaxSize
-				segment.Blocks = blocks[startBlockId:]
-
-				resp.Segments = append(resp.Segments, segment)
-			}
-		}
-
-		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d",
-			file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size))
-		return resp, nil
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, offset: %d, size: %d", 
-		file.Region, file.BucketName, file.Ino, file.Generation, file.Offset, file.Size))
-	return getSegInfoResp, nil
-}
-
-func findCheckIndex(ctx context.Context, seg *types.CreateSegmentReq) (minStart, maxStart, minEnd, maxEnd int64, increasedSize uint64, increasedNum uint32) {
-	uploadingBlocksNum := len(seg.Segment.Blocks)
-
-	minStart = seg.Segment.Blocks[0].Offset
-	maxEnd = seg.Segment.Blocks[0].Offset + int64(seg.Segment.Blocks[0].Size)
-	maxStart = seg.Segment.Blocks[0].Offset
-	minEnd = seg.Segment.Blocks[0].Offset + int64(seg.Segment.Blocks[0].Size)
-
-	increasedSize = uint64(seg.Segment.Blocks[0].Size)
-	increasedNum = uint32(uploadingBlocksNum)
-
-	if uploadingBlocksNum > 1 {
-		for i := 1; i < uploadingBlocksNum; i++ {
-			start := seg.Segment.Blocks[i].Offset
-			if start < minStart {
-				minStart = start
-			} else if start > maxStart {
-				maxStart = start
-			}
-
-			end := seg.Segment.Blocks[i].Offset + int64(seg.Segment.Blocks[i].Size)
-			if end < minEnd {
-				minEnd = end
-			} else if end > maxEnd {
-				maxEnd = end
-			}
-
-			increasedSize += uint64(seg.Segment.Blocks[i].Size)
-		}
-	}
 	return
 }
 
-func(yigFs *YigFsStorage) CreateSegmentInfo(ctx context.Context, seg *types.CreateSegmentReq, isExisted int) (err error) {
-	// 1. Find the min and max index for the blocks to be uploaded.
-	// all the blocks size and blocks number marked as increased.
-	// 2. Find already existed blocks contained by the block to be uploaded, then deleted them, and mark the blocks size and blocks number as decreased.
-	// 3. Find already existed blocks that contained the block to be uploaded, this blocks to be uploaded's size and blocks number marked as decreased.
-	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
-	// 5. if the segment does not have leader, create it.
-	// 6. get the file size and calculate new file size and blocks number.
-	// 7. finally update the file size and blocks number.
+func getGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64, 
+	yigFs *YigFsStorage) (segmentsMap map[interface{}][]int64, offsetMap map[int64]int64, err error) {
+	segmentsMap, offsetMap, err = yigFs.MetaStorage.Client.GetGreaterOffsetIndexSegs(ctx, seg, checkOffset)
+	if err != nil && err != ErrYigFsNoTargetSegment {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to getGreaterOffsetIndexSegs, region: %s, bucket: %s, ino: %d, generation: %d, checkOffset: %d",
+			seg.Region, seg.BucketName, seg.Ino, seg.Generation, checkOffset))
+		return segmentsMap, offsetMap, err
+	} else if err == ErrYigFsNoTargetSegment || len(segmentsMap) == 0 {
+		return segmentsMap, offsetMap, nil
+	}
+
+	return
+}
+
+func (yigFs *YigFsStorage) GetFileSegmentsInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
+	var checkOffset int64 = 0
+
+	if seg.Offset > 0 {
+		checkOffset = seg.Offset
+
+		if seg.Size > 0 {
+			checkOffset = seg.Offset + int64(seg.Size)
+		}
+	}
+
+	resp = &types.GetSegmentResp{}
+
+	if checkOffset > 0 {
+		var includeSegs = make(map[interface{}][]int64)
+		var includeOffset = make(map[int64]int64)
+		waitgroup.Add(1)
+		go func() {
+			defer waitgroup.Done()
+			includeSegs, includeOffset, err = getIncludeOffsetIndexSegs(ctx, seg, checkOffset, yigFs)
+			if err != nil {
+				return
+			}
+		}()
+
+		greaterSegs, greaterOffset, err := getGreaterOffsetIndexSegs(ctx, seg, checkOffset, yigFs)
+		if err != nil {
+			waitgroup.Wait()
+			return resp, err
+		}
+
+		waitgroup.Wait()
+
+		for segmentId, includeBlocks := range includeSegs {
+			isSegIdEqual := false
+			includeSegIds := segmentId.([2]uint64)
+			for segmentId, greaterBlocks := range greaterSegs {
+				greaterSegIds := segmentId.([2]uint64)
+				if includeSegIds[0] == greaterSegIds[0] && includeSegIds[1] == greaterSegIds[1] {
+					greaterSegs[segmentId] = append(includeBlocks, greaterBlocks...)
+					for blockId, offset := range includeOffset{
+						greaterOffset[blockId] = offset
+					}
+					isSegIdEqual = true
+					break
+				}
+			}
+
+			if !isSegIdEqual {
+				greaterSegs[segmentId] = includeBlocks
+				for blockId, offset := range includeOffset {
+					greaterOffset[blockId] = offset
+				}
+			}
+		}
+
+		helper.Logger.Error(ctx, fmt.Sprintf("req: greaterSegs: %v, includeSegs: %v", greaterSegs, includeSegs))
+
+		getGreatherBlocksResp, err := yigFs.MetaStorage.Client.GetSegsBlockInfo(ctx, seg, greaterSegs, greaterOffset)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("getGreaterOffsetIndexSegs: Failed to get blocks info, region: %s, bucket: %s, ino: %d, generation: %d",
+				seg.Region, seg.BucketName, seg.Ino, seg.Generation))
+			return resp, err
+		}
+
+		resp.Segments = getGreatherBlocksResp.Segments
+	} else {
+		greaterSegs, greaterOffset, err := getGreaterOffsetIndexSegs(ctx, seg, checkOffset, yigFs)
+		if err != nil {
+			return resp, err
+		}
+
+		getGreatherBlocksResp, err := yigFs.MetaStorage.Client.GetSegsBlockInfo(ctx, seg, greaterSegs, greaterOffset)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("getGreaterOffsetIndexSegs: Failed to get blocks info, region: %s, bucket: %s, ino: %d, generation: %d",
+				seg.Region, seg.BucketName, seg.Ino, seg.Generation))
+			return resp, err
+		}
+
+		resp.Segments = getGreatherBlocksResp.Segments
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segment info, region: %s, bucket: %s, ino: %d, generation: %d, checkOffset: %d",
+		seg.Region, seg.BucketName, seg.Ino, seg.Generation, checkOffset))
+	return
+}
+
+func dealPartialOverlapBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (err error) {
+	isGetInUploading, blockResp, err := yigFs.MetaStorage.Client.GetOffsetInUploadingBlock(ctx, blockInfo, block)
+	if err != nil {
+		return
+	}
+
+	isGetInExisted, existedResp, err := yigFs.MetaStorage.Client.GetOffsetInExistedBlock(ctx, blockInfo, block)
+	if err != nil {
+		return
+	}
+
+	updateBlocks := make([]*types.FileBlockInfo, 0)
+	insertBlocks := make([]*types.FileBlockInfo, 0)
+	deleteBlocks := make([]*types.FileBlockInfo, 0)
+
+	var size int
+	if isGetInExisted {
+		size = int(block.Offset - existedResp.Offset)
+		updateExistedBlock := &types.FileBlockInfo{
+			BlockId:          existedResp.BlockId,
+			Offset:           existedResp.Offset,
+			Size:             size,
+			FileBlockEndAddr: block.Offset,
+		}
+		updateBlocks = append(updateBlocks, updateExistedBlock)
+
+		size = int(existedResp.FileBlockEndAddr - block.Offset)
+		deleteExistedBlock := &types.FileBlockInfo{
+			SegmentId0:       existedResp.SegmentId0,
+			SegmentId1:       existedResp.SegmentId1,
+			BlockId:          existedResp.BlockId,
+			Offset:           block.Offset,
+			FileBlockEndAddr: existedResp.FileBlockEndAddr,
+			Size:             size,
+			Ctime:            existedResp.Ctime,
+		}
+		helper.Logger.Info(ctx, fmt.Sprintf("dealPartialOverlapBlocks, Ctime: %v, blockId: %v", existedResp.Ctime, block.BlockId))
+		deleteBlocks = append(deleteBlocks, deleteExistedBlock)
+	}
+
+	if isGetInUploading {
+		size = int(block.FileBlockEndAddr - blockResp.Offset)
+		deleteBlock := &types.FileBlockInfo{
+			SegmentId0:       blockResp.SegmentId0,
+			SegmentId1:       blockResp.SegmentId1,
+			BlockId:          blockResp.BlockId,
+			Offset:           blockResp.Offset,
+			FileBlockEndAddr: block.FileBlockEndAddr,
+			Size:             size,
+			Ctime:            blockResp.Ctime,
+		}
+		deleteBlocks = append(deleteBlocks, deleteBlock)
+
+		size = int(blockResp.FileBlockEndAddr - block.FileBlockEndAddr)
+		insertBlock := &types.FileBlockInfo{
+			SegmentId0:       blockResp.SegmentId0,
+			SegmentId1:       blockResp.SegmentId1,
+			BlockId:          blockResp.BlockId,
+			Offset:           block.FileBlockEndAddr,
+			FileBlockEndAddr: blockResp.FileBlockEndAddr,
+			Size:             size,
+			Ctime:            blockResp.Ctime,
+		}
+		helper.Logger.Info(ctx, fmt.Sprintf("dealPartialOverlapBlocks, Ctime: %v, blockId: %v", blockResp.Ctime, block.BlockId))
+		insertBlocks = append(insertBlocks, insertBlock)
+	}
+
+	err = yigFs.MetaStorage.Client.DealOverlappingBlocks(ctx, blockInfo, updateBlocks, deleteBlocks, insertBlocks)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to dealPartialOverlapBlocks, offset: %v, blockId: %v", block.Offset, block.BlockId))
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to dealPartialOverlapBlocks, offset: %v", block.Offset))
+	return
+}
+
+func dealFullCoveredUploadingBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (err error) {
+	helper.Logger.Info(ctx, fmt.Sprintf("start to dealFullCoveredUploadingBlocks, offset: %v", block.Offset))
+	isExisted, blockResp, err := yigFs.MetaStorage.Client.GetCoveredUploadingBlock(ctx, blockInfo, block)
+	if err != nil {
+		return
+	}
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to GetCoveredUploadingBlock, isExisted: %v", isExisted))
+
+	updateBlocks := make([]*types.FileBlockInfo, 0)
+	insertBlocks := make([]*types.FileBlockInfo, 0)
+	deleteBlocks := make([]*types.FileBlockInfo, 0)
+
+	var size int
+	if isExisted {
+		if blockResp.Offset != block.Offset {
+			size = int(block.Offset - blockResp.Offset)
+			updateExistedBlock := &types.FileBlockInfo{
+				BlockId:          blockResp.BlockId,
+				Offset:           blockResp.Offset,
+				Size:             size,
+				FileBlockEndAddr: block.Offset,
+			}
+			updateBlocks = append(updateBlocks, updateExistedBlock)
+		}
+
+		deleteExistedBlock := &types.FileBlockInfo{
+			SegmentId0:       blockResp.SegmentId0,
+			SegmentId1:       blockResp.SegmentId1,
+			BlockId:          blockResp.BlockId,
+			Offset:           block.Offset,
+			FileBlockEndAddr: block.FileBlockEndAddr,
+			Size:             block.Size,
+			Ctime:            blockResp.Ctime,
+		}
+		helper.Logger.Info(ctx, fmt.Sprintf("dealFullCoveredUploadingBlocks, Ctime: %v, blockId: %v", blockResp.Ctime, block.BlockId))
+		deleteBlocks = append(deleteBlocks, deleteExistedBlock)
+
+		if blockResp.FileBlockEndAddr != block.FileBlockEndAddr {
+			size = int(blockResp.FileBlockEndAddr - block.FileBlockEndAddr)
+			insertExistedBlock := &types.FileBlockInfo{
+				SegmentId0:       blockResp.SegmentId0,
+				SegmentId1:       blockResp.SegmentId1,
+				BlockId:          blockResp.BlockId,
+				Offset:           block.FileBlockEndAddr,
+				FileBlockEndAddr: blockResp.FileBlockEndAddr,
+				Size:             size,
+				Ctime:            blockResp.Ctime,
+			}
+			insertBlocks = append(insertBlocks, insertExistedBlock)
+		}
+
+		err = yigFs.MetaStorage.Client.DealOverlappingBlocks(ctx, blockInfo, updateBlocks, deleteBlocks, insertBlocks)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to dealFullCoveredUploadingBlocks, offset: %v, blockId: %v", block.Offset, block.BlockId))
+			return
+		}
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to dealFullCoveredUploadingBlocks, offset: %v", block.Offset))
+	return
+}
+
+func checkCoveredExistedBlocksAndDeleted(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (err error) {
+	coveredBlocks, err := yigFs.MetaStorage.Client.GetCoveredExistedBlocks(ctx, blockInfo, block)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetCoveredExistedBlocks, offset: %v", block.Offset))
+		return
+	}
+
+	if len(coveredBlocks) == 0 {
+		return
+	}
+
+	err = yigFs.MetaStorage.Client.DeleteBlocks(ctx, blockInfo, coveredBlocks)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted blocks, coveredBlocks: %v", coveredBlocks))
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("deletedBlocks is: %v", coveredBlocks))
+	return
+}
+
+func insertSegBlockAndCheckMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (blockId int64, isCanMerge bool, err error) {
+	blockId, isCanMerge, err = yigFs.MetaStorage.Client.InsertSegmentBlock(ctx, blockInfo, block)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insertSegBlockAndCheckMerge, offset: %v", block.Offset))
+		return
+	}
+
+	return
+}
+
+func mergeOrInsertFileBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, isCanMerge bool, yigFs *YigFsStorage) (err error) {
+	blockReq := &types.FileBlockInfo{
+		Region:     blockInfo.Region,
+		BucketName: blockInfo.BucketName,
+		Ino:        blockInfo.Ino,
+		Generation: blockInfo.Generation,
+		SegmentId0: blockInfo.SegmentId0,
+		SegmentId1: blockInfo.SegmentId1,
+	}
+
+	if isCanMerge {
+		isMerge, mergeBlock, err := yigFs.MetaStorage.Client.GetMergeBlock(ctx, blockInfo, block)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("mergeOrInsertFileBlock: Failed to get merge block, ofset:%v", block.Offset))
+			return err
+		}
+
+		if isMerge {
+			blockReq.BlockId = mergeBlock.BlockId
+			blockReq.Size = mergeBlock.Size + block.Size
+			blockReq.Offset = mergeBlock.Offset
+			blockReq.FileBlockEndAddr = mergeBlock.FileBlockEndAddr + int64(block.Size)
+
+			err = yigFs.MetaStorage.Client.UpdateBlock(ctx, blockReq)
+			if err != nil {
+				return err
+			}
+
+			helper.Logger.Info(ctx, fmt.Sprintf("Succeed to merge block, offset: %v, blockId: %v", block.Offset, block.BlockId))
+			return nil
+		}
+	}
+
+	// if not merge, insert it.
+	blockReq.BlockId = block.BlockId
+	blockReq.Size = block.Size
+	blockReq.Offset = block.Offset
+	blockReq.FileBlockEndAddr = block.FileBlockEndAddr
+
+	err = yigFs.MetaStorage.Client.CreateFileBlock(ctx, blockReq)
+	if err != nil {
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert block, offset: %v, blockId: %v", block.Offset, block.BlockId))
+	return
+}
+
+func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq, isLeaderExisted int) (err error) {
+	// Perform the following operations for each block:
+	// 1. get existed blocks fully covered by the uploading block, then deleted them.
+	// 2. deal partial overlap blocks by the uploading block.
+	// 3. insert the uploading block to segment_blocks table, and check it can be merged or not.
+	// 4. deal fully covered uploading blocks.
+	// 5. if step2 can be merge, then check the block in file_blocks table can be merged or not.
+	// if the block can be merge, merge it; else insert it.
 
 	if len(seg.Segment.Blocks) == 0 {
 		helper.Logger.Warn(ctx, "No blocks to upload")
 		return
 	}
 
-	node, createBlockErr := snowflake.NewNode(1)
-	if createBlockErr != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-	tag := int64(node.Generate())
-
-	// 1. Find the min and max index for the blocks to be uploaded.
-	// all the blocks size and blocks number marked as increased.
-	minStart, maxStart, minEnd, maxEnd, allBlocksSize, allBlocksNumber := findCheckIndex(ctx, seg)
-
-	// 2. Find already existed blocks contained by the block to be uploaded, then deleted them, and mark the blocks size and blocks number as decreased.
-	var coveredExistedBlocks = make([]uint64, 0)
+	// if the seg leader is not existed, create it.
 	waitgroup.Add(1)
 	go func() {
-		err = foundCoveredExistedBlocksAndDeleted(ctx, seg, yigFs, minStart, maxEnd, tag, &coveredExistedBlocks)
-		if err != nil {
-			return
+		defer waitgroup.Done()
+		if isLeaderExisted == types.NotExisted {
+			err = yigFs.MetaStorage.Client.CreateSegmentLeader(ctx, seg)
+			if err != nil {
+				return
+			}
 		}
 	}()
 
-	// 3. Find already existed blocks that contained the block to be uploaded, this blocks to be uploaded's size and blocks number marked as decreased.
-	var coveredUploadingBlocks = make([]uint64, 0)
-	waitgroup.Add(1)
-	go func() {
-		err = foundCoveredUploadingBlocks(ctx, seg, yigFs, maxStart, minEnd, tag, &coveredUploadingBlocks)
-		if err != nil {
-			return
-		}
-	}()
-
-	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
-	mergeNumber, err := yigFs.MetaStorage.Client.CreateFileSegment(ctx, seg)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d, err: %v",
-			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, err))
-		return
+	blockInfo := &types.DescriptBlockInfo{
+		Region:     seg.Region,
+		BucketName: seg.BucketName,
+		Ino:        seg.Ino,
+		Generation: seg.Generation,
+		SegmentId0: seg.Segment.SegmentId0,
+		SegmentId1: seg.Segment.SegmentId1,
 	}
 
-	// 5. if the segment does not have leader, create it.
-	if isExisted == types.NotExisted {
-		err = createSegLeader(ctx, seg, yigFs)
+	for _, block := range seg.Segment.Blocks {
+		// 1. get existed blocks fully covered by the uploading block, then deleted them.
+		block.FileBlockEndAddr = block.Offset + int64(block.Size)
+
+		waitgroup.Add(1)
+		go func() {
+			defer waitgroup.Done()
+			err = checkCoveredExistedBlocksAndDeleted(ctx, blockInfo, block, yigFs)
+			if err != nil {
+				return
+			}
+		}()
+
+		// 2. deal partial overlap blocks by the uploading block.
+		waitgroup.Add(1)
+		go func() {
+			defer waitgroup.Done()
+			err = dealPartialOverlapBlocks(ctx, blockInfo, block, yigFs)
+			if err != nil {
+				return
+			}
+		}()
+
+		// 3. insert the uploading block to segment_blocks table, and check it can be merged or not.
+		blockId, isCanMerge, err := insertSegBlockAndCheckMerge(ctx, blockInfo, block, yigFs)
 		if err != nil {
-			return
+			helper.Logger.Error(ctx, "Failed to insert seg block.")
+			waitgroup.Wait()
+			return err
+		}
+		block.BlockId = blockId
+
+		waitgroup.Wait()
+
+		// 4. deal fully covered uploading blocks.
+		err = dealFullCoveredUploadingBlocks(ctx, blockInfo, block, yigFs)
+		if err != nil {
+			return err
+		}
+
+		// 5. if step2 can be merge, then check the block in file_blocks table can be merged or not.
+		// if the block can be merge, merge it; else insert it.
+		err = mergeOrInsertFileBlock(ctx, blockInfo, block, isCanMerge, yigFs)
+		if err != nil {
+			return err
 		}
 	}
-	
-	// 6. get the file size and calculate new file size and blocks number.
-	getFileSize, getFileNumber, err := yigFs.MetaStorage.Client.GetFileSizeAndBlocksNum(ctx, seg)
+
+	return
+}
+
+func (yigFs *YigFsStorage) UpdateFileSizeAndBlock(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+	// get all block size and blocks number.
+	allSize, allNumber, err := yigFs.MetaStorage.Client.GetFileBlockSize(ctx, file)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get file size and blocks number, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
-			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1))
 		return err
 	}
-
-	waitgroup.Wait()
-
-	// 7. finally update the file size and blocks number.
-	allBlocksSize += getFileSize 
-
-	coveredExistedBlocksLength := len(coveredExistedBlocks)
-	if coveredExistedBlocksLength > 0 {
-		for _, size := range coveredExistedBlocks {
-			allBlocksSize -= size
-		}
-	}
-
-	coveredUploadingBlocksLength := len(coveredUploadingBlocks)
-	if coveredUploadingBlocksLength > 0 {
-		for _, size := range coveredUploadingBlocks {
-			allBlocksSize -= size
-		}
-	}
-
-	allBlocksNumber += getFileNumber - uint32(mergeNumber) - uint32(coveredExistedBlocksLength) - uint32(coveredUploadingBlocksLength)
-	helper.Logger.Info(ctx, fmt.Sprintf("mergeNumber: %v, allSize: %v, allNum: %v", mergeNumber, allBlocksSize, allBlocksNumber))
-
-	if allBlocksNumber != getFileNumber || allBlocksSize != getFileSize {
-		err = yigFs.MetaStorage.Client.UpdateFileSizeAndBlocksNum(ctx, seg, allBlocksSize, allBlocksNumber)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to update file size and blocks number, err: %v", err))
-			return
-		}
-	}
-
-	return
-}
-
-func foundCoveredUploadingBlocks(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage, 
-		maxStart, minEnd, tag int64, coveredUploadingBlocks *[]uint64) (err error) {
-	defer waitgroup.Done()
-	containBlocks, err := yigFs.MetaStorage.Client.GetCoveredUploadingBlocks(ctx, seg, maxStart, minEnd, tag)
+	// update file size and blocks number.
+	err = yigFs.MetaStorage.Client.UpdateFileSizeAndBlocksNum(ctx, file, allSize, allNumber)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the contain segment blocks, err: %v", err))
-		return
-	}
-
-	for _, block := range seg.Segment.Blocks {
-		for _, blockInfo := range containBlocks {
-			if blockInfo[0] <= block.Offset && (blockInfo[0] + blockInfo[1] > block.Offset + int64(block.Size)) || 
-				(blockInfo[0] < block.Offset && (blockInfo[0] + blockInfo[1] >= block.Offset + int64(block.Size))) {
-				*coveredUploadingBlocks = append(*coveredUploadingBlocks, uint64(block.Size))
-				break
-			}
-		}
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("containBlocks: %v, coveredUploadingBlocks: %v", containBlocks, coveredUploadingBlocks))
-	return
-}
-
-func foundCoveredExistedBlocksAndDeleted(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage, 
-		minStart, maxEnd, tag int64, coveredExistedBlocks *[]uint64) (err error) {
-	defer waitgroup.Done()
-	existedBlocks, err := yigFs.MetaStorage.Client.GetCoveredExistedBlocks(ctx, seg, minStart, maxEnd, tag)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to get the covered segment blocks, err: %v", err))
-		return
-	}
-	
-	// check and deleted covered blocks
-	for _, block := range seg.Segment.Blocks {
-		for blockId, blockInfo := range existedBlocks {
-			if block.Offset <= blockInfo[0] && (block.Offset + int64(block.Size) >= blockInfo[0] + blockInfo[1]) {
-				seg.CoveredBlockOffset = blockInfo[0]
-				err = yigFs.MetaStorage.Client.DeleteBlock(ctx, seg, blockId)
-				if err != nil {
-					helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete covered existed-block from tidb, blockId: %d, err: %v", blockId, err))
-					return
-				}
-
-				delete(existedBlocks, blockId)
-				//update coveredExistedBlocks
-				*coveredExistedBlocks = append(*coveredExistedBlocks, uint64(blockInfo[1]))
-			}
-		}
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("existedBlocks: %v, coveredExistedBlocks: %v", existedBlocks, coveredExistedBlocks))
-	return
-}
-
-func createSegLeader(ctx context.Context, seg *types.CreateSegmentReq, yigFs *YigFsStorage) (err error) {
-	// if the segment leader does not existed, create it.
-	err = yigFs.MetaStorage.Client.CreateSegmentLeader(ctx, seg)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create the segment leader, err: %v", err))
-		return
-	}
-	
-	return
-}
-
-func(yigFs *YigFsStorage) UpdateSegment(ctx context.Context, seg *types.CreateSegmentReq, isExisted int) (updateSegResp *types.UpdateSegResp, err error) {
-	// 1. Find the min and max index for the blocks to be uploaded, update the increased number and size.
-	// 2. Find already existed blocks contained by the block to be uploaded, then deleted them, and update the decreased size and number.
-	// 3. Find already existed blocks that contained the block to be uploaded, and update the decreased size and number.
-	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
-	// 5. if the segment does not have leader, create it.
-	// 6. finally return the decreased and increased size/number.
-	if len(seg.Segment.Blocks) == 0 {
-		helper.Logger.Warn(ctx, "No blocks to upload")
-		return
-	}
-
-	node, createBlockErr := snowflake.NewNode(1)
-	if createBlockErr != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-	tag := int64(node.Generate())
-
-	updateSegResp = &types.UpdateSegResp{}
-
-	// 1. Find the min and max index for the blocks to be uploaded, update the increased number and size.
-	minStart, maxStart, minEnd, maxEnd, increasedSize, increasedNumber := findCheckIndex(ctx, seg)
-
-	// 2. Find already existed blocks contained by the block to be uploaded, then deleted them, and mark the blocks size and blocks number as decreased.
-	var coveredExistedBlocks = make([]uint64, 0)
-	waitgroup.Add(1)
-	go func() {
-		err = foundCoveredExistedBlocksAndDeleted(ctx, seg, yigFs, minStart, maxEnd, tag, &coveredExistedBlocks)
-		if err != nil {
-			return
-		}
-	}()
-
-	// 3. Find already existed blocks that contained the block to be uploaded, this blocks to be uploaded's size and blocks number marked as decreased.
-	var coveredUploadingBlocks = make([]uint64, 0)
-	waitgroup.Add(1)
-	go func() {
-		err = foundCoveredUploadingBlocks(ctx, seg, yigFs, maxStart, minEnd, tag, &coveredUploadingBlocks)
-		if err != nil {
-			return
-		}
-	}()
-
-	// 4. upload blocks or merge blocks. if merge blocks, the blocks number marked as decreased.
-	mergeNumber, err := yigFs.MetaStorage.Client.CreateFileSegment(ctx, seg)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment info, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d, err: %v",
-			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1, err))
-		return
-	}
-
-	// 5. if the segment does not have leader, create it.
-	if isExisted == types.NotExisted {
-		err = createSegLeader(ctx, seg, yigFs)
-		if err != nil {
-			return
-		}
-	}
-
-	// 6. finally return the decreased and increased size/number.
-	waitgroup.Wait()
-
-	var decreasedSize uint64 = 0
-	var decreasedNumber uint32 = 0
-
-	coveredExistedBlocksLength := len(coveredExistedBlocks)
-	if coveredExistedBlocksLength > 0 {
-		for _, size := range coveredExistedBlocks {
-			decreasedSize += size
-		}
-	}
-
-	coveredUploadingBlocksLength := len(coveredUploadingBlocks)
-	if coveredUploadingBlocksLength > 0 {
-		for _, size := range coveredUploadingBlocks {
-			decreasedSize += size
-		}
-	}
-
-	decreasedNumber += uint32(coveredExistedBlocksLength) + uint32(coveredUploadingBlocksLength) + uint32(mergeNumber)
-	
-	updateSegResp = &types.UpdateSegResp {
-		IncreasedSize: increasedSize,
-		DecreasedSize: decreasedSize,
-		IncreasedNumber: increasedNumber,
-		DecreasedNumber: decreasedNumber,
-	}
-
-	return
-}
-
-func(yigFs *YigFsStorage) GetFileSizeAndBlocksNum(ctx context.Context, seg *types.CreateSegmentReq) (size uint64, number uint32, err error) {
-	size, number, err = yigFs.MetaStorage.Client.GetFileSizeAndBlocksNum(ctx, seg)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get file size and blocks number, region: %s, bucket: %s, ino: %d, generation: %d, seg_id0: %d, seg_id1: %d",
-			seg.Region, seg.BucketName, seg.Ino, seg.Generation, seg.Segment.SegmentId0, seg.Segment.SegmentId1))
-		return
-	}
-
-	return size, number, nil
-}
-
-func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNum(ctx context.Context, seg *types.CreateSegmentReq, allBlocksSize uint64, allBlocksNumber uint32) (err error) {
-	err = yigFs.MetaStorage.Client.UpdateFileSizeAndBlocksNum(ctx, seg, allBlocksSize, allBlocksNumber)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update file size and blocks number, err: %v", err))
 		return
 	}
 

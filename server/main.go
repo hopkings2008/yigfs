@@ -48,15 +48,15 @@ func main() {
 	app.Put("/v1/dir/file", apiHandlers.CreateFileHandler)
 	// SetFileAttr
 	app.Put("/v1/file/attr", apiHandlers.SetFileAttrHandler)
-	// GetSegment
-	app.Get("/v1/file/segments", apiHandlers.GetSegmentHandler)
 	// CreateSegment
 	app.Put("/v1/file/block", apiHandlers.CreateSegmentHandler)
 	// UpdateSegments
 	app.Put("/v1/file/segments", apiHandlers.UpdateSegmentsHandler)
+	// GetSegments
+	app.Get("/v1/file/segments", apiHandlers.GetSegmentsHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
-        err := app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile))
+    	err := app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile))
 	//err := app.Run(iris.Addr(port))
 	if err != nil {
 		helper.Logger.Error(nil, fmt.Sprintf("Failed to run yigfs, err: %v", err))

@@ -422,7 +422,7 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 	return
 }
 
-func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq, size uint64, blocksNum uint32) (err error) {
+func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, size uint64, blocksNum uint32) (err error) {
 	// update file size and blocks
 	now := time.Now().UTC()
 
