@@ -1,5 +1,5 @@
 [package]
-name = "append_object"
+name = "s3"
 version = "0.1.0"
 authors = ["duanjh7 <18204311659@163.com>"]
 edition = "2018"
