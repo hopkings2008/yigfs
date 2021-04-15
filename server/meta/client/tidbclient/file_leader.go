@@ -3,7 +3,6 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"time"
 	"fmt"
 
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -13,7 +12,8 @@ import (
 
 
 func CreateOrUpdateFileLeaderSql() (sqltext string) {
-	sqltext = "insert into file_leader values(?,?,?,?,?,?,?,?,?) on duplicate key update leader=values(leader), mtime=values(mtime), is_deleted=values(is_deleted)"
+	sqltext = "insert into file_leader(zone_id, region, bucket_name, ino, generation, leader, is_deleted) values(?,?,?,?,?,?,?)" +
+		" on duplicate key update leader=values(leader), is_deleted=values(is_deleted)"
 	return sqltext
 }
 
@@ -43,9 +43,8 @@ func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLea
 }
 
 func (t *TidbClient) CreateOrUpdateFileLeader(ctx context.Context, leader *types.GetLeaderReq) (err error) {
-	now := time.Now().UTC()
 	sqltext := CreateOrUpdateFileLeaderSql()
-	_, err = t.Client.Exec(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation, leader.Machine, now, now, types.NotDeleted)
+	_, err = t.Client.Exec(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation, leader.Machine, types.NotDeleted)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create file leader to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr

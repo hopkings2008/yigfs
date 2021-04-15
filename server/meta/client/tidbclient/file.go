@@ -30,13 +30,18 @@ func GetFileInfoSql() (sqltext string) {
 	return sqltext
 }
 
+func GetFileExistedSql() (sqltext string) {
+	sqltext = "select 1 from file where region=? and bucket_name=? and ino=? limit 1;"
+	return sqltext
+}
+
 func GetFileSizeAndBlocksSql() (sqltext string) {
 	sqltext = "select size, blocks from file where region=? and bucket_name=? and ino=? and generation=?"
 	return sqltext
 }
 
 func UpdateFileSizeAndBlocksSql() (sqltext string) {
-	sqltext = "update file set size=?, mtime=?, blocks=? where region=? and bucket_name=? and ino=? and generation=?"
+	sqltext = "update file set size=?, blocks=? where region=? and bucket_name=? and ino=? and generation=?"
 	return sqltext
 }
 
@@ -142,6 +147,7 @@ func (t *TidbClient) GetDirFileInfo(ctx context.Context, file *types.GetDirFileI
 func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq) (resp *types.FileInfo, err error) {
 	resp = &types.FileInfo{}
 	var ctime, mtime, atime string
+
 	sqltext:= GetFileInfoSql()
 	row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino)
 	err = row.Scan(
@@ -193,10 +199,6 @@ func (t *TidbClient) GetFileInfo(ctx context.Context, file *types.GetFileInfoReq
 }
 
 func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq) (err error) {
-	now := time.Now().UTC()
-	resp := &types.FileInfo{}
-	var ctime, mtime, atime string
-
 	var tx interface{}
 	var sqlTx *sql.Tx
 	tx, err = t.Client.Begin()
@@ -210,29 +212,19 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 
 	sqlTx, _ = tx.(*sql.Tx)
 
-	sqltext := "insert into file (ino, region, bucket_name, file_name, type, ctime, mtime, atime, perm, uid, gid)" +
-		" values(?,?,?,?,?,?,?,?,?,?,?)"
-	getFilesql := GetFileInfoSql()
-	row := sqlTx.QueryRow(getFilesql, rootDir.Region, rootDir.BucketName, types.RootDirIno)
+	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
+
+	sqltext := "insert into file (ino, region, bucket_name, file_name, type, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?);"
+	isFileExistedSql := GetFileExistedSql()
+	var f int
+	row := sqlTx.QueryRow(isFileExistedSql, rootDir.Region, rootDir.BucketName, types.RootDirIno)
 	err = row.Scan(
-		&resp.Generation,
-		&resp.ParentIno,
-		&resp.FileName,
-		&resp.Size,
-		&resp.Type,
-		&ctime,
-		&mtime,
-		&atime,
-		&resp.Perm,
-		&resp.Nlink,
-		&resp.Uid,
-		&resp.Gid,
-		&resp.Blocks,
+		&f,
 	)
 	if err == sql.ErrNoRows {
 		// create root dir
-		_, err = sqlTx.Exec(sqltext, types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, 
-			now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
+		_, err = sqlTx.Exec(sqltext, types.RootDirIno, rootDir.Region, rootDir.BucketName, ".", types.DIR_FILE, now, 
+			types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to init root dir ., err: %v", err))
 			return ErrYIgFsInternalErr
@@ -242,26 +234,14 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 		return ErrYIgFsInternalErr
 	}
 
-	row = sqlTx.QueryRow(getFilesql, rootDir.Region, rootDir.BucketName, types.RootParentDirIno)
+	row = sqlTx.QueryRow(isFileExistedSql, rootDir.Region, rootDir.BucketName, types.RootParentDirIno)
 	err = row.Scan(
-		&resp.Generation,
-		&resp.ParentIno,
-		&resp.FileName,
-		&resp.Size,
-		&resp.Type,
-		&ctime,
-		&mtime,
-		&atime,
-		&resp.Perm,
-		&resp.Nlink,
-		&resp.Uid,
-		&resp.Gid,
-		&resp.Blocks,
+		&f,
 	)
 	if err == sql.ErrNoRows {
 		// create root parent dir
-		_, err = sqlTx.Exec(sqltext, types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, 
-			now, now, now, types.DIR_PERM, rootDir.Uid, rootDir.Gid)
+		_, err = sqlTx.Exec(sqltext, types.RootParentDirIno, rootDir.Region, rootDir.BucketName, "..", types.DIR_FILE, now, 
+			types.DIR_PERM, rootDir.Uid, rootDir.Gid)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to init root parent dir .., err: %v", err))
 			return ErrYIgFsInternalErr
@@ -273,7 +253,7 @@ func (t *TidbClient) InitRootDirs(ctx context.Context, rootDir *types.InitDirReq
 
 	// create zone
 	sqltext = CreateOrUpdateZoneSql()
-	_, err = sqlTx.Exec(sqltext, rootDir.ZoneId, rootDir.Region, rootDir.BucketName, rootDir.Machine, types.MachineUp, 0, now, now)
+	_, err = sqlTx.Exec(sqltext, rootDir.ZoneId, rootDir.Region, rootDir.BucketName, rootDir.Machine, types.MachineUp)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("InitRootDirs: Failed to create zone, err: %v", err))
 		return ErrYIgFsInternalErr
@@ -297,25 +277,11 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 
 	sqlTx, _ = tx.(*sql.Tx)
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
 
-	ctime := now
-	if file.Ctime != 0 {
-		ctime = time.Unix(0, file.Ctime).UTC()
-	}
-	mtime := now
-	if file.Mtime != 0 {
-		mtime = time.Unix(0, file.Mtime).UTC()
-	}
-	atime := now
-	if file.Atime != 0 {
-		atime = time.Unix(0, file.Atime).UTC()
-	}
-
-	sqltext := "insert into file(region, bucket_name, parent_ino, file_name, size, type, ctime, mtime, atime, perm," +
-		" nlink, uid, gid, blocks) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+	sqltext := "insert into file(region, bucket_name, parent_ino, file_name, size, type, atime, perm, uid, gid) values(?,?,?,?,?,?,?,?,?,?);"
 	args := []interface{}{file.Region, file.BucketName, file.ParentIno, file.FileName, file.Size,
-		file.Type, ctime, mtime, atime, file.Perm, file.Nlink, file.Uid, file.Gid, file.Blocks}
+		file.Type, now, file.Perm, file.Uid, file.Gid}
 	_, err = sqlTx.Exec(sqltext, args...)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to create file to tidb, err: %v", err))
@@ -338,7 +304,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 
 	// create file leader
 	sqltext = CreateOrUpdateFileLeaderSql()
-	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, ino, file.Generation, file.Machine, now, now, types.NotDeleted)
+	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, ino, file.Generation, file.Machine, types.NotDeleted)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to create file leader to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
@@ -347,7 +313,7 @@ func (t *TidbClient) CreateFile(ctx context.Context, file *types.CreateFileReq) 
 
 	// create or update zone
 	sqltext = CreateOrUpdateZoneSql()
-	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, file.Machine, types.MachineUp, 0, now, now)
+	_, err = sqlTx.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, file.Machine, types.MachineUp)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("CreateFile: Failed to create or update zone to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
@@ -423,11 +389,8 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 }
 
 func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, size uint64, blocksNum uint32) (err error) {
-	// update file size and blocks
-	now := time.Now().UTC()
-
 	sqltext := UpdateFileSizeAndBlocksSql()
-	_, err = t.Client.Exec(sqltext, size, now, blocksNum, file.Region, file.BucketName, file.Ino, file.Generation)
+	_, err = t.Client.Exec(sqltext, size, blocksNum, file.Region, file.BucketName, file.Ino, file.Generation)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
 		err = ErrYIgFsInternalErr

@@ -6,7 +6,6 @@ import (
 	//"database/sql"
 	"fmt"
 	"math/rand"
-	"time"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -22,7 +21,7 @@ func GetBlockInfoSql() (sqltext string) {
 func(t *TidbClient) InsertSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
 	block *types.BlockInfo) (blockId int64, isCanMerge bool, err error) {
 	isCanMerge = false
-	sqltext := "insert into segment_blocks values(?,?,?,?,?,?,?,?,?)"
+	sqltext := "insert into segment_blocks(seg_id0, seg_id1, block_id, seg_start_addr, seg_end_addr, size) values(?,?,?,?,?,?)"
 
 	node, err := snowflake.NewNode(rand.Int63n(10))
 	if err != nil {
@@ -32,8 +31,7 @@ func(t *TidbClient) InsertSegmentBlock(ctx context.Context, blockInfo *types.Des
 	}
 	block_id := node.Generate()
 
-	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-	_, err = t.Client.Exec(sqltext, blockInfo.SegmentId0, blockInfo.SegmentId1, block_id, block.SegStartAddr, block.SegEndAddr, block.Size, now, now, types.NotDeleted)
+	_, err = t.Client.Exec(sqltext, blockInfo.SegmentId0, blockInfo.SegmentId1, block_id, block.SegStartAddr, block.SegEndAddr, block.Size)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create the segment block, blockId: %d, err: %v", block_id, err))
 		return

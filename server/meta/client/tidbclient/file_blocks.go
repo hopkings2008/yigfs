@@ -28,24 +28,20 @@ func DeleteBlockSql() (sqltext string) {
 }
 
 func UpdateBlockSql() (sqltext string) {
-	sqltext = "update file_blocks set block_id=?, size=?, end_addr=?, mtime=? where region=?" + 
+	sqltext = "update file_blocks set block_id=?, size=?, end_addr=? where region=?" + 
 		" and bucket_name=? and ino=? and generation=? and offset=? and is_deleted=?;"
 	return sqltext
 }
 
-func UpdateBlockIdSql() (sqltext string) {
-	sqltext = "update file_blocks set block_id=? where region=? and bucket_name=? and ino=? and generation=? and offset=?;"
-	return sqltext
-}
-
 func GetInsertBlockSql() (sqltext string) {
-	sqltext = "insert into file_blocks values(?,?,?,?,?,?,?,?,?,?,?,?,?);"
+	sqltext = "insert into file_blocks(region, bucket_name, ino, generation, seg_id0, seg_id1, block_id, size, offset, end_addr, ctime)" +
+		" values(?,?,?,?,?,?,?,?,?,?,?);"
 	return sqltext
 }
 
 func DeletePartialCoverBlockSql() (sqltext string) {
 	sqltext = "insert into file_blocks values(?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key" +
-		" update size=values(size), end_addr=values(end_addr), is_deleted=values(is_deleted), mtime=values(mtime);"
+		" update size=values(size), end_addr=values(end_addr), is_deleted=values(is_deleted);"
 	return sqltext
 }
 
@@ -209,8 +205,7 @@ func(t *TidbClient) DealOverlappingBlocks(ctx context.Context, blockInfo *types.
 	if len(updateBlocks) != 0 {
 		sqltext := UpdateBlockSql()
 		for _, block := range updateBlocks {
-			now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-			_, err = t.Client.Exec(sqltext, block.BlockId, block.Size, block.FileBlockEndAddr, now, blockInfo.Region, blockInfo.BucketName, 
+			_, err = t.Client.Exec(sqltext, block.BlockId, block.Size, block.FileBlockEndAddr, blockInfo.Region, blockInfo.BucketName, 
 				blockInfo.Ino, blockInfo.Generation, block.Offset, types.NotDeleted)
 			if err != nil {
 				helper.Logger.Error(ctx, fmt.Sprintf("DealOverlappingBlocks:Failed to update file block info, seg_id0: %v, seg_id1: %v, offset: %v, err: %v", 
@@ -242,11 +237,9 @@ func(t *TidbClient) DealOverlappingBlocks(ctx context.Context, blockInfo *types.
 	if len(insertBlocks) != 0 {
 		sqltext := GetInsertBlockSql()
 		for _, block := range insertBlocks {
-			now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
 			ctime := block.Ctime.Format(types.TIME_LAYOUT_TIDB)
-			helper.Logger.Error(ctx, fmt.Sprintf("DealOverlappingBlocks insert ctime: %v, block ctime: %v", ctime, block.Ctime))
 			_, err = t.Client.Exec(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, block.SegmentId0, block.SegmentId1,
-				block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, ctime, now, types.NotDeleted)
+				block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, ctime)
 			if err != nil {
 				helper.Logger.Error(ctx, fmt.Sprintf("DealOverlappingBlocks:Failed to create the file segment to tidb, err: %v", err))
 				err = ErrYIgFsInternalErr
@@ -277,8 +270,10 @@ func(t *TidbClient) GetMergeBlock(ctx context.Context, blockInfo *types.Descript
 	fileBlockResp = &types.FileBlockInfo{}
 	isExisted = false
 
-	sqltext := "select block_id, size, offset, end_addr from file_blocks where region=? and bucket_name=? and ino=? and generation=? and seg_id0=? and seg_id1=? and end_addr=? and is_deleted=?"
-	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, blockInfo.SegmentId0, blockInfo.SegmentId1, block.Offset, types.NotDeleted)
+	sqltext := "select block_id, size, offset, end_addr from file_blocks where region=? and bucket_name=?" + 
+		" and ino=? and generation=? and seg_id0=? and seg_id1=? and end_addr=? and is_deleted=?"
+	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, 
+		blockInfo.Generation, blockInfo.SegmentId0, blockInfo.SegmentId1, block.Offset, types.NotDeleted)
 	err = row.Scan(
 		&fileBlockResp.BlockId,
 		&fileBlockResp.Size,
@@ -302,8 +297,7 @@ func(t *TidbClient) GetMergeBlock(ctx context.Context, blockInfo *types.Descript
 
 func(t *TidbClient) UpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
 	sqltext := UpdateBlockSql()
-	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-	_, err = t.Client.Exec(sqltext, block.BlockId, block.Size, block.FileBlockEndAddr, now, block.Region, block.BucketName, 
+	_, err = t.Client.Exec(sqltext, block.BlockId, block.Size, block.FileBlockEndAddr, block.Region, block.BucketName, 
 		block.Ino, block.Generation, block.Offset, types.NotDeleted)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update file block info, seg_id0: %v, seg_id1: %v, offset: %v, err: %v", 
@@ -321,7 +315,7 @@ func (t *TidbClient) CreateFileBlock(ctx context.Context, block *types.FileBlock
 	sqltext := GetInsertBlockSql()
 	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
 	_, err = t.Client.Exec(sqltext, block.Region, block.BucketName, block.Ino, block.Generation, block.SegmentId0, block.SegmentId1,
-		block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, now, now, types.NotDeleted)
+		block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, now)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create the file segment to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr

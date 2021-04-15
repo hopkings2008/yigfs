@@ -16,7 +16,7 @@ func GetSegmentLeaderSql() (sqltext string) {
 }
 
 func CreateSegmentInfoSql() (sqltext string) {
-	sqltext = "insert into segment_info(zone_id, region, bucket_name, seg_id0, seg_id1, leader, max_size, is_deleted) values(?,?,?,?,?,?,?,?)"
+	sqltext = "insert into segment_info(zone_id, region, bucket_name, seg_id0, seg_id1, leader, max_size) values(?,?,?,?,?,?,?)"
 	return sqltext
 }
 
@@ -47,7 +47,7 @@ func (t *TidbClient) GetSegmentInfo(ctx context.Context, segment *types.GetSegLe
 func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
 	sqltext := CreateSegmentInfoSql()
 	args := []interface{}{segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0,
-		segment.Segment.SegmentId1, segment.Machine, segment.Segment.MaxSize, types.NotDeleted}
+		segment.Segment.SegmentId1, segment.Machine, segment.Segment.MaxSize}
 		
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
