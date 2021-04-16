@@ -3,7 +3,6 @@ package tidbclient
 import (
 	"context"
 	"database/sql"
-	"time"
 	"fmt"
 
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -13,14 +12,13 @@ import (
 
 
 func CreateOrUpdateZoneSql() (sqltext string) {
-	sqltext = "insert into zone values(?,?,?,?,?,?,?,?) on duplicate key update status=values(status), mtime=values(mtime)"
+	sqltext = "insert into zone(id, region, bucket_name, machine, status) values(?,?,?,?,?) on duplicate key update status=values(status)"
 	return sqltext
 }
 
 func (t *TidbClient) CreateOrUpdateZone(ctx context.Context, zone *types.InitDirReq) (err error) {
-	now := time.Now().UTC()
 	sqltext := CreateOrUpdateZoneSql()
-	_, err = t.Client.Exec(sqltext, zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp, 0, now, now)
+	_, err = t.Client.Exec(sqltext, zone.ZoneId, zone.Region, zone.BucketName, zone.Machine, types.MachineUp)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create or update zone to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr

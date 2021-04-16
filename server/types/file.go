@@ -65,9 +65,9 @@ type CreateFileReq struct {
 	FileName string `json:"file_name"`
 	Size uint64 `json:"size"`
 	Type uint32 `json:"type"`
-	Ctime int64 `json:"ctime"`
+	Ctime *int64 `json:"ctime"`
 	Mtime int64 `json:"mtime"`
-	Atime int64 `json:"atime"`
+	Atime *int64 `json:"atime"`
 	Perm uint32 `json:"perm"`
 	Nlink uint32 `json:"nlink"`
 	Uid uint32 `json:"uid"`

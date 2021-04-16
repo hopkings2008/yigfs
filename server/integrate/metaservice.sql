@@ -10,8 +10,8 @@ CREATE TABLE `file` (
   `file_name` varchar(255) DEFAULT NULL,
   `size` bigint(20) UNSIGNED DEFAULT 0,
   `type` int(11) UNSIGNED DEFAULT 1,
-  `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `atime` datetime DEFAULT NULL,
   `perm` int(11) UNSIGNED DEFAULT 644,
   `nlink` int(11) UNSIGNED DEFAULT 0,
@@ -32,8 +32,8 @@ CREATE TABLE `zone` (
   `machine` varchar(255) DEFAULT NULL,
   `status` tinyint(1) DEFAULT 1,
   `weight` int(11) UNSIGNED DEFAULT 0,
-  `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
    UNIQUE KEY `rowkey` (`id`, `region`, `bucket_name`, `machine`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -48,8 +48,8 @@ CREATE TABLE `file_leader` (
   `ino` bigint(20) UNSIGNED DEFAULT 0,
   `generation` bigint(20) UNSIGNED DEFAULT 0,
   `leader` varchar(255) DEFAULT NULL,
-  `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`zone_id`, `region`, `bucket_name`, `ino`, `generation`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -89,7 +89,7 @@ CREATE TABLE `file_blocks` (
   `offset` bigint(20) DEFAULT 0,
   `end_addr` bigint(20) DEFAULT 0,
   `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id0`, `seg_id1`, `block_id`, `offset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
@@ -105,8 +105,8 @@ CREATE TABLE `segment_blocks` (
   `seg_start_addr` bigint(20) DEFAULT 0,
   `seg_end_addr` bigint(20) DEFAULT 0,
   `size` int(11) DEFAULT 0,
-  `ctime` datetime DEFAULT NULL,
-  `mtime` datetime DEFAULT NULL,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
+  `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`, `seg_start_addr`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
