@@ -18,6 +18,7 @@ pub enum HttpMethod{
     Put,
     Post,
     Delete,
+    Head,
 }
 #[derive (Debug, Default)]
 pub struct RespText{
@@ -145,6 +146,9 @@ impl HttpClient{
             }
             HttpMethod::Delete => {
                 hyper::Method::DELETE
+            }
+            HttpMethod::Head => {
+                hyper::Method::HEAD
             }
             _ => {
                 hyper::Method::GET

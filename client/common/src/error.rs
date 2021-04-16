@@ -18,6 +18,8 @@ pub enum Errno{
     Enotsupp = 7,
     // not space left
     Enospc = 28,
+    // access denied
+    Eaccess = 403,
 }
 
 impl Errno {

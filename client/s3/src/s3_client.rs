@@ -32,7 +32,55 @@ impl S3Client {
     }
 
     pub async fn head_object(&self, bucket: &String, object: &String) -> Result<S3ObjectInfo, Errno>{
-        Err(Errno::Enotsupp)
+        let path = format!("/{}/{}", bucket, object);
+
+        // create url
+        let url = String::from("http://") + &self.endpoint + &path;
+
+        let body = Vec::new();
+        let aws_credentials = AwsCredentials::new(&self.ak, &self.sk);
+        //sign the request
+        let mut request = SignedRequest::new("HEAD", "s3", &self.region, &path, &self.endpoint);
+        request.sign(&aws_credentials, &body);
+
+        // set the head object req header, then send it.
+        let retry_times = 3;
+        let mut client = HttpClient::new(retry_times);
+        client.set_headers(request.headers);
+        
+        let resp = client.request(&url, &body, &HttpMethod::Head, true).await;
+        match resp {
+            Ok(resp) => {
+                if resp.status == 403 {
+                    return Err(Errno::Eaccess)
+                } else if resp.status == 404 {
+                    println!("Failed to head object, resp status is: {}", resp.status);
+                    return Err(Errno::Enotf)
+                } else if resp.status >= 300 {
+                    println!("Failed to head object, resp status is: {}", resp.status);
+                    return Err(Errno::Eintr)
+                }
+
+                let object_length = resp.headers.get("content-length");
+                match object_length {
+                    Some(size) => {
+                        let rtext = S3ObjectInfo {
+                            bucket: bucket.clone(),
+                            name: object.clone(),
+                            size: size.parse::<u64>().unwrap(),
+                        };
+                        return Ok(rtext);
+                    }
+                    None => {
+                        println!("Err object length is none.");
+                        return Err(Errno::Eintr)
+                    }
+                }
+            }
+            Err(_) => {
+                return Err(Errno::Eintr)
+            }
+        }
     }
 
     pub async fn append_object_by_path(&self, object_path: &str, bucket: &str, object: &str, append_position: &u128) -> Result<RespText, String> {
@@ -59,7 +107,7 @@ impl S3Client {
         let aws_credentials = AwsCredentials::new(&self.ak, &self.sk);
         request.sign(&aws_credentials, &body);
 
-        // send append object req
+        // set the append object req header, then send it.
         let retry_times = 3;
         let mut client = HttpClient::new(retry_times);
         client.set_headers(request.headers);
@@ -86,7 +134,7 @@ impl S3Client {
         let aws_credentials = AwsCredentials::new(&self.ak, &self.sk);
         request.sign(&aws_credentials, data);
 
-        // send append object req
+        // set the append object req header, then send it.
         let retry_times = 3;
         let mut client = HttpClient::new(retry_times);
         client.set_headers(request.headers);
