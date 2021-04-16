@@ -1,4 +1,5 @@
 use serde_derive::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config{
@@ -7,6 +8,8 @@ pub struct Config{
     pub metaserver_config: MetaServerConfig,
     pub zone_config: ZoneConfig,
     pub segment_configs: Vec<SegmentConfig>,
+    pub disk_cache_config: DiskCacheConfig,
+    pub backend_store_config: BackendStoreConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -37,4 +40,15 @@ pub struct SegmentConfig {
     pub dir: String,
     pub size: u64,
     pub num: u32, // by default is 0.
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct DiskCacheConfig{
+    pub thread_num: u32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct BackendStoreConfig {
+    pub backend_type: u32,
+    pub settings: HashMap<String, String>,
 }

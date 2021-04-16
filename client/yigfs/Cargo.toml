@@ -13,3 +13,4 @@ filesystem_mgr = { path = "../filesystem_mgr" }
 metaservice_mgr = { path = "../metaservice_mgr" }
 common = { path = "../common" }
 segment_mgr = {path = "../segment_mgr"}
+io_engine = { path = "../io_engine" }

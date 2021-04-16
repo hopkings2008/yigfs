@@ -6,6 +6,7 @@ use io_engine::types::{MsgFileOpenOp, MsgFileReadOp, MsgFileOp, MsgFileWriteOp,
     MsgFileWriteResp, MsgFileCloseOp, MsgFileReadData};
 use io_engine::io_thread_pool::IoThreadPool;
 use io_engine::disk_io_worker::DiskIoWorkerFactory;
+use io_engine::backend_storage::BackendStore;
 use crate::leader::Leader;
 use crate::file_handle::FileHandleMgr;
 use crate::types::{FileHandle, Block, BlockIo, Segment};
@@ -17,6 +18,7 @@ pub struct LeaderLocal {
     exec: Executor,
     segment_mgr: Rc<SegmentMgr>,
     handle_mgr: FileHandleMgr,
+    backend_store: Box<dyn BackendStore>,
 }
 
 impl Leader for LeaderLocal {
@@ -318,7 +320,7 @@ impl Leader for LeaderLocal {
 }
 
 impl LeaderLocal {
-    pub fn new(machine: &String, thr_num: u32, exec: &Executor, mgr: Rc<SegmentMgr>) -> Self {
+    pub fn new(machine: &String, thr_num: u32, exec: &Executor, mgr: Rc<SegmentMgr>, backend: Box<dyn BackendStore>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
             disk_io_pool: IoThreadPool::new(thr_num, &String::from("Disk"), exec, 
@@ -326,6 +328,7 @@ impl LeaderLocal {
             exec: exec.clone(),
             segment_mgr: mgr,
             handle_mgr: FileHandleMgr::create(),
+            backend_store: backend,
         }
     }
 }

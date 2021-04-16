@@ -8,6 +8,7 @@ members = [
     "segment_mgr",
     "common",
     "s3",
+    "yig_backend",
 ]
 
 

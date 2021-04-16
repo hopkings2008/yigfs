@@ -23,3 +23,14 @@ num=0
 dir="/data2/yigfs"
 size=67108864
 num=0
+
+[disk_cache_config]
+thread_num = 6
+
+[backend_store_config]
+backend_type = 1
+[backend_store_config.settings]
+ak="hahahaha"
+sk="hahahaha"
+region="cn-bj-1"
+endpint="s3.test.com"

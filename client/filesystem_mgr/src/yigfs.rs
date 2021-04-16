@@ -9,8 +9,8 @@ use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
     ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen, ReplyWrite, ReplyEmpty};
 use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
-use segment_mgr::{segment_mgr::SegmentMgr, leader_mgr::LeaderMgr};
-use common::{runtime::Executor, uuid};
+use segment_mgr::leader_mgr::LeaderMgr;
+use common::uuid;
 use crate::handle::{FileHandleInfo, FileHandleInfoMgr};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
@@ -347,11 +347,10 @@ impl Filesystem for Yigfs {
 }
 
 impl Yigfs{
-    pub fn create(meta: Rc<dyn MetaServiceMgr>, seg: Rc<SegmentMgr>, exec: &Executor)-> Yigfs{
-        let machine = meta.get_machine_id();
+    pub fn create(meta: Rc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr)-> Yigfs{
         Yigfs{
             meta_service_mgr: meta,
-            leader_mgr: LeaderMgr::new(&machine, 6, exec, seg),
+            leader_mgr: leader_mgr,
             handle_cacher: FileHandleInfoMgr::new(),
             fsid: uuid::uuid_string(),
         }

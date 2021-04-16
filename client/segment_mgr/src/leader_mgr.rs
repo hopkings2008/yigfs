@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use common::runtime::Executor;
+use io_engine::backend_storage::BackendStore;
 
 use crate::{leader::Leader, segment_mgr::SegmentMgr};
 use crate::leader_local::LeaderLocal;
@@ -20,10 +21,10 @@ pub struct LeaderMgr {
 }
 
 impl LeaderMgr {
-    pub fn new(machine: &String, thr_num: u32, exec: &Executor, seg_mgr: Rc<SegmentMgr>) -> Self {
+    pub fn new(machine: &String, thr_num: u32, exec: &Executor, seg_mgr: Rc<SegmentMgr>, backend_store: Box<dyn BackendStore>) -> Self {
         let mut leaders = HashMap::<u8, Box<dyn Leader>>::new();
         leaders.insert(LeaderType::Unknown as u8, Box::new(LeaderNotSupport::new()));
-        leaders.insert(LeaderType::Local as u8, Box::new(LeaderLocal::new(machine, thr_num, exec, seg_mgr)));
+        leaders.insert(LeaderType::Local as u8, Box::new(LeaderLocal::new(machine, thr_num, exec, seg_mgr, backend_store)));
         LeaderMgr{
             machine: machine.clone(),
             leaders: leaders,
