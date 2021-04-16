@@ -19,7 +19,7 @@ pub enum Errno{
     // not space left
     Enospc = 28,
     // access denied
-    Eaccess = 403,
+    Eaccess = 9,
 }
 
 impl Errno {
