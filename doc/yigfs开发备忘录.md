@@ -4,7 +4,7 @@
 2. 已经删除的block未写入gc
 3. list目录第一次比较慢的问题
 4. 新建一个文件，返回给client一个未满的segment
-5. 使用rusoto s3 client实现head_object方法
+
 ## client端：
 1. 枚举目录下的segment文件
 2. data写的时候传地址
