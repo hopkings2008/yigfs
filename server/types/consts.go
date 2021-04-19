@@ -25,7 +25,7 @@ const (
 )
 
 const (
-	RootDirIno = iota + 1
+	RootDirIno uint64 = iota + 1
 	RootParentDirIno
 )
 

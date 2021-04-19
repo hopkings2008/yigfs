@@ -24,6 +24,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.4 // indirect
 	github.com/ryanuber/columnize v2.1.2+incompatible // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
+	github.com/stretchr/testify v1.3.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 	gopkg.in/yaml.v2 v2.4.0 // indirect
