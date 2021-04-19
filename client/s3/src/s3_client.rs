@@ -31,7 +31,7 @@ impl S3Client {
         }
     }
 
-    pub async fn head_object(&self, bucket: &String, object: &String) -> Result<S3ObjectInfo, Errno>{
+    pub async fn head_object(&self, bucket: &str, object: &str) -> Result<S3ObjectInfo, Errno>{
         let path = format!("/{}/{}", bucket, object);
 
         // create url
@@ -65,8 +65,8 @@ impl S3Client {
                 match object_length {
                     Some(size) => {
                         let rtext = S3ObjectInfo {
-                            bucket: bucket.clone(),
-                            name: object.clone(),
+                            bucket: bucket.to_string(),
+                            name: object.to_string(),
                             size: size.parse::<u64>().unwrap(),
                         };
                         return Ok(rtext);
@@ -83,7 +83,7 @@ impl S3Client {
         }
     }
 
-    pub async fn append_object_by_path(&self, object_path: &String, bucket: &String, object: &String, append_position: &u128) -> Result<AppendS3ObjectResp, Errno> {
+    pub async fn append_object_by_path(&self, object_path: &str, bucket: &str, object: &str, append_position: &u128) -> Result<AppendS3ObjectResp, Errno> {
         // add the body
         let f = File::open(object_path).expect("Error to open the object file");
         let mut reader = BufReader::new(f);
@@ -126,8 +126,8 @@ impl S3Client {
                 match next_append_position {
                     Some(position) => {
                         let rtext = AppendS3ObjectResp {
-                            bucket: bucket.clone(),
-                            name: object.clone(),
+                            bucket: bucket.to_string(),
+                            name: object.to_string(),
                             next_append_position: position.parse::<u64>().unwrap(),
                         };
                         return Ok(rtext);
@@ -144,7 +144,7 @@ impl S3Client {
         }
     }
 
-    pub async fn append_object(&self, data: &[u8], bucket: &String, object: &String, append_position: &u128) -> Result<AppendS3ObjectResp, Errno> {
+    pub async fn append_object(&self, data: &[u8], bucket: &str, object: &str, append_position: &u128) -> Result<AppendS3ObjectResp, Errno> {
         // create url
         let params = String::from("?append");
         let path = format!("/{}/{}", bucket, object);
@@ -181,8 +181,8 @@ impl S3Client {
                 match next_append_position {
                     Some(position) => {
                         let rtext = AppendS3ObjectResp {
-                            bucket: bucket.clone(),
-                            name: object.clone(),
+                            bucket: bucket.to_string(),
+                            name: object.to_string(),
                             next_append_position: position.parse::<u64>().unwrap(),
                         };
                         return Ok(rtext);
