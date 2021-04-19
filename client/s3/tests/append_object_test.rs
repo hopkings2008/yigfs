@@ -14,13 +14,16 @@ fn test_append_object_by_path()->Result<(), String> {
     let exec = Executor::create();
 
     let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
-    let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&object_path, &target_bucket, &target_object, &append_position))?;
-    if resp.status >= 300 {
-        return Err(format!("Failed to append object, got invalid status {}", resp.status));
+    let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&object_path, &target_bucket, &target_object, &append_position));
+    match resp {
+        Ok(result) => {
+            println!("resp is {:?}", result);
+            return Ok(());
+        }
+        Err(error) => {
+            return Err(format!("Failed to append object by path, error {:?}", error));
+        }
     }
-
-    println!("resp body {}, resp headers {:?}", resp.body, resp.headers);
-    return Ok(());
 }
 
 #[test]
@@ -36,11 +39,14 @@ fn test_append_object()->Result<(), String> {
     let exec = Executor::create();
 
     let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
-    let resp = exec.get_runtime().block_on(s3_client.append_object(&data, &target_bucket, &target_object, &append_position))?;
-    if resp.status >= 300 {
-        return Err(format!("Failed to append object, got invalid status {}", resp.status));
+    let resp = exec.get_runtime().block_on(s3_client.append_object(&data, &target_bucket, &target_object, &append_position));
+    match resp {
+        Ok(result) => {
+            println!("resp is {:?}", result);
+            return Ok(());
+        }
+        Err(error) => {
+            return Err(format!("Failed to append object, error {:?}", error));
+        }
     }
-
-    println!("resp body {}, resp headers {:?}", resp.body, resp.headers);
-    return Ok(());
 }

@@ -4,8 +4,8 @@ use std::io::BufReader;
 use crate::signature::AwsCredentials;
 use crate::signature::SignedRequest;
 use crate::types::S3ObjectInfo;
+use crate::types::AppendS3ObjectResp;
 
-use common::http_client::RespText;
 use common::http_client::HttpClient;
 use common::http_client::HttpMethod;
 use common::error::Errno;
@@ -57,7 +57,7 @@ impl S3Client {
                     println!("Failed to head object, resp status is: {}", resp.status);
                     return Err(Errno::Enotf)
                 } else if resp.status >= 300 {
-                    println!("Failed to head object, resp status is: {}", resp.status);
+                    println!("Failed to head object, resp status is: {}, body is: {}", resp.status, resp.body);
                     return Err(Errno::Eintr)
                 }
 
@@ -83,7 +83,7 @@ impl S3Client {
         }
     }
 
-    pub async fn append_object_by_path(&self, object_path: &str, bucket: &str, object: &str, append_position: &u128) -> Result<RespText, String> {
+    pub async fn append_object_by_path(&self, object_path: &String, bucket: &String, object: &String, append_position: &u128) -> Result<AppendS3ObjectResp, Errno> {
         // add the body
         let f = File::open(object_path).expect("Error to open the object file");
         let mut reader = BufReader::new(f);
@@ -113,10 +113,38 @@ impl S3Client {
         client.set_headers(request.headers);
         
         let resp = client.request(&final_url, &body, &HttpMethod::Post, true).await;
-        return resp
+        match resp {
+            Ok(resp) => {
+                if resp.status == 403 {
+                    return Err(Errno::Eaccess)
+                } else if resp.status >= 300 {
+                    println!("Failed to append object by path, resp status is: {}, body is: {}", resp.status, resp.body);
+                    return Err(Errno::Eintr)
+                }
+
+                let next_append_position = resp.headers.get("x-amz-next-append-position");
+                match next_append_position {
+                    Some(position) => {
+                        let rtext = AppendS3ObjectResp {
+                            bucket: bucket.clone(),
+                            name: object.clone(),
+                            next_append_position: position.parse::<u64>().unwrap(),
+                        };
+                        return Ok(rtext);
+                    }
+                    None => {
+                        println!("Err next append object position is None.");
+                        return Err(Errno::Eintr)
+                    }
+                }
+            }
+            Err(_) => {
+                return Err(Errno::Eintr)
+            }
+        }
     }
 
-    pub async fn append_object(&self, data: &[u8], bucket: &str, object: &str, append_position: &u128) -> Result<RespText, String> {
+    pub async fn append_object(&self, data: &[u8], bucket: &String, object: &String, append_position: &u128) -> Result<AppendS3ObjectResp, Errno> {
         // create url
         let params = String::from("?append");
         let path = format!("/{}/{}", bucket, object);
@@ -140,6 +168,34 @@ impl S3Client {
         client.set_headers(request.headers);
 
         let resp = client.request(&final_url, data, &HttpMethod::Post, true).await;
-        return resp
+        match resp {
+            Ok(resp) => {
+                if resp.status == 403 {
+                    return Err(Errno::Eaccess)
+                } else if resp.status >= 300 {
+                    println!("Failed to append object, resp status is: {}, body is: {}", resp.status, resp.body);
+                    return Err(Errno::Eintr)
+                }
+
+                let next_append_position = resp.headers.get("x-amz-next-append-position");
+                match next_append_position {
+                    Some(position) => {
+                        let rtext = AppendS3ObjectResp {
+                            bucket: bucket.clone(),
+                            name: object.clone(),
+                            next_append_position: position.parse::<u64>().unwrap(),
+                        };
+                        return Ok(rtext);
+                    }
+                    None => {
+                        println!("Err next append object position is None.");
+                        return Err(Errno::Eintr)
+                    }
+                }
+            }
+            Err(_) => {
+                return Err(Errno::Eintr)
+            }
+        }
     }
 }
