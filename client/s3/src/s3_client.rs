@@ -1,6 +1,7 @@
 use std::io::prelude::*;
 use std::fs::File;
 use std::io::BufReader;
+use std::convert::From;
 use crate::signature::AwsCredentials;
 use crate::signature::SignedRequest;
 use crate::types::S3ObjectInfo;
@@ -54,7 +55,6 @@ impl S3Client {
                 if resp.status == 403 {
                     return Err(Errno::Eaccess)
                 } else if resp.status == 404 {
-                    println!("Failed to head object, resp status is: {}", resp.status);
                     return Err(Errno::Enotf)
                 } else if resp.status >= 300 {
                     println!("Failed to head object, resp status is: {}, body is: {}", resp.status, resp.body);
@@ -192,6 +192,51 @@ impl S3Client {
                         return Err(Errno::Eintr)
                     }
                 }
+            }
+            Err(_) => {
+                return Err(Errno::Eintr)
+            }
+        }
+    }
+
+    pub async fn get_object(&self, bucket: &str, object: &str, offset: &u64, size: &u32) -> Result<Vec<u8>, Errno>{
+        let path = format!("/{}/{}", bucket, object);
+
+        // create url
+        let url = String::from("http://") + &self.endpoint + &path;
+
+        let body = Vec::new();
+        let aws_credentials = AwsCredentials::new(&self.ak, &self.sk);
+        //sign the request
+        let mut request = SignedRequest::new("GET", "s3", &self.region, &path, &self.endpoint);
+        request.sign(&aws_credentials, &body);
+
+        // add range header
+        let get_size: u64 = From::from(size.clone());
+        let end = offset + get_size - 1;
+        request.add_header("Range", &format!("bytes={}-{}", offset, end));
+
+        // set the head object req header, then send it.
+        let retry_times = 3;
+        let mut client = HttpClient::new(retry_times);
+        client.set_headers(request.headers);
+        
+        let resp = client.request(&url, &body, &HttpMethod::Get, true).await;
+        match resp {
+            Ok(resp) => {
+                if resp.status == 403 {
+                    return Err(Errno::Eaccess)
+                } else if resp.status == 404 {
+                    return Err(Errno::Enotf)
+                } else if resp.status == 416 {
+                    return Err(Errno::Erange)
+                } else if resp.status >= 300 {
+                    println!("Failed to get object, resp status is: {}, body is: {}", resp.status, resp.body);
+                    return Err(Errno::Eintr)
+                }
+
+                let object = resp.body.into_bytes();
+                return Ok(object);
             }
             Err(_) => {
                 return Err(Errno::Eintr)

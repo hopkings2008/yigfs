@@ -20,6 +20,8 @@ pub enum Errno{
     Enospc = 28,
     // access denied
     Eaccess = 9,
+    // range error
+    Erange = 10,
 }
 
 impl Errno {

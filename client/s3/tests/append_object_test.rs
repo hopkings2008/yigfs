@@ -17,7 +17,7 @@ fn test_append_object_by_path()->Result<(), String> {
     let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&object_path, &target_bucket, &target_object, &append_position));
     match resp {
         Ok(result) => {
-            println!("resp is {:?}", result);
+            println!("test_append_object_by_path resp is {:?}", result);
             return Ok(());
         }
         Err(error) => {
@@ -42,7 +42,7 @@ fn test_append_object()->Result<(), String> {
     let resp = exec.get_runtime().block_on(s3_client.append_object(&data, &target_bucket, &target_object, &append_position));
     match resp {
         Ok(result) => {
-            println!("resp is {:?}", result);
+            println!("test_append_object resp is {:?}", result);
             return Ok(());
         }
         Err(error) => {
