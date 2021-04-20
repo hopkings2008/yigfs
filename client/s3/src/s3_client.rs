@@ -216,7 +216,7 @@ impl S3Client {
         let end = offset + get_size - 1;
         request.add_header("Range", &format!("bytes={}-{}", offset, end));
 
-        // set the head object req header, then send it.
+        // set the get object req header, then send it.
         let retry_times = 3;
         let mut client = HttpClient::new(retry_times);
         client.set_headers(request.headers);
