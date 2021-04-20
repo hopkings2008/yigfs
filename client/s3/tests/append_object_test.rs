@@ -10,7 +10,7 @@ fn test_append_object_by_path()->Result<(), String> {
     let target_bucket = String::from("test-bucket");
     let target_object = String::from("test-object-1");
     let object_path = String::from("/home/test_object");
-    let append_position: u128 = 0;
+    let append_position: u64 = 0;
     let exec = Executor::create();
 
     let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
@@ -34,7 +34,7 @@ fn test_append_object()->Result<(), String> {
     let sk = String::from("hehehehe");
     let target_bucket = String::from("test-bucket");
     let target_object = String::from("test-object-2");
-    let append_position: u128 = 0;
+    let append_position: u64 = 0;
     let data: Vec<u8> = "Hello, World!".into();
     let exec = Executor::create();
 
