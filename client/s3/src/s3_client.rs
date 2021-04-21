@@ -83,7 +83,7 @@ impl S3Client {
         }
     }
 
-    pub async fn append_object_by_path(&self, object_path: &str, bucket: &str, object: &str, append_position: &u64) -> Result<AppendS3ObjectResp, Errno> {
+    pub async fn append_object_by_path(&self, bucket: &str, object: &str, append_position: &u64, object_path: &str) -> Result<AppendS3ObjectResp, Errno> {
         // add the body
         let f = File::open(object_path).expect("Error to open the object file");
         let mut reader = BufReader::new(f);
@@ -144,7 +144,7 @@ impl S3Client {
         }
     }
 
-    pub async fn append_object(&self, data: &[u8], bucket: &str, object: &str, append_position: &u64) -> Result<AppendS3ObjectResp, Errno> {
+    pub async fn append_object(&self, bucket: &str, object: &str, append_position: &u64, data: &[u8]) -> Result<AppendS3ObjectResp, Errno> {
         // create url
         let params = String::from("?append");
         let path = format!("/{}/{}", bucket, object);
