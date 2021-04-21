@@ -8,5 +8,7 @@ edition = "2018"
 
 [dependencies]
 common = {path="../common"}
+io_engine = { path = "../io_engine" }
 s3 = { path = "../s3" }
 crossbeam-channel = "0.4"
+tokio = { version = "1", features = ["full"]}

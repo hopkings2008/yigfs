@@ -1,13 +1,6 @@
 [mount_config]
 mnt = "/mnt/yigfs"
 
-[s3_config]
-region = "cn"
-server = "http://127.0.0.1"
-bucket = "mybucket"
-ak = "ak"
-sk = "sk"
-
 [metaserver_config]
 meta_server = "http//127.0.0.1"
 
@@ -30,7 +23,9 @@ thread_num = 6
 [backend_store_config]
 backend_type = 1
 [backend_store_config.settings]
+bucket="mybucket"
 ak="hahahaha"
 sk="hahahaha"
 region="cn-bj-1"
 endpint="s3.test.com"
+thread_num="6"

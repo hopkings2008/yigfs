@@ -15,10 +15,10 @@ use crate::segment_mgr::SegmentMgr;
 pub struct LeaderLocal {
     machine: String,
     disk_io_pool: IoThreadPool,
+    backend_store: Box<dyn BackendStore>,
     exec: Executor,
     segment_mgr: Rc<SegmentMgr>,
     handle_mgr: FileHandleMgr,
-    backend_store: Box<dyn BackendStore>,
 }
 
 impl Leader for LeaderLocal {
@@ -323,12 +323,12 @@ impl LeaderLocal {
     pub fn new(machine: &String, thr_num: u32, exec: &Executor, mgr: Rc<SegmentMgr>, backend: Box<dyn BackendStore>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
-            disk_io_pool: IoThreadPool::new(thr_num, &String::from("Disk"), exec, 
-            &DiskIoWorkerFactory::new()),
+            disk_io_pool: IoThreadPool::new(thr_num, &String::from("Disk"), 
+            exec, &DiskIoWorkerFactory::new()),
+            backend_store: backend,
             exec: exec.clone(),
             segment_mgr: mgr,
             handle_mgr: FileHandleMgr::create(),
-            backend_store: backend,
         }
     }
 }

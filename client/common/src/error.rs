@@ -79,4 +79,15 @@ impl Errno {
             }
         }
     }
+
+    pub fn is_enotf(&self) -> bool {
+        match *self {
+            Errno::Enotf => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
 }
