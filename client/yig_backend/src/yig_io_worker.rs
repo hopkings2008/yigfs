@@ -149,7 +149,7 @@ impl YigIoWorker{
 
     fn write(&self, bucket: &String, object: &String, offset: u64, data: &[u8]) -> Result<u64, Errno>{
         let ret = self.exec.get_runtime().
-        block_on(self.s3_client.append_object(data, bucket, object, &offset));
+        block_on(self.s3_client.append_object(bucket, object, &offset, data));
         match ret {
             Ok(ret) => {
                 return Ok(ret.next_append_position);

@@ -64,9 +64,11 @@ impl SegmentMgr {
     }
 
     pub fn new_segment(&self, leader: &String) -> Segment {
-        let mut l = leader.clone();
-        if l == "" {
+        let l: String;
+        if leader == "" {
             l = self.meta_service_mgr.get_machine_id();
+        } else {
+            l = leader.clone();
         }
         let mut seg = Segment::new(&l);
         let idx = self.get_segment_dir_idx(seg.seg_id0, seg.seg_id1);

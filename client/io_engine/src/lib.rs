@@ -5,4 +5,6 @@ pub mod io_thread_pool;
 pub mod disk_io_worker;
 pub mod backend_storage;
 pub mod backend_store_mgr;
+pub mod cache_store;
+pub mod disk_cache_store;
 mod file_handle_ref;
