@@ -2,7 +2,7 @@
 use crate::io_thread_pool::IoThreadPool;
 use crate::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteOp, 
     MsgFileWriteResp, MsgFileReadOp, MsgFileReadData, MsgFileCloseOp};
-use crate::cache_store::CacheStore;
+use crate::cache_store::{CacheStore, CacheStoreFactory, CacheStoreConfig};
 use crate::disk_io_worker::DiskIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
@@ -116,7 +116,7 @@ impl CacheStore for DiskCache {
             }
             Err(err) => {
                 println!("disk_cache_store: read: failed to recv read resp for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
-            id0, id1, dir, offset, ret);
+            id0, id1, dir, offset, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -169,5 +169,20 @@ impl DiskCache {
                 &DiskIoWorkerFactory::new(),
             ),
         }
+    }
+}
+
+pub struct DiskCacheStoreFactory{
+}
+
+impl CacheStoreFactory for DiskCacheStoreFactory{
+    fn new_cache_store(&self, cfg: &CacheStoreConfig, exec: &Executor) -> Result<Box<dyn CacheStore>, Errno>{
+        Ok(Box::new(DiskCache::new(cfg.thread_num, exec)))
+    }
+}
+
+impl DiskCacheStoreFactory{
+    pub fn new()->Box<dyn CacheStoreFactory>{
+        Box::new(DiskCacheStoreFactory{})
     }
 }
