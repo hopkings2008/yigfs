@@ -20,3 +20,24 @@ func(yigFs *YigFsStorage) UpdateSegBlockInfo(ctx context.Context, seg *types.Upd
 	return
 }
 
+func(yigFs *YigFsStorage) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segs *types.GetIncompleteUploadSegsResp, err error) {
+	segs = &types.GetIncompleteUploadSegsResp{}
+
+	segsResp, err := yigFs.MetaStorage.Client.GetSegsByLeader(ctx, seg)
+	if err != nil {
+		return
+	}
+	if len(segsResp) == 0 {
+		helper.Logger.Warn(ctx, fmt.Sprintf("GetIncompleteUploadSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+		segs.Segments = make([]*types.IncompleteUploadSegInfo, 0)
+		return
+	}
+	
+	segs, err = yigFs.MetaStorage.Client.GetIncompleteUploadSegs(ctx, segsResp)
+	if err != nil {
+		return
+	}
+
+	return
+}

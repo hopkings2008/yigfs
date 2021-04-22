@@ -18,3 +18,7 @@ func(m *Meta) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmen
 func(m *Meta) UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
 	return m.Client.UpdateSegBlockInfo(ctx, seg)
 }
+
+func(m *Meta) GetSegsByLeader(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segs []*types.UpdateSegBlockInfo, err error) {
+	return m.Client.GetSegsByLeader(ctx, seg)
+}

@@ -111,3 +111,5 @@ CREATE TABLE `segment_blocks` (
    UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`, `seg_start_addr`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+ALTER TABLE segment_blocks ADD INDEX listkey (seg_end_addr);

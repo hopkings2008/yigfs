@@ -255,3 +255,49 @@ func(yigFs MetaAPIHandlers) UpdateSegBlockInfoHandler(ctx iris.Context) {
 	ctx.JSON(resp)
 	return
 }
+
+func(yigFs MetaAPIHandlers) HeartBeatHandler(ctx iris.Context) {
+	resp := &types.GetIncompleteUploadSegsResp{}
+	defer GetSpendTime("HeartBeatHandler")()
+
+	r := ctx.Request()
+	reqContext := r.Context()
+
+	// get req
+	segReq := &types.GetIncompleteUploadSegsReq{}
+	if err := ctx.ReadJSON(&segReq); err != nil {
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read GetIncompleteUploadSegsReq from body, err: %v", err))
+		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	// check request params
+	if segReq.BucketName == "" || segReq.ZoneId == "" || segReq.Machine == "" {
+		helper.Logger.Error(reqContext, "Some HeartBeatHandler required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	if segReq.Region == "" {
+		segReq.Region = "cn-bj-1"
+	}
+
+	uuidStr := uuid.New()
+	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// get incomplete upload segments by machine from tidb.
+	var err error
+	resp, err = yigFs.YigFsAPI.GetIncompleteUploadSegs(reqContext, segReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+	
+	resp.Result = GetErrInfo(NoYigFsErr)
+
+	ctx.JSON(resp)
+	return
+}
