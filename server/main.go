@@ -2,6 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"runtime"
+	"syscall"
 
 	"github.com/hopkings2008/yigfs/server/api"
 	"github.com/hopkings2008/yigfs/server/helper"
@@ -10,6 +14,14 @@ import (
 	"github.com/kataras/iris"
 )
 
+
+func DumpStacks() {
+	buf := make([]byte, 1<<16)
+	stackLen := runtime.Stack(buf, true)
+	helper.Logger.Error(nil, "Received SIGQUIT, goroutine dump")
+	helper.Logger.Error(nil, buf[:stackLen])
+	helper.Logger.Error(nil, "*** dump end")
+}
 
 func main() {
 	// New ris
@@ -60,10 +72,37 @@ func main() {
 	app.Get("/v1/machine/heartbeat", apiHandlers.HeartBeatHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
-    	err := app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile))
-	//err := app.Run(iris.Addr(port))
-	if err != nil {
-		helper.Logger.Error(nil, fmt.Sprintf("Failed to run yigfs, err: %v", err))
+	isHTTP2 := false
+    
+	go func() {
+		var err error
+		if isHTTP2 {
+			err = app.Run(iris.TLS(port, helper.CONFIG.MetaServiceConfig.TlsCertFile, helper.CONFIG.MetaServiceConfig.TlsKeyFile))
+		} else {
+			err = app.Run(iris.Addr(port))
+		}
+		if err != nil {
+			helper.Logger.Error(nil, fmt.Sprintf("Failed to run yigfs metaservice, err: %v", err))
+		}
+	}()
+
+	// ignore signal handlers set by Iris
+	signal.Ignore()
+	signalQueue := make(chan os.Signal, 1)
+	signal.Notify(signalQueue, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP, syscall.SIGUSR1)
+	for {
+		s := <-signalQueue
+		switch s {
+		case syscall.SIGHUP:
+			// reload config file
+			helper.SetupConfig()
+		case syscall.SIGUSR1:
+			go DumpStacks()
+		default:
+			// stop Yigfs MetaService
+			helper.Logger.Info(nil, "Yigfs MetaService stopped")
+			return
+		}
 	}
 }
 
