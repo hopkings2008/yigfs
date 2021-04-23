@@ -87,26 +87,25 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetI
 	}
 	defer rows.Close()
 
-	var seg_id0, seg_id1 uint64
-	var latest_offset int
-	var latest_end_addr int
+	var segId0, segId1 uint64
+	var latestOffset, latestEndAddr int
 
 	for rows.Next() {
 		err = rows.Scan(
-			&seg_id0,
-			&seg_id1,
-			&latest_offset,
-			&latest_end_addr)
+			&segId0,
+			&segId1,
+			&latestOffset,
+			&latestEndAddr)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query incomplete segs getting by leader, err: %v", err))
 			return
 		}
 
-		if latest_offset < latest_end_addr {
+		if latestOffset < latestEndAddr {
 			segInfo := &types.IncompleteUploadSegInfo{
-				SegmentId0: seg_id0,
-				SegmentId1: seg_id1,
-				NextOffset: latest_offset,
+				SegmentId0: segId0,
+				SegmentId1: segId1,
+				NextOffset: latestOffset,
 			}
 
 			segsResp.Segments = append(segsResp.Segments, segInfo)
@@ -125,10 +124,10 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetI
 
 func (t *TidbClient) UpdateSegLatestEndAddr(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
 	sqltext := "select latest_end_addr from segment_info where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-	var latest_end_addr int
+	var latestEndAddr int
 	row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
 	err = row.Scan (
-		&latest_end_addr,
+		&latestEndAddr,
 	)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("UpdateSegLatestEndAddr: Failed to get the latest_end_add, err: %v", err))
@@ -136,7 +135,7 @@ func (t *TidbClient) UpdateSegLatestEndAddr(ctx context.Context, seg *types.Upda
 		return
 	}
 
-	if seg.SegBlockInfo.LatestEndAddr > latest_end_addr {
+	if seg.SegBlockInfo.LatestEndAddr > latestEndAddr {
 		sqltext = "update segment_info set latest_end_addr=? where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
 		_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.LatestEndAddr, seg.ZoneId, seg.Region, seg.BucketName, 
 			seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
