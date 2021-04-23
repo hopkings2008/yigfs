@@ -185,7 +185,7 @@ impl Leader for LeaderLocal {
                     return Err(ret);*/
                 }
                 Err(err) => {
-                    if err.is_enoent() {
+                    if err.is_enospc() {
                         println!("LeadLocal: write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {} with offset: {}",
                             id0, id1, seg_dir, ino, offset);
                         let seg = self.segment_mgr.new_segment(&String::from(""));
@@ -193,11 +193,11 @@ impl Leader for LeaderLocal {
                         id0 = seg.seg_id0;
                         id1 = seg.seg_id1;
                         seg_max_size = seg.max_size;
-                        println!("write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
+                        println!("LeadLocal: write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
                     id0, id1, ino, offset);
                         continue;
                     }
-                    println!("write: failed to get response for seg(id0: {}, id1: {}) of ino: {} with offset: {}, err: {:?}", 
+                    println!("LeadLocal: write: failed to get response for seg(id0: {}, id1: {}) of ino: {} with offset: {}, err: {:?}", 
                         id0, id1, ino, offset, err);
                     return Err(err);
                 }
