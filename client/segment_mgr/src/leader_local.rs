@@ -4,8 +4,7 @@ use common::runtime::Executor;
 use common::error::Errno;
 use io_engine::types::{MsgFileOpenOp, MsgFileReadOp, MsgFileOp, MsgFileWriteOp, 
     MsgFileWriteResp, MsgFileCloseOp, MsgFileReadData};
-use io_engine::io_thread_pool::IoThreadPool;
-use io_engine::disk_io_worker::DiskIoWorkerFactory;
+use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
 use crate::leader::Leader;
 use crate::file_handle::FileHandleMgr;
@@ -14,7 +13,7 @@ use crate::segment_mgr::SegmentMgr;
 
 pub struct LeaderLocal {
     machine: String,
-    disk_io_pool: IoThreadPool,
+    cache_store: Box<dyn CacheStore>,
     backend_store: Box<dyn BackendStore>,
     exec: Executor,
     segment_mgr: Rc<SegmentMgr>,
@@ -49,35 +48,13 @@ impl Leader for LeaderLocal {
         }
         for seg in &segments {
             let seg_dir = self.segment_mgr.get_segment_dir(seg.seg_id0, seg.seg_id1);
-            let worker = self.disk_io_pool.get_thread(seg.seg_id0, seg.seg_id1);
-            let (tx, rx) = bounded::<Errno>(1);
-            let msg = MsgFileOpenOp{
-                id0: seg.seg_id0,
-                id1: seg.seg_id1,
-                dir: seg_dir,
-                resp_sender: tx,
-            };
-            let ret = worker.do_io(MsgFileOp::OpOpen(msg));
-            if !ret.is_success() {
-                println!("open(id0: {}, id1: {}): failed to send open msg, err: {:?}",
-                seg.seg_id0, seg.seg_id1, ret);
-                return ret;
+            let ret = self.cache_store.open(seg.seg_id0, seg.seg_id1, &seg_dir);
+            if ret.is_success(){
+                continue;
             }
-            let ret = rx.recv();
-            match ret {
-                Ok(e) => {
-                    if !e.is_success() {
-                        println!("open(id0: {}, id1: {}) failed with errno: {:?}", seg.seg_id0, seg.seg_id1, e);
-                        return e;
-                    }
-                    continue;
-                }
-                Err(err) => {
-                    println!("open: failed to get response for (id0: {}, id1: {}), err: {}", 
-                    seg.seg_id0, seg.seg_id1, err);
-                    return Errno::Eintr;
-                }
-            }
+            println!("LeaderLocal open: seg(id0: {}, id1: {}) for ino: {} failed, err: {:?}",
+            seg.seg_id0, seg.seg_id1, ino, ret);
+            return ret;
         }
 
         let file_handle = FileHandle {
@@ -114,47 +91,30 @@ impl Leader for LeaderLocal {
                     }
                     // read the data.
                     let seg_dir = self.segment_mgr.get_segment_dir(s.seg_id0, s.seg_id1);
-                    let (tx, rx) = bounded::<MsgFileReadData>(1);
-                    let msg = MsgFileReadOp{
-                        id0: s.seg_id0,
-                        id1: s.seg_id1,
-                        dir: seg_dir,
-                        offset: start,
-                        size: to_read,
-                        data_sender: tx,
-                    };
-                    let worker = self.disk_io_pool.get_thread(s.seg_id0, s.seg_id1);
-                    let ret = worker.do_io(MsgFileOp::OpRead(msg));
-                    if !ret.is_success(){
-                        println!("read: failed to read data for ino: {}, offset: {}, err: {:?}", ino, start, ret);
-                        return Err(ret);
-                    }
-                    let ret = rx.recv();
+                    let ret = self.cache_store.read(s.seg_id0, 
+                        s.seg_id1, &seg_dir, start, to_read);
                     match ret {
                         Ok(ret) => {
-                            if ret.err.is_success() {
-                                if let Some(d) = ret.data{
-                                    let l = d.len() as u32;
-                                    total_read -= l as u32;
-                                    start += l as u64;
-                                    data.extend(d);
-                                }
-                            } else if ret.err.is_eof() {
-                                println!("read: got eof for ino: {}, offset: {}, start: {}", ino, offset, start);
-                                return Ok(data);
-                            } else {
-                                println!("read: got error when read data for ino: {}, offset: {}, start: {}, err: {:?}",
-                                ino, offset, start, ret.err);
-                                return Err(ret.err);
+                            if let Some(d) = ret{
+                                let l = d.len() as u32;
+                                total_read -= l as u32;
+                                start += l as u64;
+                                data.extend(d);
                             }
                         }
                         Err(err) => {
-                            println!("read: failed to got response for ino: {}, offset: {}, start: {}, err: {}", 
-                            ino, offset, start, err);
+                            if err.is_eof() {
+                                println!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, size: {}",
+                                ino, s.seg_id0, s.seg_id1, start, to_read);
+                                return Ok(data);
+                            }
+                            println!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
+                            ino, offset, start, to_read, err);
+                            return Err(err);
                         }
                     }
                     if total_read == 0 {
-                        println!("read: finished for ino: {}, offset: {}", ino, offset);
+                        println!("LeadLocal: read: finished for ino: {}, offset: {}, size: {}", ino, offset, size);
                         return Ok(data);
                     }
                 }
@@ -185,44 +145,10 @@ impl Leader for LeaderLocal {
         //println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
         loop {
             //println!("write: seg(id0: {}, id1: {}, max_size: {})", id0, id1, seg_max_size);
-            let worker = self.disk_io_pool.get_thread(id0, id1);
             let seg_dir = self.segment_mgr.get_segment_dir(id0, id1);
-            let (tx, rx) = bounded::<MsgFileWriteResp>(1);
-            let msg = MsgFileWriteOp{
-                id0: id0,
-                id1: id1,
-                max_size: seg_max_size,
-                dir: seg_dir.clone(),
-                offset: offset, // the file offset is not used currently.
-                data: data.to_vec(),
-                resp_sender: tx,
-            };
-            let ret = worker.do_io(MsgFileOp::OpWrite(msg));
-            if !ret.is_success() {
-                println!("write: failed to send_disk_io for ino: {}, seg(id0: {}, id1: {}), err: {:?}",
-                ino, id0, id1, ret);
-                return Err(Errno::Eintr);
-            }
-            let ret = rx.recv();
+            let ret = self.cache_store.write(id0, id1, &seg_dir, offset, seg_max_size, data);
             match ret {
                 Ok(r) => {
-                    if !r.err.is_success() {
-                        if r.err.is_enospc() {
-                            println!("write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {} with offset: {}",
-                            id0, id1, seg_dir, ino, offset);
-                            let seg = self.segment_mgr.new_segment(&String::from(""));
-                            self.handle_mgr.add_segment(ino, &seg);
-                            id0 = seg.seg_id0;
-                            id1 = seg.seg_id1;
-                            seg_max_size = seg.max_size;
-                            println!("write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
-                        id0, id1, ino, offset);
-                            continue;
-                        }
-                        println!("write: failed to write segment(id0: {}, id1: {}) for ino: {} with offset: {}, err: {:?}",
-                        id0, id1, ino, offset, r.err);
-                        return Err(r.err);
-                    }
                     // write block success.
                     let b = Block {
                         ino: ino,
@@ -259,9 +185,21 @@ impl Leader for LeaderLocal {
                     return Err(ret);*/
                 }
                 Err(err) => {
-                    println!("write: failed to get response for seg(id0: {}, id1: {}) of ino: {} with offset: {}, err: {}", 
+                    if err.is_enoent() {
+                        println!("LeadLocal: write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {} with offset: {}",
+                            id0, id1, seg_dir, ino, offset);
+                        let seg = self.segment_mgr.new_segment(&String::from(""));
+                        self.handle_mgr.add_segment(ino, &seg);
+                        id0 = seg.seg_id0;
+                        id1 = seg.seg_id1;
+                        seg_max_size = seg.max_size;
+                        println!("write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
+                    id0, id1, ino, offset);
+                        continue;
+                    }
+                    println!("write: failed to get response for seg(id0: {}, id1: {}) of ino: {} with offset: {}, err: {:?}", 
                         id0, id1, ino, offset, err);
-                    return Err(Errno::Eintr);
+                    return Err(err);
                 }
             }
             
@@ -278,7 +216,7 @@ impl Leader for LeaderLocal {
                 handle = ret;
             }
             Err(err) => {
-                println!("close: failed to get file handle for ino: {}, err: {:?}", ino, err);
+                println!("LeadLocal close: failed to get file handle for ino: {}, err: {:?}", ino, err);
                 return err;
             }
         }
@@ -286,7 +224,7 @@ impl Leader for LeaderLocal {
         if !handle.segments.is_empty() {
             let ret = self.segment_mgr.update_segments(ino, &handle.segments);
             if !ret.is_success(){
-                println!("close: failed to update segments for ino: {}, err: {:?}", ino, ret);
+                println!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);
                 return ret;
             }
         }
@@ -297,17 +235,12 @@ impl Leader for LeaderLocal {
                 ino, s.seg_id0, s.seg_id1, b.offset, b.size);
             }
             //close the segment.
-            let worker = self.disk_io_pool.get_thread(s.seg_id0, s.seg_id1);
-            let msg = MsgFileCloseOp{
-                id0: s.seg_id0,
-                id1: s.seg_id1,
-            };
-            let ret = worker.do_io(MsgFileOp::OpClose(msg));
-            if !ret.is_success(){
-                println!("failed to close seg: id0: {}, id1: {} for ino: {}, err: {:?}", 
-                    s.seg_id0, s.seg_id1, ino, ret);
-                return ret;
+            let ret = self.cache_store.close(s.seg_id0, s.seg_id1);
+            if ret.is_success(){
+                continue;
             }
+            println!("LeadLocal: close: failed to close seg: (id0: {}, id1: {}), err: {:?}",
+            s.seg_id0, s.seg_id1, ret);
         }
 
         let err = self.handle_mgr.del(ino);
@@ -320,11 +253,10 @@ impl Leader for LeaderLocal {
 }
 
 impl LeaderLocal {
-    pub fn new(machine: &String, thr_num: u32, exec: &Executor, mgr: Rc<SegmentMgr>, backend: Box<dyn BackendStore>) -> Self {
+    pub fn new(machine: &String, exec: &Executor, mgr: Rc<SegmentMgr>, cache: Box<dyn CacheStore>, backend: Box<dyn BackendStore>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
-            disk_io_pool: IoThreadPool::new(thr_num, &String::from("Disk"), 
-            exec, &DiskIoWorkerFactory::new()),
+            cache_store: cache,
             backend_store: backend,
             exec: exec.clone(),
             segment_mgr: mgr,

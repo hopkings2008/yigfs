@@ -123,3 +123,11 @@ impl BackendStoreFactory for YigBackendFactory{
         Ok(Box::new(YigBackend::new(&region, &endpoint, &ak, &sk, &bucket, thread_num, &self.exec)))
     }
 }
+
+impl YigBackendFactory {
+    pub fn new(exec: &Executor) -> Box<dyn BackendStoreFactory> {
+        Box::new(YigBackendFactory{
+            exec: exec.clone(),
+        })
+    }
+}

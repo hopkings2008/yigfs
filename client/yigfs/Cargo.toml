@@ -14,3 +14,4 @@ metaservice_mgr = { path = "../metaservice_mgr" }
 common = { path = "../common" }
 segment_mgr = {path = "../segment_mgr"}
 io_engine = { path = "../io_engine" }
+yig_backend = { path = "../yig_backend" }

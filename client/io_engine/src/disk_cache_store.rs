@@ -2,7 +2,7 @@
 use crate::io_thread_pool::IoThreadPool;
 use crate::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteOp, 
     MsgFileWriteResp, MsgFileReadOp, MsgFileReadData, MsgFileCloseOp};
-use crate::cache_store::{CacheStore, CacheStoreFactory, CacheStoreConfig};
+use crate::cache_store::{CacheStore, CacheStoreFactory, CacheStoreConfig, CacheWriteResult};
 use crate::disk_io_worker::DiskIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
@@ -48,7 +48,7 @@ impl CacheStore for DiskCache {
     }
     // capacity: the max size of one cache file.
     // add capacity in this api to avoid maintain it in cache implementation.
-    fn write(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8])->Result<u32, Errno>{
+    fn write(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8])->Result<CacheWriteResult, Errno>{
         let worker = self.disk_pool.get_thread(id0, id1);
         let (tx, rx) = bounded::<MsgFileWriteResp>(1);
         let msg = MsgFileWriteOp{
@@ -70,7 +70,10 @@ impl CacheStore for DiskCache {
         match ret{
             Ok(ret) => {
                 if ret.err.is_success() {
-                    return Ok(ret.nwrite);
+                    return Ok(CacheWriteResult{
+                        offset: ret.offset,
+                        nwrite: ret.nwrite,
+                    });
                 }
                 return Err(ret.err);
             }
@@ -107,7 +110,7 @@ impl CacheStore for DiskCache {
                 } else if ret.err.is_eof() {
                     println!("disk_cache_store: read: read eof for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
             id0, id1, dir, offset, ret);
-                    return Ok(ret.data);
+                    return Err(Errno::Eeof);
                 } else {
                     println!("disk_cache_store: read: failed to read data for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
             id0, id1, dir, offset, ret);
