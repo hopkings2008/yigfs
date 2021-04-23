@@ -91,8 +91,9 @@ impl Leader for LeaderLocal {
                     }
                     // read the data.
                     let seg_dir = self.segment_mgr.get_segment_dir(s.seg_id0, s.seg_id1);
+                    let seg_offset = b.seg_start_addr + start - b.offset;
                     let ret = self.cache_store.read(s.seg_id0, 
-                        s.seg_id1, &seg_dir, start, to_read);
+                        s.seg_id1, &seg_dir, seg_offset, to_read);
                     match ret {
                         Ok(ret) => {
                             if let Some(d) = ret{
