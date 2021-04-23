@@ -67,7 +67,7 @@ CREATE TABLE `segment_info` (
   `leader` varchar(255) DEFAULT NULL,
   `max_size` int(11) DEFAULT 0,
   `latest_offset` int(11) DEFAULT 0,
-  `latest_end_addr` int(11) DEFAULT 0,
+  `max_end_addr` int(11) DEFAULT 0,
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,

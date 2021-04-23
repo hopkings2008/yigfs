@@ -363,6 +363,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	}
 
 	// if the seg leader is not existed, create it.
+	// update max_end_addr for segment_info.
 	waitgroup.Add(1)
 	go func() {
 		defer waitgroup.Done()
@@ -373,7 +374,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 			}
 		}
 
-		// get max end_addr and update latest_end_addr.
+		// get max end_addr and update max_end_addr.
 		maxEnd := seg.Segment.Blocks[blocksNum-1].SegEndAddr
 		if blocksNum > 1 {
 			for _, block := range seg.Segment.Blocks {
@@ -386,7 +387,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 		segInfo := &types.UpdateSegBlockInfo{
 			SegmentId0: seg.Segment.SegmentId0,
 			SegmentId1: seg.Segment.SegmentId1,
-			LatestEndAddr: maxEnd,
+			MaxEndAddr: maxEnd,
 		}
 
 		updateReq := &types.UpdateSegBlockInfoReq{
