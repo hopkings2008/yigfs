@@ -196,8 +196,8 @@ func Test_WriteFile(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		block := &types.BlockInfo {
 			Offset: int64(offset),
-			SegStartAddr: int64(startAddr),
-			SegEndAddr: int64(endAddr),
+			SegStartAddr: startAddr,
+			SegEndAddr: endAddr,
 			Size: Size,
 		}
 
@@ -227,8 +227,8 @@ func Test_WriteFile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		block := &types.BlockInfo {
 			Offset: int64(offset),
-			SegStartAddr: int64(startAddr),
-			SegEndAddr: int64(endAddr),
+			SegStartAddr: startAddr,
+			SegEndAddr: endAddr,
 			Size: Size,
 		}
 
@@ -427,8 +427,8 @@ func Test_UpdateSegments(t *testing.T) {
 
 		block := &types.BlockInfo {
 			Offset: int64(i * offset) + int64(Size),
-			SegStartAddr: int64(startAddr),
-			SegEndAddr: int64(endAddr),
+			SegStartAddr: startAddr,
+			SegEndAddr: endAddr,
 			Size: Size,
 		}
 

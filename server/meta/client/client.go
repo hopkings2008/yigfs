@@ -67,8 +67,8 @@ type Client interface {
 	// update segment block info
 	UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 	// get incomplete upload segments by machine
-	GetIncompleteUploadSegs(ctx context.Context, segs []*types.UpdateSegBlockInfo) (segsResp *types.GetIncompleteUploadSegsResp, err error)
-	// get segs by leader
-	GetSegsByLeader(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segs []*types.UpdateSegBlockInfo, err error)
+	GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp *types.GetIncompleteUploadSegsResp, err error)
+	// update seg's latest end addr
+	UpdateSegLatestEndAddr(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 }
 

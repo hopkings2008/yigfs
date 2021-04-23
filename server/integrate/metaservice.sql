@@ -67,6 +67,7 @@ CREATE TABLE `segment_info` (
   `leader` varchar(255) DEFAULT NULL,
   `max_size` int(11) DEFAULT 0,
   `latest_offset` int(11) DEFAULT 0,
+  `latest_end_addr` int(11) DEFAULT 0,
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
@@ -102,8 +103,8 @@ CREATE TABLE `segment_blocks` (
   `seg_id0` bigint(20) UNSIGNED DEFAULT 0,
   `seg_id1` bigint(20) UNSIGNED DEFAULT 0,
   `block_id` bigint(20) DEFAULT 0,
-  `seg_start_addr` bigint(20) DEFAULT 0,
-  `seg_end_addr` bigint(20) DEFAULT 0,
+  `seg_start_addr` int(11) DEFAULT 0,
+  `seg_end_addr` int(11) DEFAULT 0,
   `size` int(11) DEFAULT 0,
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -111,5 +112,3 @@ CREATE TABLE `segment_blocks` (
    UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`, `seg_start_addr`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
-ALTER TABLE segment_blocks ADD INDEX listkey (seg_end_addr);

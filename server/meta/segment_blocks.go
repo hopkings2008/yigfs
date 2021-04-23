@@ -14,7 +14,3 @@ func (m *Meta) InsertSegmentBlock(ctx context.Context, blockInfo *types.Descript
 func(m *Meta) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segmentMap map[interface{}][]int64, offsetMap map[int64]int64) (resp *types.GetSegmentResp, err error) {
 	return m.Client.GetSegsBlockInfo(ctx, seg, segmentMap, offsetMap)
 }
-
-func(m *Meta) GetIncompleteUploadSegs(ctx context.Context, segs []*types.UpdateSegBlockInfo) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
-	return m.Client.GetIncompleteUploadSegs(ctx, segs)
-}
