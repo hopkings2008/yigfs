@@ -251,9 +251,16 @@ impl DiskIoWorker {
                     }
                 }
             } // loop
-            if errno.is_eof() || errno.is_success() {
+            if errno.is_success() {
                 let resp_msg = MsgFileReadData{
                     data: Some(resp_data),
+                    err: errno,
+                };
+                msg.response(resp_msg);
+                return;
+            } else if errno.is_enospc() {
+                let resp_msg = MsgFileReadData{
+                    data: None,
                     err: errno,
                 };
                 msg.response(resp_msg);

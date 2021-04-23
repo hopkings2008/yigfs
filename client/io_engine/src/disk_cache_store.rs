@@ -109,11 +109,11 @@ impl CacheStore for DiskCache {
                     return Ok(ret.data);
                 } else if ret.err.is_eof() {
                     println!("disk_cache_store: read: read eof for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
-            id0, id1, dir, offset, ret);
+            id0, id1, dir, offset, ret.err);
                     return Err(Errno::Eeof);
                 } else {
                     println!("disk_cache_store: read: failed to read data for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
-            id0, id1, dir, offset, ret);
+            id0, id1, dir, offset, ret.err);
                     return Err(ret.err);
                 }
             }
