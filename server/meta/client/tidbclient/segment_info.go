@@ -89,7 +89,7 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetI
 
 	var seg_id0, seg_id1 uint64
 	var latest_offset int
-	var latest_end_addr int64
+	var latest_end_addr int
 
 	for rows.Next() {
 		err = rows.Scan(
@@ -102,11 +102,11 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetI
 			return
 		}
 
-		if latest_offset < int(latest_end_addr) {
+		if latest_offset < latest_end_addr {
 			segInfo := &types.IncompleteUploadSegInfo{
 				SegmentId0: seg_id0,
 				SegmentId1: seg_id1,
-				NextOffset: int64(latest_offset),
+				NextOffset: latest_offset,
 			}
 
 			segsResp.Segments = append(segsResp.Segments, segInfo)

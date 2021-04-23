@@ -35,5 +35,5 @@ type GetIncompleteUploadSegsResp struct {
 type IncompleteUploadSegInfo struct {
 	SegmentId0   uint64 `json:"seg_id0"`
     SegmentId1   uint64 `json:"seg_id1"`
-    NextOffset   int64  `json:"next_offset"`
+    NextOffset   int  `json:"next_offset"`
 }
