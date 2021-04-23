@@ -356,12 +356,14 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	// 5. if step2 can be merge, then check the block in file_blocks table can be merged or not.
 	// if the block can be merge, merge it; else insert it.
 
-	if len(seg.Segment.Blocks) == 0 {
+	blocksNum := len(seg.Segment.Blocks)
+	if blocksNum == 0 {
 		helper.Logger.Warn(ctx, "No blocks to upload")
 		return
 	}
 
 	// if the seg leader is not existed, create it.
+	// update max_end_addr for segment_info.
 	waitgroup.Add(1)
 	go func() {
 		defer waitgroup.Done()
@@ -370,6 +372,34 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 			if err != nil {
 				return
 			}
+		}
+
+		// get max end_addr and update max_end_addr.
+		maxEnd := seg.Segment.Blocks[blocksNum-1].SegEndAddr
+		if blocksNum > 1 {
+			for _, block := range seg.Segment.Blocks {
+				if block.SegEndAddr > maxEnd {
+					maxEnd = block.SegEndAddr
+				}
+			}
+		}
+
+		segInfo := &types.UpdateSegBlockInfo{
+			SegmentId0: seg.Segment.SegmentId0,
+			SegmentId1: seg.Segment.SegmentId1,
+			MaxEndAddr: maxEnd,
+		}
+
+		updateReq := &types.UpdateSegBlockInfoReq{
+			ZoneId: seg.ZoneId,
+			Region: seg.Region,
+			BucketName: seg.BucketName,
+			SegBlockInfo: segInfo,
+		}
+
+		err = yigFs.MetaStorage.Client.UpdateSegLatestEndAddr(ctx, updateReq)
+		if err != nil {
+			return
 		}
 	}()
 
@@ -414,11 +444,10 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 		}
 		block.BlockId = blockId
 
-		waitgroup.Wait()
-
 		// 4. deal fully covered uploading blocks.
 		err = dealFullCoveredUploadingBlocks(ctx, blockInfo, block, yigFs)
 		if err != nil {
+			waitgroup.Wait()
 			return err
 		}
 
@@ -426,8 +455,11 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 		// if the block can be merge, merge it; else insert it.
 		err = mergeOrInsertFileBlock(ctx, blockInfo, block, isCanMerge, yigFs)
 		if err != nil {
+			waitgroup.Wait()
 			return err
 		}
+
+		waitgroup.Wait()
 	}
 
 	return

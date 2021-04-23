@@ -18,3 +18,11 @@ func(m *Meta) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmen
 func(m *Meta) UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
 	return m.Client.UpdateSegBlockInfo(ctx, seg)
 }
+
+func(m *Meta) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
+	return m.Client.GetIncompleteUploadSegs(ctx, seg)
+}
+
+func(m *Meta) UpdateSegLatestEndAddr(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
+	return m.Client.UpdateSegLatestEndAddr(ctx, seg)
+}

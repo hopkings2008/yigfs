@@ -74,4 +74,80 @@ func (t *TidbClient) UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSe
 	return
 }
 
+func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
+	segsResp = &types.GetIncompleteUploadSegsResp{}
+	sqltext := "select seg_id0, seg_id1, latest_offset, max_end_addr from segment_info where zone_id=? and region=? and bucket_name=? and leader=? and is_deleted=?"
+	rows, err := t.Client.Query(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Machine, types.NotDeleted)
+	if err == sql.ErrNoRows {
+		err = nil
+		return
+	} else if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, err: %v", err))
+		return
+	}
+	defer rows.Close()
+
+	var segId0, segId1 uint64
+	var latestOffset, maxEndAddr int
+
+	for rows.Next() {
+		err = rows.Scan(
+			&segId0,
+			&segId1,
+			&latestOffset,
+			&maxEndAddr)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query incomplete segs getting by leader, err: %v", err))
+			return
+		}
+
+		if latestOffset < maxEndAddr {
+			segInfo := &types.IncompleteUploadSegInfo{
+				SegmentId0: segId0,
+				SegmentId1: segId1,
+				NextOffset: latestOffset,
+			}
+
+			segsResp.Segments = append(segsResp.Segments, segInfo)
+		}
+	}
+
+	err = rows.Err()
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for incomplete segs getting by leader, err: %v", err))
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.Segments)))
+	return
+}
+
+func (t *TidbClient) UpdateSegLatestEndAddr(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
+	sqltext := "select max_end_addr from segment_info where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	var maxEndAddr int
+	row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
+	err = row.Scan (
+		&maxEndAddr,
+	)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("UpdateSegLatestEndAddr: Failed to get the latest_end_add, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	if seg.SegBlockInfo.MaxEndAddr > maxEndAddr {
+		sqltext = "update segment_info set max_end_addr=? where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+		_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.MaxEndAddr, seg.ZoneId, seg.Region, seg.BucketName, 
+			seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to update seg latest end addr, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update seg latest end addr, latest end addr: %v", seg.SegBlockInfo.MaxEndAddr))
+	}
+
+	helper.Logger.Info(ctx, "Succeed to update seg latest end addr")
+	return
+}
 

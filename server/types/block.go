@@ -32,8 +32,8 @@ type SegmentInfo struct {
 
 type BlockInfo struct {
 	Offset int64 `json:"offset"`
-	SegStartAddr int64 `json:"seg_start_addr"`
-	SegEndAddr int64 `json:"seg_end_addr"`
+	SegStartAddr int `json:"seg_start_addr"`
+	SegEndAddr int `json:"seg_end_addr"`
 	Size int `json:"size"`
 	BlockId int64 `json:"block_id,omitempty"`
 	FileBlockEndAddr int64 `json:"file_block_end_addr,omitempty"`
@@ -83,8 +83,8 @@ type FileBlockInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
 	BlockId int64 `json:"block_id"`
-	SegStartAddr int64 `json:"seg_start_addr"`
-	SegEndAddr int64 `json:"seg_end_addr"`
+	SegStartAddr int `json:"seg_start_addr"`
+	SegEndAddr int `json:"seg_end_addr"`
 	FileBlockEndAddr int64 `json:"file_block_end_addr,omitempty"`
 	Size int `json:"size"`
 	Offset int64 `json:"offset,omitempty"`

@@ -196,8 +196,8 @@ func Test_WriteFile(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		block := &types.BlockInfo {
 			Offset: int64(offset),
-			SegStartAddr: int64(startAddr),
-			SegEndAddr: int64(endAddr),
+			SegStartAddr: startAddr,
+			SegEndAddr: endAddr,
 			Size: Size,
 		}
 
@@ -227,8 +227,8 @@ func Test_WriteFile(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		block := &types.BlockInfo {
 			Offset: int64(offset),
-			SegStartAddr: int64(startAddr),
-			SegEndAddr: int64(endAddr),
+			SegStartAddr: startAddr,
+			SegEndAddr: endAddr,
 			Size: Size,
 		}
 
@@ -427,8 +427,8 @@ func Test_UpdateSegments(t *testing.T) {
 
 		block := &types.BlockInfo {
 			Offset: int64(i * offset) + int64(Size),
-			SegStartAddr: int64(startAddr),
-			SegEndAddr: int64(endAddr),
+			SegStartAddr: startAddr,
+			SegEndAddr: endAddr,
 			Size: Size,
 		}
 
@@ -445,3 +445,18 @@ func Test_UpdateSegments(t *testing.T) {
 	t.Logf("Succeed to upload block, resp: %s", updateSegsInfo)
 }
 
+func Test_HeartBeat(t *testing.T) {
+	r := require.New(t)
+ 	// get incomplete upload segs
+	segReq := &types.GetIncompleteUploadSegsReq {
+		ZoneId: ZoneId,
+		Region: Region,
+		BucketName: BucketName,
+		Machine: Machine,
+	}
+
+	heartBeatResp, heartBeatInfo, err := HeartBeat(segReq)
+	r.Nil(err)
+	r.Equal(heartBeatResp.Result.ErrCode, 0)
+	t.Logf("Succeed to test heart beat, resp: %s", heartBeatInfo)
+}
