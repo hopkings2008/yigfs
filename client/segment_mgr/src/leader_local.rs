@@ -76,7 +76,8 @@ impl Leader for LeaderLocal {
                 file_handle = ret;
             }
             Err(err) => {
-                println!("read: failed to get file_handle for ino: {}, err: {:?}", ino, err);
+                println!("read: failed to get file_handle for ino: {}, offset: {}, size: {}, err: {:?}", 
+                ino, offset, size, err);
                 return Err(err);
             }
         }
@@ -106,8 +107,8 @@ impl Leader for LeaderLocal {
                         }
                         Err(err) => {
                             if err.is_eof() {
-                                println!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, size: {}",
-                                ino, s.seg_id0, s.seg_id1, start, to_read);
+                                println!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, start: {}, size: {}",
+                                ino, s.seg_id0, s.seg_id1, offset, start, to_read);
                                 continue;
                             }
                             println!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
@@ -116,7 +117,8 @@ impl Leader for LeaderLocal {
                         }
                     }
                     if total_read == 0 {
-                        println!("LeadLocal: read: finished for ino: {}, offset: {}, size: {}", ino, offset, size);
+                        println!("LeadLocal: read: finished for ino: {}, offset: {}, start: {}, size: {}", 
+                        ino, offset, start, size);
                         return Ok(data);
                     }
                 }
