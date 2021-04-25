@@ -30,7 +30,6 @@ impl CacheStore for DiskCache {
             return ret;
         }
         let ret = rx.recv();
-        drop(rx);
         match ret {
             Ok(e) => {
                 if !e.is_success() {
