@@ -259,10 +259,14 @@ impl DiskIoWorker {
                 msg.response(resp_msg);
                 return;
             } else if errno.is_eof() {
-                let resp_msg = MsgFileReadData{
+                let mut resp_msg = MsgFileReadData{
                     data: None,
                     err: errno,
                 };
+                if resp_data.len() > 0 {
+                    resp_msg.data = Some(resp_data);
+                    resp_msg.err = Errno::Esucc;
+                }
                 msg.response(resp_msg);
                 return;
             }
