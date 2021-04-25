@@ -193,7 +193,7 @@ impl DiskIoWorker {
                     self.handles.insert(d, FileHandleRef::new(f));
                 }
                 Err(err) => {
-                    println!("do_write: failed to open({}), err: {}", name, err);
+                    println!("do_read: failed to open({}), err: {}", name, err);
                     let mut resp_msg = MsgFileReadData{
                         data: None,
                         err: Errno::Eintr,
@@ -258,7 +258,7 @@ impl DiskIoWorker {
                 };
                 msg.response(resp_msg);
                 return;
-            } else if errno.is_enospc() {
+            } else if errno.is_eof() {
                 let resp_msg = MsgFileReadData{
                     data: None,
                     err: errno,
@@ -271,6 +271,7 @@ impl DiskIoWorker {
                 err: errno,
             };
             msg.response(resp_msg);
+            return;
         } // if
         // file handle not found.
         println!("do_read: cannot find file handle for id0: {}, id1: {}", msg.id0, msg.id1);
