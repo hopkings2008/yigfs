@@ -298,6 +298,7 @@ impl HandleMgr {
     fn add_segment(&mut self, msg: &MsgAddSegment) {
         if let Some(h) = self.handles.get_mut(&msg.ino) {
            h.segments.push(msg.seg.copy());
+           h.mark_dirty();
            return;
         }
     }
@@ -309,6 +310,7 @@ impl HandleMgr {
                     continue;
                 }
                 s.add_block(msg.ino, msg.block.offset, msg.block.seg_start_addr, msg.block.size);
+                h.mark_dirty();
                 return;
             }
         }

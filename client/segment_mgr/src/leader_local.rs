@@ -61,6 +61,7 @@ impl Leader for LeaderLocal {
             ino: ino,
             leader: self.machine.clone(),
             segments: segments,
+            is_dirty: 0,
         };
         self.handle_mgr.add(&file_handle);
 
@@ -222,7 +223,7 @@ impl Leader for LeaderLocal {
             }
         }
         // update the segments into meta server.
-        if !handle.segments.is_empty() {
+        if handle.is_dirty() && !handle.segments.is_empty() {
             let ret = self.segment_mgr.update_segments(ino, &handle.segments);
             if !ret.is_success(){
                 println!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);

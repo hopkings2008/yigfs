@@ -215,6 +215,7 @@ pub struct FileHandle {
     pub ino: u64,
     pub leader: String,
     pub segments: Vec<Segment>,
+    pub is_dirty: u8,
 }
 
 impl FileHandle {
@@ -223,6 +224,7 @@ impl FileHandle {
             ino: self.ino,
             leader: self.leader.clone(),
             segments: Vec::<Segment>::new(),
+            is_dirty: self.is_dirty,
         };
         for s in &self.segments {
             handle.segments.push(s.copy());
@@ -235,7 +237,16 @@ impl FileHandle {
             ino: ino,
             leader: String::from(""),
             segments: Vec::<Segment>::new(),
+            is_dirty: 0,
         }
+    }
+
+    pub fn mark_dirty(&mut self){
+        self.is_dirty = 1;
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.is_dirty == 1
     }
 }
 
