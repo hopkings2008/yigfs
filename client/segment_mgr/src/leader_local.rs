@@ -107,7 +107,7 @@ impl Leader for LeaderLocal {
                             if err.is_eof() {
                                 println!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, size: {}",
                                 ino, s.seg_id0, s.seg_id1, start, to_read);
-                                return Ok(data);
+                                continue;
                             }
                             println!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
                             ino, offset, start, to_read, err);
