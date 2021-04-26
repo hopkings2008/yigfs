@@ -3,11 +3,12 @@
 use crate::yig_io_worker::YigIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::backend_storage::{BackendStore, BackendStoreFactory};
+use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
 use io_engine::types::{MsgFileOp, MsgFileOpenOp};
 use io_engine::io_thread_pool::IoThreadPool;
 use std::collections::HashMap;
 use crossbeam_channel::bounded;
+use crossbeam_channel::Sender;
 
 pub struct YigBackend{
     bucket: String,
@@ -42,14 +43,121 @@ impl BackendStore for YigBackend{
             }
         }
     }
-    fn write(&self, id0: u64, id1: u64, offset: u64, data: &[u8])->Errno{
-        Errno::Enotsupp
+    fn write(&self, id0: u64, id1: u64, offset: u64, data: &[u8])->MsgFileWriteResp{
+        let mut result = MsgFileWriteResp{
+            offset: offset,
+            nwrite: 0,
+            err: Errno::Eintr,
+        };
+        let thr = self.yig_pool.get_thread(id0, id1);
+        let (tx, rx) = bounded::<MsgFileWriteResp>(1);
+        let msg = MsgFileWriteOp{
+            id0: id0,
+            id1: id1,
+            dir: self.bucket.clone(),
+            max_size: 0, // currently, not used.
+            offset: offset,
+            data: data.to_vec(),
+            resp_sender: tx,
+        };
+        let ret = thr.do_io(MsgFileOp::OpWrite(msg));
+        if !ret.is_success(){
+            println!("YigBackend::write: failed to send OpWrite for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            self.bucket, id0, id1, offset, data.len(), ret);
+            result.err = ret;
+            return result;
+        }
+        let ret = rx.recv();
+        match ret {
+            Ok(ret) => {
+                result.nwrite = ret.nwrite;
+                result.err = ret.err;
+            }
+            Err(err) => {
+                println!("YigBackend::write: failed to recv write result for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            self.bucket, id0, id1, offset, data.len(), err);
+                result.err = Errno::Eintr;
+            }
+        }
+        result
     }
-    fn read(&self, id0: u64, id1: u64, offset: u64, size: u32)->Result<Vec<u8>, Errno>{
-        Err(Errno::Enotsupp)
+
+    fn write_async(&self, id0: u64, id1: u64, offset: u64, data: &[u8], resp_sender: Sender<MsgFileWriteResp>)->Errno{
+        let thr = self.yig_pool.get_thread(id0, id1);
+        let msg = MsgFileWriteOp{
+            id0: id0,
+            id1: id1,
+            dir: self.bucket.clone(),
+            max_size: 0, // currently, not used.
+            offset: offset,
+            data: data.to_vec(),
+            resp_sender: resp_sender,
+        };
+        let ret = thr.do_io(MsgFileOp::OpWrite(msg));
+        if !ret.is_success(){
+            println!("YigBackend::write_async: failed to send OpWrite for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            self.bucket, id0, id1, offset, data.len(), ret);
+            return ret;
+        }
+        return Errno::Esucc;
     }
-    fn close(&self, id0: u64, id1: u64) -> Errno{
-        Errno::Enotsupp
+
+    fn read(&self, id0: u64, id1: u64, offset: u64, size: u32)->Result<Option<Vec<u8>>, Errno>{
+        let thr = self.yig_pool.get_thread(id0, id1);
+        let (tx, rx) = bounded::<MsgFileReadData>(1);
+        let msg_read = MsgFileReadOp{
+            id0: id0,
+            id1: id1,
+            dir: self.bucket.clone(),
+            offset: offset,
+            size: size,
+            data_sender: tx,
+        };
+        let ret = thr.do_io(MsgFileOp::OpRead(msg_read));
+        if !ret.is_success(){
+            println!("YigBackend::read: failed to send OpRead for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            self.bucket, id0, id1, offset, size, ret);
+            return Err(ret);
+        }
+        let ret = rx.recv();
+        match ret {
+            Ok(ret) => {
+                if ret.err.is_success() {
+                    return Ok(ret.data);
+                }
+                println!("YigBackend::read: failed to read bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            self.bucket, id0, id1, offset, size, ret);
+                return Err(ret.err);
+            }
+            Err(err) => {
+                println!("YigBackend::read: failed to recv read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {}",
+            self.bucket, id0, id1, offset, size, err);
+                return Err(Errno::Eintr);
+            }
+        }
+    }
+
+    fn read_async(&self, id0: u64, id1: u64, offset: u64, size: u32, resp_sender: Sender<MsgFileReadData>) -> Errno{
+        let thr = self.yig_pool.get_thread(id0, id1);
+        let msg_read = MsgFileReadOp{
+            id0: id0,
+            id1: id1,
+            dir: self.bucket.clone(),
+            offset: offset,
+            size: size,
+            data_sender: resp_sender,
+        };
+        let ret = thr.do_io(MsgFileOp::OpRead(msg_read));
+        if !ret.is_success(){
+            println!("YigBackend::read_async: failed to send OpRead for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            self.bucket, id0, id1, offset, size, ret);
+            return ret;
+        }
+        return Errno::Esucc;
+    }
+    
+    fn close(&self, _id0: u64, _id1: u64) -> Errno{
+        Errno::Esucc
     }
 }
 

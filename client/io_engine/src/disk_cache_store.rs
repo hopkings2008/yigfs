@@ -83,6 +83,27 @@ impl CacheStore for DiskCache {
             }
         }
     }
+
+    fn write_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8], write_resp: Sender<MsgFileWriteResp>) -> Errno{
+        let worker = self.disk_pool.get_thread(id0, id1);
+        let msg = MsgFileWriteOp{
+            id0: id0,
+            id1: id1,
+            max_size: capacity,
+            dir: dir.clone(),
+            offset: offset, // the file offset is not used currently.
+            data: data.to_vec(),
+            resp_sender: write_resp,
+        };
+        let ret = worker.do_io(MsgFileOp::OpWrite(msg));
+        if !ret.is_success() {
+            println!("write: failed to send_disk_io for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}",
+            id0, id1, dir, offset, ret);
+            return ret;
+        }
+        return Errno::Esucc;
+    }
+
     fn read(&self, id0: u64, id1: u64, dir: &String, offset: u64, size: u32)->Result<Option<Vec<u8>>, Errno>{
         let worker = self.disk_pool.get_thread(id0, id1);
         let (tx, rx) = bounded::<MsgFileReadData>(1);

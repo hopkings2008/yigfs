@@ -1,6 +1,6 @@
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteResp};
+use io_engine::types::{MsgFileOp, MsgFileReadData, MsgFileWriteResp};
 use io_engine::io_worker::{IoWorker, IoWorkerFactory};
 use s3::s3_client::S3Client;
 use crossbeam_channel::{Receiver, select};
@@ -93,7 +93,30 @@ impl YigIoWorker{
                     }
                 }
             }
-            MsgFileOp::OpRead(msg_read) => {}
+
+            MsgFileOp::OpRead(msg_read) => {
+                let obj = self.id_to_object_name(msg_read.id0, msg_read.id1);
+                let mut resp = MsgFileReadData{
+                    data: None,
+                    err: Errno::Eintr,
+                };
+                let ret = self.read(&msg_read.dir,
+                    &obj,
+                    msg_read.offset,
+                    msg_read.size);
+                match ret {
+                    Ok(ret) =>{
+                        resp.data = Some(ret);
+                    }
+                    Err(err) => {
+                        println!("YigIoWorker: OpRead: failed to read: {}/{}, offset: {}, size: {}, err: {:?}",
+                    msg_read.dir, obj, msg_read.offset, msg_read.size, err);
+                        resp.err = err;
+                    }
+                }
+                msg_read.response(resp);
+            }
+
             MsgFileOp::OpWrite(msg_write) => {
                 let obj = self.id_to_object_name(msg_write.id0, msg_write.id1);
                 let mut resp = MsgFileWriteResp{
@@ -157,6 +180,22 @@ impl YigIoWorker{
             Err(err) => {
                 println!("failed to append({}/{}, offset: {}, size: {}, err: {:?}",
                 bucket, object, offset, data.len(), err);
+                return Err(err);
+            }
+        }
+    }
+
+    fn read(&self, bucket: &String, object: &String, offset: u64, size: u32) -> Result<Vec<u8>, Errno> {
+        let ret = self.exec.get_runtime().block_on(
+            self.s3_client.get_object(&bucket, &object, &offset, &size)
+        );
+        match ret {
+            Ok(ret) => {
+                return Ok(ret);
+            }
+            Err(err) => {
+                println!("failed to get({}/{}, offset: {}, size: {}, err: {:?}",
+                bucket, object, offset, size, err);
                 return Err(err);
             }
         }

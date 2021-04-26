@@ -1,9 +1,6 @@
 use std::rc::Rc;
-use crossbeam_channel::bounded;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::types::{MsgFileOpenOp, MsgFileReadOp, MsgFileOp, MsgFileWriteOp, 
-    MsgFileWriteResp, MsgFileCloseOp, MsgFileReadData};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
 use crate::leader::Leader;
