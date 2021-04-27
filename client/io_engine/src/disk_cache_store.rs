@@ -1,5 +1,5 @@
 
-use crate::io_thread_pool::IoThreadPool;
+use crate::{io_thread_pool::IoThreadPool, types::MsgFileOpenResp};
 use crate::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteOp, 
     MsgFileWriteResp, MsgFileReadOp, MsgFileReadData, MsgFileCloseOp};
 use crate::cache_store::{CacheStore, CacheStoreFactory, CacheStoreConfig, CacheWriteResult};
@@ -17,7 +17,7 @@ impl CacheStore for DiskCache {
     // return: file size
     fn open(&self, id0: u64, id1: u64, dir: &String) -> Errno{
         let worker = self.disk_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<Errno>(1);
+        let (tx, rx) = bounded::<MsgFileOpenResp>(1);
         let msg = MsgFileOpenOp{
             id0: id0,
             id1: id1,
@@ -33,9 +33,9 @@ impl CacheStore for DiskCache {
         let ret = rx.recv();
         match ret {
             Ok(e) => {
-                if !e.is_success() {
-                    println!("open(id0: {}, id1: {}, dir: {}) failed with errno: {:?}", id0, id1, dir, e);
-                    return e;
+                if !e.err.is_success() {
+                    println!("open(id0: {}, id1: {}, dir: {}) failed with errno: {:?}", id0, id1, dir, e.err);
+                    return e.err;
                 }
                 return Errno::Esucc;
             }
@@ -46,6 +46,24 @@ impl CacheStore for DiskCache {
             }
         }
     }
+
+    fn open_async(&self, id0: u64, id1: u64, dir: &String, open_resp: Sender<MsgFileOpenResp>) -> Errno{
+        let worker = self.disk_pool.get_thread(id0, id1);
+        let msg = MsgFileOpenOp{
+            id0: id0,
+            id1: id1,
+            dir: dir.clone(),
+            resp_sender: open_resp,
+        };
+        let ret = worker.do_io(MsgFileOp::OpOpen(msg));
+        if !ret.is_success() {
+            println!("open(id0: {}, id1: {}, dir: {}): failed to send open msg, err: {:?}",
+            id0, id1, dir, ret);
+            return ret;
+        }
+        return Errno::Esucc;
+    }
+
     // capacity: the max size of one cache file.
     // add capacity in this api to avoid maintain it in cache implementation.
     fn write(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8])->Result<CacheWriteResult, Errno>{

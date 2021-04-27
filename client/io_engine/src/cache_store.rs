@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::types::{MsgFileReadData, MsgFileWriteResp};
+use crate::types::{MsgFileOpenResp, MsgFileReadData, MsgFileWriteResp};
 use common::{error::Errno, runtime::Executor};
 use crossbeam_channel::Sender;
 
@@ -15,6 +15,7 @@ pub struct CacheWriteResult {
 pub trait CacheStore{
     // return: file size
     fn open(&self, id0: u64, id1: u64, dir: &String) -> Errno;
+    fn open_async(&self, id0: u64, id1: u64, dir: &String, open_resp: Sender<MsgFileOpenResp>) -> Errno;
     // capacity: the max size of one cache file.
     // add capacity in this api to avoid maintain it in cache implementation.
     fn write(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8])->Result<CacheWriteResult, Errno>;

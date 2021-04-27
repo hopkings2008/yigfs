@@ -3,7 +3,7 @@
 use crate::yig_io_worker::YigIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
+use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileOpenResp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
 use io_engine::types::{MsgFileOp, MsgFileOpenOp};
 use io_engine::io_thread_pool::IoThreadPool;
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ pub struct YigBackend{
 impl BackendStore for YigBackend{
     fn open(&self, id0: u64, id1: u64) -> Errno {
         let thr = self.yig_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<Errno>(1);
+        let (tx, rx) = bounded::<MsgFileOpenResp>(1);
         let msg = MsgFileOpenOp{
             id0: id0,
             id1: id1,
@@ -35,7 +35,11 @@ impl BackendStore for YigBackend{
         let ret = rx.recv();
         match ret {
             Ok(ret) => {
-                return ret;
+                if !ret.err.is_success(){
+                    println!("YigBackend::open: failed to open id0: {}, id1: {}, err: {:?}",
+                    id0, id1, ret.err);
+                }
+                return ret.err;
             }
             Err(err) => {
                 println!("YigBackend::open: failed to got result for open id0: {}, id1: {}, err: {}",

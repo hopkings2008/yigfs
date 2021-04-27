@@ -1,6 +1,6 @@
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::types::{MsgFileOp, MsgFileReadData, MsgFileWriteResp};
+use io_engine::types::{MsgFileOp, MsgFileOpenResp, MsgFileReadData, MsgFileWriteResp};
 use io_engine::io_worker::{IoWorker, IoWorkerFactory};
 use s3::s3_client::S3Client;
 use crossbeam_channel::{Receiver, select};
@@ -84,7 +84,11 @@ impl YigIoWorker{
                         result = err;
                     }
                 }
-                let ret = msg_open.resp_sender.send(result);
+                let ret = msg_open.resp_sender.send(MsgFileOpenResp{
+                    id0: msg_open.id0,
+                    id1: msg_open.id1,
+                    err: result,
+                });
                 match ret {
                     Ok(_) => {
                     }

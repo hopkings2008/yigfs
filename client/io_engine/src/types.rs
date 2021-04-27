@@ -8,12 +8,16 @@ pub struct MsgFileOpenOp {
     pub id0: u64,
     pub id1: u64,
     pub dir: String,
-    pub resp_sender: Sender<Errno>,
+    pub resp_sender: Sender<MsgFileOpenResp>,
 }
 
 impl MsgFileOpenOp{
     pub fn response(&self, err: Errno){
-        let ret = self.resp_sender.send(err);
+        let ret = self.resp_sender.send(MsgFileOpenResp{
+            id0: self.id0,
+            id1: self.id1,
+            err: err,
+        });
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -22,6 +26,13 @@ impl MsgFileOpenOp{
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct MsgFileOpenResp{
+    pub id0: u64,
+    pub id1: u64,
+    pub err: Errno,
 }
 
 #[derive(Debug)]
