@@ -1,6 +1,7 @@
 mod options;
 
 use std::rc::Rc;
+use std::sync::Arc;
 use filesystem_mgr::{FilesystemMgr, MountOptions};
 use common::parse_config;
 use common::runtime::Executor;
@@ -40,7 +41,7 @@ fn main() {
     // register yig backend.
     let yig_backend_factory = YigBackendFactory::new(&single_thread_exec);
     backend_store_mgr.register(1, yig_backend_factory);
-    let backend_store: Box<dyn BackendStore>;
+    let backend_store: Arc<dyn BackendStore>;
     let ret = 
     backend_store_mgr.get_backend_store(cfg.backend_store_config.backend_type, &cfg.backend_store_config.settings);
     match ret {
@@ -57,7 +58,7 @@ fn main() {
         thread_num: cfg.disk_cache_config.thread_num,
     };
     let cache_store_factory = DiskCacheStoreFactory::new();
-    let cache_store: Box<dyn CacheStore>;
+    let cache_store: Arc<dyn CacheStore>;
     let ret = cache_store_factory.new_cache_store(
         &cache_store_config, &single_thread_exec);
     match ret {

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::types::{MsgFileReadData, MsgFileWriteResp};
 use common::{error::Errno, runtime::Executor};
 use crossbeam_channel::Sender;
@@ -31,5 +33,5 @@ pub struct CacheStoreConfig{
 
 pub trait CacheStoreFactory {
     // cfg is the configuration settings.
-    fn new_cache_store(&self, cfg: &CacheStoreConfig, exec: &Executor) -> Result<Box<dyn CacheStore>, Errno>;
+    fn new_cache_store(&self, cfg: &CacheStoreConfig, exec: &Executor) -> Result<Arc<dyn CacheStore>, Errno>;
 }

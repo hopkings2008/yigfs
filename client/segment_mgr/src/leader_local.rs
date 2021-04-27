@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::rc::Rc;
 use common::runtime::Executor;
 use common::error::Errno;
@@ -10,8 +11,8 @@ use crate::segment_mgr::SegmentMgr;
 
 pub struct LeaderLocal {
     machine: String,
-    cache_store: Box<dyn CacheStore>,
-    backend_store: Box<dyn BackendStore>,
+    cache_store: Arc<dyn CacheStore>,
+    backend_store: Arc<dyn BackendStore>,
     exec: Executor,
     segment_mgr: Rc<SegmentMgr>,
     handle_mgr: FileHandleMgr,
@@ -254,7 +255,7 @@ impl Leader for LeaderLocal {
 }
 
 impl LeaderLocal {
-    pub fn new(machine: &String, exec: &Executor, mgr: Rc<SegmentMgr>, cache: Box<dyn CacheStore>, backend: Box<dyn BackendStore>) -> Self {
+    pub fn new(machine: &String, exec: &Executor, mgr: Rc<SegmentMgr>, cache: Arc<dyn CacheStore>, backend: Arc<dyn BackendStore>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
             cache_store: cache,

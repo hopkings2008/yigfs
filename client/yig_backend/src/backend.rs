@@ -9,6 +9,7 @@ use io_engine::io_thread_pool::IoThreadPool;
 use std::collections::HashMap;
 use crossbeam_channel::bounded;
 use crossbeam_channel::Sender;
+use std::sync::Arc;
 
 pub struct YigBackend{
     bucket: String,
@@ -178,7 +179,7 @@ pub struct YigBackendFactory{
 }
 
 impl BackendStoreFactory for YigBackendFactory{
-    fn new_backend_store(&self, cfg: &HashMap<String, String>) -> Result<Box<dyn BackendStore>, Errno>{
+    fn new_backend_store(&self, cfg: &HashMap<String, String>) -> Result<Arc<dyn BackendStore>, Errno>{
         let region: String;
         let endpoint: String;
         let ak: String;
@@ -228,7 +229,7 @@ impl BackendStoreFactory for YigBackendFactory{
             return Err(Errno::Eintr);
         }
 
-        Ok(Box::new(YigBackend::new(&region, &endpoint, &ak, &sk, &bucket, thread_num, &self.exec)))
+        Ok(Arc::new(YigBackend::new(&region, &endpoint, &ak, &sk, &bucket, thread_num, &self.exec)))
     }
 }
 

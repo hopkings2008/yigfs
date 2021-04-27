@@ -7,6 +7,7 @@ use crate::disk_io_worker::DiskIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
 use crossbeam_channel::{bounded, Sender};
+use std::sync::Arc;
 
 pub struct DiskCache {
     disk_pool: IoThreadPool,
@@ -199,8 +200,8 @@ pub struct DiskCacheStoreFactory{
 }
 
 impl CacheStoreFactory for DiskCacheStoreFactory{
-    fn new_cache_store(&self, cfg: &CacheStoreConfig, exec: &Executor) -> Result<Box<dyn CacheStore>, Errno>{
-        Ok(Box::new(DiskCache::new(cfg.thread_num, exec)))
+    fn new_cache_store(&self, cfg: &CacheStoreConfig, exec: &Executor) -> Result<Arc<dyn CacheStore>, Errno>{
+        Ok(Arc::new(DiskCache::new(cfg.thread_num, exec)))
     }
 }
 

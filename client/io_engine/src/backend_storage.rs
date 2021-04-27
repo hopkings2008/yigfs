@@ -2,6 +2,7 @@
 use common::error::Errno;
 use crossbeam_channel::Sender;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::types::{MsgFileReadData, MsgFileWriteResp};
 
@@ -22,5 +23,5 @@ pub trait BackendStore{
 
 pub trait BackendStoreFactory {
     // cfg is the configuration settings.
-    fn new_backend_store(&self, cfg: &HashMap<String, String>) -> Result<Box<dyn BackendStore>, Errno>;
+    fn new_backend_store(&self, cfg: &HashMap<String, String>) -> Result<Arc<dyn BackendStore>, Errno>;
 }
