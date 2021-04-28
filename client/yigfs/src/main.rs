@@ -33,7 +33,7 @@ fn main() {
 
     let exec = Executor::create();
     let single_thread_exec = Executor::create_single_threaded();
-    let meta_service = new_metaserver_mgr(&cfg, &exec).unwrap();
+    let meta_service = new_metaserver_mgr(&cfg, &single_thread_exec).unwrap();
     let segment_mgr = Rc::new(SegmentMgr::create(&cfg, meta_service.clone()));
     // create backend store.
     // [TODO] we should create backend store as plugin. but currently, only hardcoded.
