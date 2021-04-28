@@ -10,7 +10,7 @@ use common::runtime::Executor;
 use crossbeam_channel::{Receiver, select};
 
 use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, 
-    MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
+    MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp, MsgFileOpResp};
 use crate::file_handle_ref::FileHandleRef;
 
 struct DiskIoWorker {

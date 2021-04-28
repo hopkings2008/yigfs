@@ -8,16 +8,16 @@ pub struct MsgFileOpenOp {
     pub id0: u64,
     pub id1: u64,
     pub dir: String,
-    pub resp_sender: Sender<MsgFileOpenResp>,
+    pub resp_sender: Sender<MsgFileOpResp>,
 }
 
 impl MsgFileOpenOp{
     pub fn response(&self, err: Errno){
-        let ret = self.resp_sender.send(MsgFileOpenResp{
+        let ret = self.resp_sender.send(MsgFileOpResp::OpRespOpen(MsgFileOpenResp{
             id0: self.id0,
             id1: self.id1,
             err: err,
-        });
+        }));
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -67,12 +67,12 @@ pub struct MsgFileWriteOp {
     // file offset, not the offset in the segment.
     pub offset: u64,
     pub data: Vec<u8>,
-    pub resp_sender: Sender<MsgFileWriteResp>,
+    pub resp_sender: Sender<MsgFileOpResp>,
 }
 
 impl MsgFileWriteOp {
     pub fn response(&self, msg: MsgFileWriteResp){
-        let ret = self.resp_sender.send(msg);
+        let ret = self.resp_sender.send(MsgFileOpResp::OpRespWrite(msg));
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -96,12 +96,12 @@ pub struct MsgFileReadOp {
     pub dir: String,
     pub offset: u64,
     pub size: u32,
-    pub data_sender: Sender<MsgFileReadData>,
+    pub data_sender: Sender<MsgFileOpResp>,
 }
 
 impl MsgFileReadOp {
     pub fn response(&self, msg: MsgFileReadData) {
-        let ret = self.data_sender.send(msg);
+        let ret = self.data_sender.send(MsgFileOpResp::OpRespRead(msg));
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -119,4 +119,11 @@ pub enum MsgFileOp {
     OpRead(MsgFileReadOp),
     OpClose(MsgFileCloseOp),
     //OpDel(MsgFileDelOp),
+}
+
+#[derive(Debug)]
+pub enum MsgFileOpResp{
+    OpRespOpen(MsgFileOpenResp),
+    OpRespRead(MsgFileReadData),
+    OpRespWrite(MsgFileWriteResp),
 }

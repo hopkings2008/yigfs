@@ -3,7 +3,7 @@
 use crate::yig_io_worker::YigIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileOpenResp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
+use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileOpResp, MsgFileOpenResp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
 use io_engine::types::{MsgFileOp, MsgFileOpenOp};
 use io_engine::io_thread_pool::IoThreadPool;
 use std::collections::HashMap;
@@ -19,7 +19,7 @@ pub struct YigBackend{
 impl BackendStore for YigBackend{
     fn open(&self, id0: u64, id1: u64) -> Errno {
         let thr = self.yig_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<MsgFileOpenResp>(1);
+        let (tx, rx) = bounded::<MsgFileOpResp>(1);
         let msg = MsgFileOpenOp{
             id0: id0,
             id1: id1,
@@ -35,11 +35,20 @@ impl BackendStore for YigBackend{
         let ret = rx.recv();
         match ret {
             Ok(ret) => {
-                if !ret.err.is_success(){
-                    println!("YigBackend::open: failed to open id0: {}, id1: {}, err: {:?}",
-                    id0, id1, ret.err);
+                match ret {
+                    MsgFileOpResp::OpRespOpen(ret) => {
+                        if !ret.err.is_success(){
+                            println!("YigBackend::open: failed to open id0: {}, id1: {}, err: {:?}",
+                            id0, id1, ret.err);
+                        }
+                        return ret.err;
+                    }
+                    _ => {
+                        println!("YigBackend::open: got invalid open resp for id0: {}, id1: {}",
+                        id0, id1);
+                        return Errno::Eintr;
+                    }
                 }
-                return ret.err;
             }
             Err(err) => {
                 println!("YigBackend::open: failed to got result for open id0: {}, id1: {}, err: {}",
@@ -55,7 +64,7 @@ impl BackendStore for YigBackend{
             err: Errno::Eintr,
         };
         let thr = self.yig_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<MsgFileWriteResp>(1);
+        let (tx, rx) = bounded::<MsgFileOpResp>(1);
         let msg = MsgFileWriteOp{
             id0: id0,
             id1: id1,
@@ -75,8 +84,18 @@ impl BackendStore for YigBackend{
         let ret = rx.recv();
         match ret {
             Ok(ret) => {
-                result.nwrite = ret.nwrite;
-                result.err = ret.err;
+                match ret {
+                    MsgFileOpResp::OpRespWrite(ret) => {
+                        result.nwrite = ret.nwrite;
+                        result.err = ret.err;
+                    }
+                    _ => {
+                        println!("YigBackend::write: got invalid write resp for {}/id0: {}, id1: {}, offset: {}, size: {}",
+                        self.bucket, id0, id1, offset, data.len());
+                        result.err = Errno::Eintr;
+                        return result;
+                    }
+                }
             }
             Err(err) => {
                 println!("YigBackend::write: failed to recv write result for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
@@ -87,7 +106,7 @@ impl BackendStore for YigBackend{
         result
     }
 
-    fn write_async(&self, id0: u64, id1: u64, offset: u64, data: &[u8], resp_sender: Sender<MsgFileWriteResp>)->Errno{
+    fn write_async(&self, id0: u64, id1: u64, offset: u64, data: &[u8], resp_sender: Sender<MsgFileOpResp>)->Errno{
         let thr = self.yig_pool.get_thread(id0, id1);
         let msg = MsgFileWriteOp{
             id0: id0,
@@ -109,7 +128,7 @@ impl BackendStore for YigBackend{
 
     fn read(&self, id0: u64, id1: u64, offset: u64, size: u32)->Result<Option<Vec<u8>>, Errno>{
         let thr = self.yig_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<MsgFileReadData>(1);
+        let (tx, rx) = bounded::<MsgFileOpResp>(1);
         let msg_read = MsgFileReadOp{
             id0: id0,
             id1: id1,
@@ -127,12 +146,21 @@ impl BackendStore for YigBackend{
         let ret = rx.recv();
         match ret {
             Ok(ret) => {
-                if ret.err.is_success() {
-                    return Ok(ret.data);
+                match ret {
+                    MsgFileOpResp::OpRespRead(ret) => {
+                        if ret.err.is_success() {
+                            return Ok(ret.data);
+                        }
+                        println!("YigBackend::read: failed to read bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+                    self.bucket, id0, id1, offset, size, ret);
+                        return Err(ret.err);
+                    }
+                    _ => {
+                        println!("YigBackend::read: got invalid read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}",
+                        self.bucket, id0, id1, offset, size);
+                        return Err(Errno::Eintr);
+                    }
                 }
-                println!("YigBackend::read: failed to read bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
-            self.bucket, id0, id1, offset, size, ret);
-                return Err(ret.err);
             }
             Err(err) => {
                 println!("YigBackend::read: failed to recv read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {}",
@@ -142,7 +170,7 @@ impl BackendStore for YigBackend{
         }
     }
 
-    fn read_async(&self, id0: u64, id1: u64, offset: u64, size: u32, resp_sender: Sender<MsgFileReadData>) -> Errno{
+    fn read_async(&self, id0: u64, id1: u64, offset: u64, size: u32, resp_sender: Sender<MsgFileOpResp>) -> Errno{
         let thr = self.yig_pool.get_thread(id0, id1);
         let msg_read = MsgFileReadOp{
             id0: id0,

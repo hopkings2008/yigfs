@@ -1,7 +1,6 @@
 
-use crate::{io_thread_pool::IoThreadPool, types::MsgFileOpenResp};
-use crate::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteOp, 
-    MsgFileWriteResp, MsgFileReadOp, MsgFileReadData, MsgFileCloseOp};
+use crate::io_thread_pool::IoThreadPool;
+use crate::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteOp, MsgFileReadOp, MsgFileCloseOp, MsgFileOpResp};
 use crate::cache_store::{CacheStore, CacheStoreFactory, CacheStoreConfig, CacheWriteResult};
 use crate::disk_io_worker::DiskIoWorkerFactory;
 use common::runtime::Executor;
@@ -17,7 +16,7 @@ impl CacheStore for DiskCache {
     // return: file size
     fn open(&self, id0: u64, id1: u64, dir: &String) -> Errno{
         let worker = self.disk_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<MsgFileOpenResp>(1);
+        let (tx, rx) = bounded::<MsgFileOpResp>(1);
         let msg = MsgFileOpenOp{
             id0: id0,
             id1: id1,
@@ -32,12 +31,21 @@ impl CacheStore for DiskCache {
         }
         let ret = rx.recv();
         match ret {
-            Ok(e) => {
-                if !e.err.is_success() {
-                    println!("open(id0: {}, id1: {}, dir: {}) failed with errno: {:?}", id0, id1, dir, e.err);
-                    return e.err;
+            Ok(ret) => {
+                match ret {
+                    MsgFileOpResp::OpRespOpen(e) => {
+                        if !e.err.is_success() {
+                            println!("open(id0: {}, id1: {}, dir: {}) failed with errno: {:?}", id0, id1, dir, e.err);
+                            return e.err;
+                        }
+                        return Errno::Esucc;
+                    }
+                    _ => {
+                        println!("open(id0: {}, id1: {}, dir: {}), got invalid resp", id0, id1, dir);
+                        return Errno::Eintr;
+                    }
                 }
-                return Errno::Esucc;
+                
             }
             Err(err) => {
                 println!("open: failed to get response for (id0: {}, id1: {}, dir: {}), err: {}", 
@@ -47,7 +55,7 @@ impl CacheStore for DiskCache {
         }
     }
 
-    fn open_async(&self, id0: u64, id1: u64, dir: &String, open_resp: Sender<MsgFileOpenResp>) -> Errno{
+    fn open_async(&self, id0: u64, id1: u64, dir: &String, open_resp: Sender<MsgFileOpResp>) -> Errno{
         let worker = self.disk_pool.get_thread(id0, id1);
         let msg = MsgFileOpenOp{
             id0: id0,
@@ -68,7 +76,7 @@ impl CacheStore for DiskCache {
     // add capacity in this api to avoid maintain it in cache implementation.
     fn write(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8])->Result<CacheWriteResult, Errno>{
         let worker = self.disk_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<MsgFileWriteResp>(1);
+        let (tx, rx) = bounded::<MsgFileOpResp>(1);
         let msg = MsgFileWriteOp{
             id0: id0,
             id1: id1,
@@ -87,13 +95,23 @@ impl CacheStore for DiskCache {
         let ret = rx.recv();
         match ret{
             Ok(ret) => {
-                if ret.err.is_success() {
-                    return Ok(CacheWriteResult{
-                        offset: ret.offset,
-                        nwrite: ret.nwrite,
-                    });
+                match ret {
+                    MsgFileOpResp::OpRespWrite(ret) => {
+                        if ret.err.is_success() {
+                            return Ok(CacheWriteResult{
+                                offset: ret.offset,
+                                nwrite: ret.nwrite,
+                            });
+                        }
+                        return Err(ret.err);
+                    }
+                    _ => {
+                        println!("write: failed to get resp for seg(id0: {}, id1: {}, dir: {})",
+                        id0, id1, dir);
+                        return Err(Errno::Eintr);
+                    }
                 }
-                return Err(ret.err);
+                
             }
             Err(err) => {
                 println!("disk_cache_store: write: failed to recv write result for seg(id0: {}, id1: {}, dir: {}), err: {}",
@@ -103,7 +121,7 @@ impl CacheStore for DiskCache {
         }
     }
 
-    fn write_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8], write_resp: Sender<MsgFileWriteResp>) -> Errno{
+    fn write_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, capacity: u64, data: &[u8], write_resp: Sender<MsgFileOpResp>) -> Errno{
         let worker = self.disk_pool.get_thread(id0, id1);
         let msg = MsgFileWriteOp{
             id0: id0,
@@ -125,7 +143,7 @@ impl CacheStore for DiskCache {
 
     fn read(&self, id0: u64, id1: u64, dir: &String, offset: u64, size: u32)->Result<Option<Vec<u8>>, Errno>{
         let worker = self.disk_pool.get_thread(id0, id1);
-        let (tx, rx) = bounded::<MsgFileReadData>(1);
+        let (tx, rx) = bounded::<MsgFileOpResp>(1);
         let msg = MsgFileReadOp{
             id0: id0,
             id1: id1,
@@ -144,16 +162,25 @@ impl CacheStore for DiskCache {
         let ret = rx.recv();
         match ret {
             Ok(ret) => {
-                if ret.err.is_success() {
-                    return Ok(ret.data);
-                } else if ret.err.is_eof() {
-                    println!("disk_cache_store: read: read eof for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
-            id0, id1, dir, offset, ret.err);
-                    return Err(Errno::Eeof);
-                } else {
-                    println!("disk_cache_store: read: failed to read data for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
-            id0, id1, dir, offset, ret.err);
-                    return Err(ret.err);
+                match ret {
+                    MsgFileOpResp::OpRespRead(ret) => {
+                        if ret.err.is_success() {
+                            return Ok(ret.data);
+                        } else if ret.err.is_eof() {
+                            println!("disk_cache_store: read: read eof for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+                    id0, id1, dir, offset, ret.err);
+                            return Err(Errno::Eeof);
+                        } else {
+                            println!("disk_cache_store: read: failed to read data for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+                    id0, id1, dir, offset, ret.err);
+                            return Err(ret.err);
+                        }
+                    }
+                    _ => {
+                        println!("disk_cache_store: read: failed to get invalid resp for seg(id0: {}, id1: {}, dir: {}",
+                    id0, id1, dir);
+                        return Err(Errno::Eintr);
+                    }
                 }
             }
             Err(err) => {
@@ -166,7 +193,7 @@ impl CacheStore for DiskCache {
     // for backup to backend store.
     // read_resp is used for the cache thread to send read response throught it,
     // and can be used to implement the pipeline pattern.
-    fn read_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, size: u32, read_resp: Sender<MsgFileReadData>) -> Errno{
+    fn read_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, size: u32, read_resp: Sender<MsgFileOpResp>) -> Errno{
         let worker = self.disk_pool.get_thread(id0, id1);
         let msg = MsgFileReadOp{
             id0: id0,

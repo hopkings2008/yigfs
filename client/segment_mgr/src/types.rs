@@ -299,3 +299,24 @@ pub enum MsgFileHandleOp{
     GetLastSegment(MsgGetLastSegment),
     AddSegment(MsgAddSegment),
 }
+
+#[derive(Debug)]
+pub struct SegUpload{
+    pub id0: u64,
+    pub id1: u64,
+    pub dir: String,
+    pub offset: u64, // from where to upload.
+}
+
+#[derive(Debug)]
+pub struct SegDownload{
+    pub id0: u64,
+    pub id1: u64,
+    pub dir: String,
+    pub offset: u64, // from where to download.
+}
+#[derive(Debug)]
+pub enum SegSyncOp{
+    OpUpload(SegUpload),
+    OpDownload(SegDownload),
+}
