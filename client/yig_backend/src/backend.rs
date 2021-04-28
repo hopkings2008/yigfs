@@ -59,6 +59,8 @@ impl BackendStore for YigBackend{
     }
     fn write(&self, id0: u64, id1: u64, offset: u64, data: &[u8])->MsgFileWriteResp{
         let mut result = MsgFileWriteResp{
+            id0: id0,
+            id1: id1,
             offset: offset,
             nwrite: 0,
             err: Errno::Eintr,

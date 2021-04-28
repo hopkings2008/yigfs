@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::cmp::{Eq, PartialEq};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum SegState{
     Unknown = 0,
     CacheOpen,
@@ -64,7 +64,7 @@ impl SegStateMachine{
         self.state_machine.insert(SegState::CacheOpen, SegState::CacheRead);
         self.state_machine.insert(SegState::CacheRead, SegState::BackendWrite);
         self.state_machine.insert(SegState::BackendWrite, SegState::MetaUpload);
-        self.state_machine.insert(SegState::CacheReadEof, SegState::CacheClose);
+        self.state_machine.insert(SegState::MetaUpload, SegState::CacheRead);
     }
     
     pub fn prepare_for_download(&mut self){
@@ -88,6 +88,15 @@ impl SegStateMachine{
     pub fn get_dir(&self) -> &String{
         &self.dir
     }
+
+    pub fn get_current_state(&self) -> SegState {
+        self.current_state
+    }
+
+    pub fn is_state_match(&self, other: &SegState) -> bool {
+        self.current_state == *other
+    }
+
     pub fn get_next_state(&self) -> SegState {
         if let Some(s) = self.state_machine.get(&self.current_state){
             return *s;

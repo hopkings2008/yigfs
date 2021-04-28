@@ -101,6 +101,8 @@ impl YigIoWorker{
             MsgFileOp::OpRead(msg_read) => {
                 let obj = self.id_to_object_name(msg_read.id0, msg_read.id1);
                 let mut resp = MsgFileReadData{
+                    id0: msg_read.id0,
+                    id1: msg_read.id1,
                     data: None,
                     err: Errno::Eintr,
                 };
@@ -124,6 +126,8 @@ impl YigIoWorker{
             MsgFileOp::OpWrite(msg_write) => {
                 let obj = self.id_to_object_name(msg_write.id0, msg_write.id1);
                 let mut resp = MsgFileWriteResp{
+                    id0: msg_write.id0,
+                    id1: msg_write.id1,
                     offset: 0,
                     nwrite: 0,
                     err: Errno::Esucc,

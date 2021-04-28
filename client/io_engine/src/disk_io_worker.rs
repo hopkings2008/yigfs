@@ -10,7 +10,7 @@ use common::runtime::Executor;
 use crossbeam_channel::{Receiver, select};
 
 use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, 
-    MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp, MsgFileOpResp};
+    MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::file_handle_ref::FileHandleRef;
 
 struct DiskIoWorker {
@@ -107,6 +107,8 @@ impl DiskIoWorker {
     fn do_write(&mut self, msg: &MsgFileWriteOp) {
         let d = NumberOp::to_u128(msg.id0, msg.id1);
         let mut resp_msg = MsgFileWriteResp{
+            id0: msg.id0,
+            id1: msg.id1,
             offset: 0,
             nwrite: 0,
             err: Errno::Enotf,
@@ -195,6 +197,8 @@ impl DiskIoWorker {
                 Err(err) => {
                     println!("do_read: failed to open({}), err: {}", name, err);
                     let mut resp_msg = MsgFileReadData{
+                        id0: msg.id0,
+                        id1: msg.id1,
                         data: None,
                         err: Errno::Eintr,
                     };
@@ -213,6 +217,8 @@ impl DiskIoWorker {
                 Err(err) => {
                     println!("do_read: fail to seek to {} for {:?}, err: {}", msg.offset, msg, err);
                     let resp_msg = MsgFileReadData{
+                        id0: msg.id0,
+                        id1: msg.id1,
                         data: None,
                         err: Errno::Eintr,
                     };
@@ -253,6 +259,8 @@ impl DiskIoWorker {
             } // loop
             if errno.is_success() {
                 let resp_msg = MsgFileReadData{
+                    id0: msg.id0,
+                    id1: msg.id1,
                     data: Some(resp_data),
                     err: errno,
                 };
@@ -260,6 +268,8 @@ impl DiskIoWorker {
                 return;
             } else if errno.is_eof() {
                 let mut resp_msg = MsgFileReadData{
+                    id0: msg.id0,
+                    id1: msg.id1,
                     data: None,
                     err: errno,
                 };
@@ -271,6 +281,8 @@ impl DiskIoWorker {
                 return;
             }
             let resp_msg = MsgFileReadData{
+                id0: msg.id0,
+                id1: msg.id1,
                 data: None,
                 err: errno,
             };
@@ -280,6 +292,8 @@ impl DiskIoWorker {
         // file handle not found.
         println!("do_read: cannot find file handle for id0: {}, id1: {}", msg.id0, msg.id1);
         let resp_msg = MsgFileReadData{
+            id0: msg.id0,
+            id1: msg.id1,
             data: None,
             err: Errno::Enotf,
         };

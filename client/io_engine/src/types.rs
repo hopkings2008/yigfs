@@ -51,6 +51,8 @@ pub struct MsgFileCloseOp{
 
 #[derive(Debug)]
 pub struct MsgFileWriteResp {
+    pub id0: u64,
+    pub id1: u64,
     pub offset: u64,
     pub nwrite: u32,
     pub err: Errno,
@@ -85,6 +87,8 @@ impl MsgFileWriteOp {
 
 #[derive(Debug)]
 pub struct MsgFileReadData {
+    pub id0: u64,
+    pub id1: u64,
     pub data: Option<Vec<u8>>,
     pub err: Errno,
 }
