@@ -18,7 +18,7 @@ impl Executor{
     pub fn create_single_threaded()-> Self {
         Executor{
             runtime: Arc::new(tokio::runtime::Builder::new_current_thread().
-            enable_io().
+            enable_all().
             build().expect("runtime curent thread new successfully.")),
         }
     }
