@@ -130,7 +130,7 @@ impl YigIoWorker{
                     id1: msg_write.id1,
                     offset: 0,
                     nwrite: 0,
-                    err: Errno::Esucc,
+                    err: Errno::Eintr,
                 };
                 let ret = self.write(&msg_write.dir, &obj, msg_write.offset,
                      msg_write.data.as_slice());

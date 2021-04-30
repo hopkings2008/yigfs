@@ -5,6 +5,7 @@ use common::numbers::NumberOp;
 use io_engine::types::{MsgFileOpResp, MsgFileOpenResp, MsgFileReadData, MsgFileWriteResp};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
+use metaservice_mgr::{meta_op::{MetaOpResp, MetaOpUploadSeg, MetaOpUploadSegResp}, meta_store::MetaStore};
 use std::sync::Arc;
 use std::collections::HashMap;
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
@@ -13,10 +14,13 @@ use crossbeam_channel::{Receiver, Sender, select, unbounded};
 pub struct SegSyncHandler{
     cache_store: Arc<dyn CacheStore>,
     backend_store: Arc<dyn BackendStore>,
+    meta_store: Arc<MetaStore>,
     cache_op_tx: Sender<MsgFileOpResp>,
     cache_op_rx: Receiver<MsgFileOpResp>,
     backend_op_tx: Sender<MsgFileOpResp>,
     backend_op_rx: Receiver<MsgFileOpResp>,
+    meta_op_tx: Sender<MetaOpResp>,
+    meta_op_rx: Receiver<MetaOpResp>,
     op_rx: Receiver<SegSyncOp>,
     stop_rx: Receiver<u8>,
     seg_state_machines: HashMap<u128, SegStateMachine>,
@@ -25,17 +29,22 @@ pub struct SegSyncHandler{
 impl SegSyncHandler{
     pub fn new(cache_store: Arc<dyn CacheStore>, 
         backend_store: Arc<dyn BackendStore>, 
+        meta_store: Arc<MetaStore>,
         op_rx: Receiver<SegSyncOp>,
         stop_rx: Receiver<u8>) -> Self{
         let (cache_op_tx, cache_op_rx) = unbounded::<MsgFileOpResp>();
         let (backend_op_tx, backend_op_rx) = unbounded::<MsgFileOpResp>();
+        let (meta_op_tx, meta_op_rx) = unbounded::<MetaOpResp>();
         SegSyncHandler{
             cache_store: cache_store,
             backend_store: backend_store,
+            meta_store: meta_store,
             cache_op_tx: cache_op_tx,
             cache_op_rx: cache_op_rx,
             backend_op_tx: backend_op_tx,
             backend_op_rx: backend_op_rx,
+            meta_op_tx: meta_op_tx,
+            meta_op_rx: meta_op_rx,
             op_rx: op_rx,
             stop_rx: stop_rx,
             seg_state_machines: HashMap::new(),
@@ -62,6 +71,26 @@ impl SegSyncHandler{
                         }
                         Err(err) => {
                             println!("SegSyncHandler::start: failed to recv cache_store message, err: {}", err);
+                        }
+                    }
+                }
+                recv(self.backend_op_rx) -> ret => {
+                    match ret {
+                        Ok(msg) => {
+                            self.handle_backend_store_op(msg);
+                        }
+                        Err(err) => {
+                            println!("SegSyncHandler::start: failed to recv backend_store message, err: {}", err);
+                        }
+                    }
+                }
+                recv(self.meta_op_rx) -> ret => {
+                    match ret{
+                        Ok(msg) => {
+                            self.handle_meta_store_op(msg);
+                        }
+                        Err(err) => {
+                            println!("SegSyncHandler::start: failed to recv meta_store message, err: {}", err);
                         }
                     }
                 }
@@ -110,6 +139,7 @@ impl SegSyncHandler{
         }
     }
 
+    // handle cache io callback.
     fn handle_cache_op(&mut self, op: MsgFileOpResp){
         match op {
             MsgFileOpResp::OpRespOpen(open_op) => {
@@ -222,6 +252,7 @@ impl SegSyncHandler{
         self.cache_store.close(op.id0, op.id1);
     }
 
+    // handle backend io callback.
     fn handle_backend_store_op(&mut self, op: MsgFileOpResp){
         match op{
             MsgFileOpResp::OpRespOpen(open_op) => {
@@ -232,7 +263,9 @@ impl SegSyncHandler{
                 println!("handle_backend_store_op: skip read_op: seg: id0: {}, id1: {}",
                 read_op.id0, read_op.id1);
             }
-            MsgFileOpResp::OpRespWrite(write_op) => {}
+            MsgFileOpResp::OpRespWrite(write_op) => {
+                self.handle_backend_store_write(write_op);
+            }
         }
     }
 
@@ -251,12 +284,77 @@ impl SegSyncHandler{
             // get next state to process.
             let next_state = s.get_next_state();
             match next_state {
-                SegState::MetaUpload => {}
-                _ => {}
+                SegState::MetaUpload => {
+                    let offset = op.offset+op.nwrite as u64;
+                    s.set_state(SegState::MetaUpload);
+                    // update the segment offset.
+                    s.set_offset(offset);
+                    let ret = self.meta_store.upload_segment_async(op.id0, op.id1, offset-1, self.meta_op_tx.clone());
+                    if !ret.is_success() {
+                        println!("handle_backend_store_write: failed to send update segment for id0: {}, id1: {}, offset: {}, err: {:?}",
+                        op.id0, op.id1, offset, ret);
+                        self.cache_store.close(op.id0, op.id1);
+                        self.seg_state_machines.remove(&seg_id);
+                    }
+                    return;
+                }
+                _ => {
+                    println!("handle_backend_store_write: got invalid state: {:?}, expected MetaUpload for id0: {}, id1: {}",
+                    next_state, op.id0, op.id1);
+                    self.cache_store.close(op.id0, op.id1);
+                    self.seg_state_machines.remove(&seg_id);
+                    return;
+                }
             }
-            return;
         }
         println!("handle_backend_store_write: got unmanged seg id0: {}, id1: {}", op.id0, op.id1);
         self.cache_store.close(op.id0, op.id1);
+    }
+
+    // handle meta io callback.
+    fn handle_meta_store_op(&mut self, op: MetaOpResp){
+        match op{
+            MetaOpResp::RespUploadSeg(op) => {
+                self.handle_meta_store_upload_seg(op);
+            }
+        }
+    }
+
+    fn handle_meta_store_upload_seg(&mut self, op: MetaOpUploadSegResp){
+        let seg_id = NumberOp::to_u128(op.id0, op.id1);
+
+        if let Some(s) = self.seg_state_machines.get_mut(&seg_id) {
+            if !s.is_state_match(&SegState::MetaUpload){
+                println!("handle_meta_store_upload_seg: got invalid seg state, expected MetaUpload, got: {:?}
+                 for seg id0: {}, id1: {}", s.get_current_state(), op.id0, op.id1);
+                 // close the cache & remove the state machines.
+                 self.cache_store.close(op.id0, op.id1);
+                 self.seg_state_machines.remove(&seg_id);
+                 return;
+            }
+            // get next state to process.
+            let next_state = s.get_next_state();
+            match next_state {
+                SegState::CacheRead => {
+                    s.set_state(SegState::CacheRead);
+                    let ret = self.cache_store.read_async(op.id0, op.id1, s.get_dir(), 
+                    s.get_offset(), 4<<20, self.cache_op_tx.clone());
+                    if !ret.is_success(){
+                        println!("handle_meta_store_upload_seg: failed to preform cache read for id0: {}, id1: {},
+                        offset: {}, err: {:?}", op.id0, op.id1, s.get_offset(), ret);
+                        self.cache_store.close(op.id0, op.id1);
+                        self.seg_state_machines.remove(&seg_id);
+                    }
+                    return;
+                }
+                _ => {
+                    println!("handle_meta_store_upload_seg: got invalid seg next state {:?} for id0: {}, id1: {},
+                        expected CacheRead", next_state, op.id0, op.id1);
+                    self.cache_store.close(op.id0, op.id1);
+                    self.seg_state_machines.remove(&seg_id);
+                    return;
+                }
+            }
+        }
     }
 }
