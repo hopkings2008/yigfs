@@ -13,9 +13,9 @@ use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
 use common::runtime::Executor;
-use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespReadDir, RespSetFileAttr};
+use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespReadDir, RespSetFileAttr, RespUploadSegment};
 
-use self::message::{ReqUpdateSegments, RespUpdateSegments};
+use self::message::{MsgSegmentOffset, ReqUpdateSegments, RespUpdateSegments};
 pub struct MetaServiceMgrImpl{
     http_client: Arc<http_client::HttpClient>,
     meta_server_url: String,
@@ -541,6 +541,71 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         if resp.result.err_code != 0 {
             println!("update_file_segments: failed to add file block for {}, err: {}", body, resp.result.err_msg);
+            return Errno::Eintr;
+        }
+
+        return Errno::Esucc;
+    }
+
+    fn upload_segment(&self, id0: u64, id1: u64, next_offset: u64) -> Errno{
+        let req_upload_seg = ReqUploadSegment{
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
+            segment: MsgSegmentOffset{
+                seg_id0: id0,
+                seg_id1: id1,
+                latest_offset: next_offset,
+            },
+        };
+        let req_body: String;
+        let ret = json::encode_to_str::<ReqUploadSegment>(&req_upload_seg);
+        match ret {
+            Ok(ret) => {
+                req_body = ret;
+            }
+            Err(ret) => {
+                println!("upload_segment: failed to encode to json for id0: {}, id1: {}, next_offset: {}, err: {}",
+            id0, id1, next_offset, ret);
+                return Errno::Eintr;
+            }
+        }
+
+        let url = format!("{}/v1/segment/block", self.meta_server_url);
+        let resp_body: RespText;
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(
+            &url, req_body.as_bytes(), &HttpMethod::Put, false));
+        match ret{
+            Ok(ret) => {
+                resp_body = ret;
+            }
+            Err(err) => {
+                println!("upload_segment: failed to send req: {}, err: {}", req_body, err);
+                return Errno::Eintr;
+            }
+        }
+        if resp_body.status >= 300 {
+            println!("upload_segment: got resp status: {}, resp_body: {} for req: {}",
+            resp_body.status, resp_body.body, req_body);
+            return Errno::Eintr;
+        }
+
+        let resp: RespUploadSegment;
+        let ret = json::decode_from_str::<RespUploadSegment>(&resp_body.body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                println!("upload_segment: failed to decode resp: {} for req: {}, err: {}", 
+                resp_body.body, req_body, err);
+                return Errno::Eintr;
+            }
+        }
+
+        if resp.result.err_code != 0 {
+            println!("upload_segment: failed to upload: {}, err: {}", req_body, resp.result.err_msg);
             return Errno::Eintr;
         }
 

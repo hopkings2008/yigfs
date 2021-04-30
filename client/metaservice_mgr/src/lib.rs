@@ -1,6 +1,11 @@
 pub mod types;
 pub mod mgr;
 pub mod mgr_impl;
+pub mod meta_store;
+pub mod meta_op;
+mod meta_thread;
+mod meta_worker;
+mod meta_thread_pool;
 
 use std::rc::Rc;
 use common::config::Config;

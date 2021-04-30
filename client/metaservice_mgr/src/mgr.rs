@@ -2,7 +2,7 @@ use crate::types::{DirEntry, FileLeader, NewFileInfo, SetFileAttr, Segment};
 use crate::types::FileAttr;
 use common::error::Errno;
 
-pub trait MetaServiceMgr {
+pub trait MetaServiceMgr: Send + Sync {
     fn mount(&self, uid: u32, gid: u32) -> Result<(), Errno>;
     fn read_dir(&self, ino: u64, offset: i64)->Result<Vec<DirEntry>, Errno>;
     fn read_dir_file_attr(&self, ino: u64, name: &String) -> Result<FileAttr, Errno>;
@@ -14,4 +14,5 @@ pub trait MetaServiceMgr {
     fn get_machine_id(&self) -> String;
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno;
     fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno;
+    fn upload_segment(&self, id0: u64, id1: u64, next_offset: u64) -> Errno;
 }

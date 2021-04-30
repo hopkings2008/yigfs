@@ -276,3 +276,25 @@ pub struct ReqAddBlock{
 pub struct RespAddBock{
     pub result: RespResult,
 }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgSegmentOffset{
+    pub seg_id0: u64,
+    pub seg_id1: u64,
+    pub latest_offset: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqUploadSegment{
+    pub region: String,
+    pub bucket: String,
+    pub zone: String,
+    pub machine: String,
+    #[serde(rename(serialize = "segment", deserialize = "segment"))]
+    pub segment: MsgSegmentOffset,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespUploadSegment{
+    pub result: RespResult,
+}
