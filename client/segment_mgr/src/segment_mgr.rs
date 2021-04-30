@@ -1,7 +1,7 @@
 extern crate tokio;
 extern crate hash_ring;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use crate::types::{Block, Segment, DataDir};
 use common::{error::Errno, numbers::NumberOp};
 use common::config::Config;
@@ -10,7 +10,7 @@ use metaservice_mgr::types::Segment as MetaSegment;
 use hash_ring::HashRing;
 
 pub struct SegmentMgr {
-    meta_service_mgr: Rc<dyn MetaServiceMgr>,
+    meta_service_mgr: Arc<dyn MetaServiceMgr>,
     // initialized during new() and later readonly.
     data_dirs: Vec<DataDir>,
     // key: u128 stands for segmentid; nodes usize stands for the index of data_dirs.
@@ -76,7 +76,7 @@ impl SegmentMgr {
         seg
     }
 
-    pub fn create(cfg: &Config, mgr: Rc<dyn MetaServiceMgr>) -> Self {
+    pub fn create(cfg: &Config, mgr: Arc<dyn MetaServiceMgr>) -> Self {
         let mut dirs: Vec<DataDir> = Vec::new();
         let mut dir_idxs: Vec<usize> = Vec::new();
         let mut idx : usize = 0;

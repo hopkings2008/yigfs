@@ -26,6 +26,7 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
         ino: 1,
         leader: String::from(""),
         segments: Vec::<Segment>::new(),
+        is_dirty: 0,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){
@@ -58,6 +59,7 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
         ino: ino,
         leader: String::from(""),
         segments: Vec::<Segment>::new(),
+        is_dirty: 0,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){
@@ -109,6 +111,7 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         ino: ino,
         leader: String::from(""),
         segments: Vec::<Segment>::new(),
+        is_dirty: 0,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){

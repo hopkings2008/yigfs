@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::rc::Rc;
 use common::runtime::Executor;
 use common::error::Errno;
 use io_engine::cache_store::CacheStore;
@@ -14,7 +13,7 @@ pub struct LeaderLocal {
     cache_store: Arc<dyn CacheStore>,
     backend_store: Arc<dyn BackendStore>,
     exec: Executor,
-    segment_mgr: Rc<SegmentMgr>,
+    segment_mgr: Arc<SegmentMgr>,
     handle_mgr: FileHandleMgr,
 }
 
@@ -255,7 +254,7 @@ impl Leader for LeaderLocal {
 }
 
 impl LeaderLocal {
-    pub fn new(machine: &String, exec: &Executor, mgr: Rc<SegmentMgr>, cache: Arc<dyn CacheStore>, backend: Arc<dyn BackendStore>) -> Self {
+    pub fn new(machine: &String, exec: &Executor, mgr: Arc<SegmentMgr>, cache: Arc<dyn CacheStore>, backend: Arc<dyn BackendStore>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
             cache_store: cache,

@@ -1,7 +1,7 @@
 pub mod yigfs;
 mod handle;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use yigfs::Yigfs;
 use metaservice_mgr::mgr::MetaServiceMgr;
 use segment_mgr::leader_mgr::LeaderMgr;
@@ -12,12 +12,12 @@ pub struct MountOptions{
 }
 
 pub struct FilesystemMgr {
-   meta_service_mgr: Rc<dyn MetaServiceMgr>,
+   meta_service_mgr: Arc<dyn MetaServiceMgr>,
    leader_mgr: Option<LeaderMgr>,
 }
 
 impl FilesystemMgr{
-    pub fn create(meta_service_mgr: Rc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr)->FilesystemMgr{
+    pub fn create(meta_service_mgr: Arc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr)->FilesystemMgr{
         FilesystemMgr{
             meta_service_mgr: meta_service_mgr,
             leader_mgr: Some(leader_mgr),

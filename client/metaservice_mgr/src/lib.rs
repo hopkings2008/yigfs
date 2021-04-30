@@ -7,16 +7,16 @@ mod meta_thread;
 mod meta_worker;
 mod meta_thread_pool;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use common::config::Config;
 use common::runtime::Executor;
 
 
-pub fn new_metaserver_mgr(cfg: &Config, exec: &Executor) -> Result<Rc<dyn mgr::MetaServiceMgr>, String>{
+pub fn new_metaserver_mgr(cfg: &Config, exec: &Executor) -> Result<Arc<dyn mgr::MetaServiceMgr>, String>{
     let ret = mgr_impl::MetaServiceMgrImpl::new(cfg, exec);
     match ret {
         Ok(ret) => {
-            return Ok(Rc::new(ret));
+            return Ok(Arc::new(ret));
         }
         Err(error) => {
             return Err(format!("failed to new MetaServiceMgrImpl, err: {}", error));

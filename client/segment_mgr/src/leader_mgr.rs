@@ -1,6 +1,5 @@
 
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use common::runtime::Executor;
 use io_engine::backend_storage::BackendStore;
@@ -22,7 +21,7 @@ pub struct LeaderMgr {
 }
 
 impl LeaderMgr {
-    pub fn new(machine: &String, exec: &Executor, seg_mgr: Rc<SegmentMgr>, 
+    pub fn new(machine: &String, exec: &Executor, seg_mgr: Arc<SegmentMgr>, 
         cache_store: Arc<dyn CacheStore>, backend_store: Arc<dyn BackendStore>) -> Self {
         let mut leaders = HashMap::<u8, Box<dyn Leader>>::new();
         leaders.insert(LeaderType::Unknown as u8, Box::new(LeaderNotSupport::new()));

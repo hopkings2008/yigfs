@@ -3,7 +3,7 @@ extern crate libc;
 extern crate time;
 
 use std::ffi::OsStr;
-use std::rc::Rc;
+use std::sync::Arc;
 use libc::{ENOENT, c_int};
 use time::Timespec;
 use fuse::{FileType, FileAttr, Filesystem, Request, 
@@ -17,7 +17,7 @@ const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 sec
 
 
 pub struct Yigfs{
-    meta_service_mgr: Rc<dyn MetaServiceMgr>,
+    meta_service_mgr: Arc<dyn MetaServiceMgr>,
     leader_mgr: LeaderMgr,
     handle_cacher: FileHandleInfoMgr,
     // fsid for this mounted yigfs instance
@@ -347,7 +347,7 @@ impl Filesystem for Yigfs {
 }
 
 impl Yigfs{
-    pub fn create(meta: Rc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr)-> Yigfs{
+    pub fn create(meta: Arc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr)-> Yigfs{
         Yigfs{
             meta_service_mgr: meta,
             leader_mgr: leader_mgr,

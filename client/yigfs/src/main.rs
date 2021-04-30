@@ -1,6 +1,5 @@
 mod options;
 
-use std::rc::Rc;
 use std::sync::Arc;
 use filesystem_mgr::{FilesystemMgr, MountOptions};
 use common::parse_config;
@@ -34,7 +33,7 @@ fn main() {
     let exec = Executor::create();
     let single_thread_exec = Executor::create_single_threaded();
     let meta_service = new_metaserver_mgr(&cfg, &single_thread_exec).unwrap();
-    let segment_mgr = Rc::new(SegmentMgr::create(&cfg, meta_service.clone()));
+    let segment_mgr = Arc::new(SegmentMgr::create(&cfg, meta_service.clone()));
     // create backend store.
     // [TODO] we should create backend store as plugin. but currently, only hardcoded.
     let mut backend_store_mgr = BackendStoreMgr::new();
