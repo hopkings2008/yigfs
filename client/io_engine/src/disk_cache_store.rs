@@ -8,6 +8,7 @@ use common::error::Errno;
 use crossbeam_channel::{bounded, Sender};
 use std::sync::Arc;
 
+// must be implemented as thread safe.
 pub struct DiskCache {
     disk_pool: IoThreadPool,
 }

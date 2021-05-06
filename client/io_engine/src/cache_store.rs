@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::types::{MsgFileOpResp, MsgFileReadData};
+use crate::types::MsgFileOpResp;
 use common::{error::Errno, runtime::Executor};
 use crossbeam_channel::Sender;
 
@@ -12,7 +12,7 @@ pub struct CacheWriteResult {
     pub nwrite: u32,
 }
 
-pub trait CacheStore{
+pub trait CacheStore: Send + Sync{
     // return: file size
     fn open(&self, id0: u64, id1: u64, dir: &String) -> Errno;
     fn open_async(&self, id0: u64, id1: u64, dir: &String, open_resp: Sender<MsgFileOpResp>) -> Errno;

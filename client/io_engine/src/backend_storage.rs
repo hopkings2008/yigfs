@@ -4,14 +4,14 @@ use crossbeam_channel::Sender;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::types::{MsgFileOp, MsgFileOpResp, MsgFileReadData, MsgFileWriteResp};
+use crate::types::{MsgFileOpResp, MsgFileWriteResp};
 
 
 
 /*
 * note that BackendStore must be implemented as threadsafe.
 */
-pub trait BackendStore{
+pub trait BackendStore: Send + Sync{
     // return: file size
     fn open(&self, id0: u64, id1: u64) -> Errno;
     fn write(&self, id0: u64, id1: u64, offset: u64, data: &[u8])->MsgFileWriteResp;

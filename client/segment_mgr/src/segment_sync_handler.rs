@@ -148,7 +148,7 @@ impl SegSyncHandler{
             MsgFileOpResp::OpRespRead(read_op) => {
                 self.handle_cache_read(read_op);
             }
-            MsgFileOpResp::OpRespWrite(write_op) => {}
+            MsgFileOpResp::OpRespWrite(_write_op) => {}
         }
     }
 
