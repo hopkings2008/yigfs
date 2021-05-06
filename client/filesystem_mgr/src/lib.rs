@@ -4,7 +4,7 @@ mod handle;
 use std::sync::Arc;
 use yigfs::Yigfs;
 use metaservice_mgr::mgr::MetaServiceMgr;
-use segment_mgr::leader_mgr::LeaderMgr;
+use segment_mgr::{heartbeat_mgr::HeartbeatMgr, leader_mgr::LeaderMgr};
 
 pub struct MountOptions{
     // mount point
@@ -14,13 +14,15 @@ pub struct MountOptions{
 pub struct FilesystemMgr {
    meta_service_mgr: Arc<dyn MetaServiceMgr>,
    leader_mgr: Option<LeaderMgr>,
+   heartbeat_mgr: Arc<HeartbeatMgr>,
 }
 
 impl FilesystemMgr{
-    pub fn create(meta_service_mgr: Arc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr)->FilesystemMgr{
+    pub fn create(meta_service_mgr: Arc<dyn MetaServiceMgr>, leader_mgr: LeaderMgr, heartbeat_mgr: Arc<HeartbeatMgr>)->FilesystemMgr{
         FilesystemMgr{
             meta_service_mgr: meta_service_mgr,
             leader_mgr: Some(leader_mgr),
+            heartbeat_mgr: heartbeat_mgr,
         }
     }
 

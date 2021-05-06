@@ -82,14 +82,16 @@ fn main() {
 
     let leader_mgr = LeaderMgr::new(&meta_service.get_machine_id(),
     &exec, segment_mgr.clone(), cache_store.clone(), backend_store.clone());
-    let mut filesystem = FilesystemMgr::create(meta_service.clone(), leader_mgr);
+    // start heartbeat mgr.
+    let heartbeat_mgr = Arc::new(HeartbeatMgr::new(cfg.heartbeat_config.timeout, 
+        syncer.clone(), 
+meta_service.clone(),
+        segment_mgr));
+    let mut filesystem = FilesystemMgr::create(meta_service.clone(), 
+    leader_mgr, heartbeat_mgr.clone());
     let mount_options = MountOptions{
         mnt: cfg.mount_config.mnt.clone(),
     };
-    // start heartbeat mgr.
-    HeartbeatMgr::new(cfg.heartbeat_config.timeout, 
-        syncer.clone(), 
-meta_service,
-        segment_mgr);
+    
     filesystem.mount(mount_options);
 }

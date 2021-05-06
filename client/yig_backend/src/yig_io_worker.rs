@@ -40,7 +40,7 @@ impl IoWorker for YigIoWorker {
                 recv(self.stop_rx) -> msg => {
                     match msg {
                         Ok(msg) => {
-                            println!("YigIoWorker: got stop message: {:?}", msg);
+                            println!("YigIoWorker: got stop message: {:?}, stopping...", msg);
                             break;
                         }
                         Err(err) => {
