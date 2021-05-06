@@ -88,7 +88,7 @@ fn main() {
     };
     // start heartbeat mgr.
     HeartbeatMgr::new(cfg.heartbeat_config.timeout, 
-        syncer, 
+        syncer.clone(), 
 meta_service,
         segment_mgr);
     filesystem.mount(mount_options);
