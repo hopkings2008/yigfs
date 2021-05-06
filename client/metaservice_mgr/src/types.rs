@@ -112,3 +112,22 @@ pub struct Block {
     pub size: i64,
 }
 
+#[derive(Debug, Default)]
+pub struct HeartbeatUploadSeg{
+    pub id0: u64,
+    pub id1: u64,
+    // next offset to upload
+    pub offset: u64,
+}
+
+#[derive(Debug, Default)]
+pub struct HeartbeatRemoveSeg{
+    pub id0: u64,
+    pub id1: u64,
+}
+#[derive(Debug, Default)]
+pub struct HeartbeatResult{
+    pub upload_segments: Vec<HeartbeatUploadSeg>,
+    pub remove_segments: Vec<HeartbeatRemoveSeg>,
+}
+

@@ -1,4 +1,6 @@
-use crate::types::{DirEntry, FileLeader, NewFileInfo, SetFileAttr, Segment};
+use crate::types::{DirEntry, FileLeader, 
+    NewFileInfo, SetFileAttr, 
+    Segment, HeartbeatResult};
 use crate::types::FileAttr;
 use common::error::Errno;
 
@@ -15,4 +17,5 @@ pub trait MetaServiceMgr: Send + Sync {
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno;
     fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno;
     fn upload_segment(&self, id0: u64, id1: u64, next_offset: u64) -> Errno;
+    fn heartbeat(&self)-> Result<HeartbeatResult, Errno>;
 }

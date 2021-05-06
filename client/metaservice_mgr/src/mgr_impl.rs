@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::{mgr, types::{Block, FileLeader, NewFileInfo, Segment, SetFileAttr}};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
+use crate::types::{HeartbeatResult, HeartbeatUploadSeg};
 use common::http_client;
 use common::http_client::RespText;
 use common::config::Config;
@@ -13,9 +14,9 @@ use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
 use common::runtime::Executor;
-use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespReadDir, RespSetFileAttr, RespUploadSegment};
+use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment};
 
-use self::message::{MsgSegmentOffset, ReqUpdateSegments, RespUpdateSegments};
+use self::message::{MsgSegmentOffset, ReqHeartbeat, ReqUpdateSegments, RespUpdateSegments};
 pub struct MetaServiceMgrImpl{
     http_client: Arc<http_client::HttpClient>,
     meta_server_url: String,
@@ -610,6 +611,74 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
 
         return Errno::Esucc;
+    }
+
+    // implment heartbeat
+    fn heartbeat(&self)->Result<HeartbeatResult, Errno> {
+        let req = ReqHeartbeat {
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
+        };
+        let req_str: String;
+        let ret = json::encode_to_str::<ReqHeartbeat>(&req);
+        match ret {
+            Ok(ret) => {
+                req_str = ret;
+            }
+            Err(err) => {
+                println!("heartbeat: failed to encode heart req: {:?}, err: {}", req, err);
+                return Err(Errno::Eintr);
+            }
+        }
+
+        let url = format!("{}/v1/machine/heartbeat", self.meta_server_url);
+        let resp_text: RespText;
+        let ret = self.exec.get_runtime().block_on(
+            self.http_client.request(&url, req_str.as_bytes(), &HttpMethod::Get, false)
+        );
+        match ret {
+            Ok(ret) => {
+                resp_text = ret;
+            }
+            Err(err) => {
+                println!("heartbeat: failed to send heart: {} to server, err: {}", req_str, err);
+                return Err(Errno::Eintr);
+            }
+        }
+
+        if resp_text.status >= 300 {
+            println!("heartbeat: got status error: {} for heartbeat, resp: {}", resp_text.status, resp_text.body);
+            return Err(Errno::Eintr);
+        }
+
+        let mut result = HeartbeatResult{
+            upload_segments: Vec::new(),
+            remove_segments: Vec::new(),
+        };
+
+        let resp: RespHeartbeat;
+        let ret = json::decode_from_str::<RespHeartbeat>(&resp_text.body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                println!("heartbeat: got error for heartbeat: {}, err: {}", req_str, err);
+                return Err(Errno::Eintr);
+            }
+        }
+        for u in &resp.upload_segments {
+            result.upload_segments.push(HeartbeatUploadSeg{
+                id0: u.seg_id0,
+                id1: u.seg_id1,
+                offset: u.next_offset,
+            });
+            // TODO remove segments.
+        }
+
+        Ok(result)
     }
 }
 

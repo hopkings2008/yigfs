@@ -298,3 +298,32 @@ pub struct ReqUploadSegment{
 pub struct RespUploadSegment{
     pub result: RespResult,
 }
+
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqHeartbeat{
+    pub region: String,
+    pub bucket: String,
+    pub zone: String,
+    pub machine: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgUploadSegment{
+    pub seg_id0: u64,
+    pub seg_id1: u64,
+    pub next_offset: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct MsgRemoveSegment{
+    pub seg_id0: u64,
+    pub seg_id1: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespHeartbeat {
+    pub result: RespResult,
+    pub upload_segments: Vec<MsgUploadSegment>,
+    pub remove_segments: Vec<MsgRemoveSegment>,
+}
