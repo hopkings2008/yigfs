@@ -26,6 +26,7 @@ pub trait CacheStore: Send + Sync{
     // and can be used to implement the pipeline pattern.
     fn read_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, size: u32, read_resp: Sender<MsgFileOpResp>) -> Errno;
     fn close(&self, id0: u64, id1: u64) -> Errno;
+    fn stop(&mut self);
 }
 
 pub struct CacheStoreConfig{

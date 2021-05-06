@@ -5,7 +5,7 @@ use common::numbers::NumberOp;
 use io_engine::types::{MsgFileOpResp, MsgFileOpenResp, MsgFileReadData, MsgFileWriteResp};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
-use metaservice_mgr::{meta_op::{MetaOpResp, MetaOpUploadSeg, MetaOpUploadSegResp}, meta_store::MetaStore};
+use metaservice_mgr::{meta_op::{MetaOpResp, MetaOpUploadSegResp}, meta_store::MetaStore};
 use std::sync::Arc;
 use std::collections::HashMap;
 use crossbeam_channel::{Receiver, Sender, select, unbounded};

@@ -10,6 +10,7 @@ pub struct Config{
     pub segment_configs: Vec<SegmentConfig>,
     pub disk_cache_config: DiskCacheConfig,
     pub backend_store_config: BackendStoreConfig,
+    pub heartbeat_config: HeartbeatConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -27,6 +28,7 @@ pub struct S3Config {
 #[derive(Deserialize, Debug, Clone)]
 pub struct MetaServerConfig {
     pub meta_server: String,
+    pub thread_num: u32,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -51,4 +53,9 @@ pub struct DiskCacheConfig{
 pub struct BackendStoreConfig {
     pub backend_type: u32,
     pub settings: HashMap<String, String>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct HeartbeatConfig{
+    pub timeout: u64,
 }

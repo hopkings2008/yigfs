@@ -227,6 +227,10 @@ impl CacheStore for DiskCache {
         }
         return Errno::Esucc;
     }
+
+    fn stop(&mut self){
+        self.disk_pool.stop();
+    }
 }
 
 impl DiskCache {

@@ -3,7 +3,7 @@
 use crate::yig_io_worker::YigIoWorkerFactory;
 use common::runtime::Executor;
 use common::error::Errno;
-use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileOpResp, MsgFileOpenResp, MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
+use io_engine::{backend_storage::{BackendStore, BackendStoreFactory}, types::{MsgFileOpResp, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp}};
 use io_engine::types::{MsgFileOp, MsgFileOpenOp};
 use io_engine::io_thread_pool::IoThreadPool;
 use std::collections::HashMap;

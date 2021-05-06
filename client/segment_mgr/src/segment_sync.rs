@@ -18,7 +18,7 @@ impl SegSyncer {
     pub fn new(cache_store: Arc<dyn CacheStore>, backend_store: Arc<dyn BackendStore>, meta_store: Arc<MetaStore>) -> Self{
         let (op_tx, op_rx) = unbounded::<SegSyncOp>();
         let (stop_tx, stop_rx) = bounded::<u8>(1);
-        let mut seg_sync_handler = SegSyncHandler::new(cache_store.clone(), 
+        let mut seg_sync_handler = SegSyncHandler::new(cache_store.clone(),
         backend_store.clone(),
         meta_store.clone(),
         op_rx,
@@ -34,7 +34,19 @@ impl SegSyncer {
         syncer
     }
 
-    pub fn sync_segment(&self, dir: &String, id0: u64, id1: u64, offset: u64) -> Errno {
+    pub fn stop(&mut self) {
+        let ret = self.stop_tx.send(1);
+        match ret {
+            Ok(_) => {
+                self.thr.join();
+            }
+            Err(err) => {
+                println!("SegSyncer: failed to perform stop, err: {}", err);
+            }
+        }
+    }
+
+    pub fn upload_segment(&self, dir: &String, id0: u64, id1: u64, offset: u64) -> Errno {
         let op = SegUpload{
             id0: id0,
             id1: id1,

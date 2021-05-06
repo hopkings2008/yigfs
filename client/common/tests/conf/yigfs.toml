@@ -3,6 +3,7 @@ mnt = "/mnt/yigfs"
 
 [metaserver_config]
 meta_server = "http//127.0.0.1"
+thread_num = 5
 
 [zone_config]
 zone = "A9DADA1C-6F50-4602-94C6-D5F7FBCFF1EF"
@@ -29,3 +30,6 @@ sk="hahahaha"
 region="cn-bj-1"
 endpint="s3.test.com"
 thread_num="6"
+
+[heartbeat_config]
+timeout = 5

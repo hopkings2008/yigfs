@@ -36,7 +36,7 @@ impl MetaThreadPool {
 
     pub fn get_meta_thread_for_seg(&self, id0: u64, id1: u64) -> &MetaThread{
         let id = NumberOp::to_u128(id0, id1);
-        let size = self.pool.len() as u32;
+        let size = self.num();
         let idx = (id % size as u128) as usize;
         &self.pool[idx]
     }

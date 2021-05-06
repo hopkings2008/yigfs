@@ -7,7 +7,10 @@ use common::runtime::Executor;
 use common::config::Config;
 use segment_mgr::segment_mgr::SegmentMgr;
 use segment_mgr::leader_mgr::LeaderMgr;
+use segment_mgr::heartbeat_mgr::HeartbeatMgr;
+use segment_mgr::segment_sync::SegSyncer;
 use metaservice_mgr::new_metaserver_mgr;
+use metaservice_mgr::meta_store::MetaStore;
 use io_engine::backend_store_mgr::BackendStoreMgr;
 use io_engine::backend_storage::BackendStore;
 use io_engine::cache_store::{CacheStore, CacheStoreConfig};
@@ -69,12 +72,24 @@ fn main() {
             return;
         }
     }
+    // create meta_store
+    let meta_store = Arc::new(MetaStore::new(
+        cfg.metaserver_config.thread_num, meta_service.clone()
+    ));
+    // create segment_syncer
+    let segment_syncer = SegSyncer::new(cache_store.clone(), backend_store.clone(), meta_store.clone());
+    let syncer = Arc::new(segment_syncer);
 
     let leader_mgr = LeaderMgr::new(&meta_service.get_machine_id(),
-    &exec, segment_mgr.clone(), cache_store, backend_store);
+    &exec, segment_mgr.clone(), cache_store.clone(), backend_store.clone());
     let mut filesystem = FilesystemMgr::create(meta_service.clone(), leader_mgr);
     let mount_options = MountOptions{
         mnt: cfg.mount_config.mnt.clone(),
     };
+    // start heartbeat mgr.
+    HeartbeatMgr::new(cfg.heartbeat_config.timeout, 
+        syncer, 
+meta_service,
+        segment_mgr);
     filesystem.mount(mount_options);
 }
