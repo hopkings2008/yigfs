@@ -24,8 +24,8 @@ impl MetaThreadPool {
         return mp;
     }
 
-    pub fn stop(&self){
-        for t in &self.pool {
+    pub fn stop(&mut self){
+        for t in &mut self.pool {
             t.stop();
         }
     }

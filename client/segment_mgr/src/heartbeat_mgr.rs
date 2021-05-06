@@ -30,8 +30,10 @@ impl HeartbeatMgr {
         });
         return hm;
     }
+}
 
-    pub fn stop(&mut self){
+impl Drop for HeartbeatMgr{
+    fn drop(&mut self){
         let ret = self.stop_tx.send(1);
         match ret{
             Ok(_) => {

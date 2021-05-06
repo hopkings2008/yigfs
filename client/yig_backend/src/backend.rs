@@ -196,6 +196,12 @@ impl BackendStore for YigBackend{
     }
 }
 
+impl Drop for YigBackend{
+    fn drop(&mut self){
+        self.yig_pool.stop();
+    }
+}
+
 impl YigBackend {
     pub fn new(region: &String, endpoint: &String, ak: &String, sk: &String, bucket: &String, num: u32, exec: &Executor) -> Self {
         YigBackend{

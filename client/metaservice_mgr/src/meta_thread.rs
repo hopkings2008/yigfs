@@ -31,10 +31,12 @@ impl MetaThread {
         return thr;
     }
 
-    pub fn stop(&self) {
+    pub fn stop(&mut self) {
         let ret = self.stop_tx.send(1);
         match ret{
-            Ok(_) =>{}
+            Ok(_) =>{
+                self.thr.join();
+            }
             Err(err) => {
                 println!("MetaThread::stop: failed to send the stop signal, err: {}", err);
             }

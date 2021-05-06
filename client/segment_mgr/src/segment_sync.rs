@@ -34,18 +34,6 @@ impl SegSyncer {
         syncer
     }
 
-    pub fn stop(&mut self) {
-        let ret = self.stop_tx.send(1);
-        match ret {
-            Ok(_) => {
-                self.thr.join();
-            }
-            Err(err) => {
-                println!("SegSyncer: failed to perform stop, err: {}", err);
-            }
-        }
-    }
-
     pub fn upload_segment(&self, dir: &String, id0: u64, id1: u64, offset: u64) -> Errno {
         let op = SegUpload{
             id0: id0,
@@ -62,6 +50,20 @@ impl SegSyncer {
                 println!("sync_segment: failed to send upload op for id0: {}, id1: {}, offset: {}, err: {}",
                 id0, id1, offset, err);
                 return Errno::Eintr;
+            }
+        }
+    }
+}
+
+impl Drop for SegSyncer{
+    fn drop(&mut self) {
+        let ret = self.stop_tx.send(1);
+        match ret {
+            Ok(_) => {
+                self.thr.join();
+            }
+            Err(err) => {
+                println!("SegSyncer: failed to perform stop, err: {}", err);
             }
         }
     }

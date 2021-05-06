@@ -19,10 +19,6 @@ impl MetaStore{
         }
     }
 
-    pub fn stop(&self) {
-        self.meta_pool.stop();
-    }
-
     pub fn upload_segment_async(&self, id0: u64, id1: u64, offset: u64, resp_tx: Sender<MetaOpResp>) -> Errno {
         let thr = self.meta_pool.get_meta_thread_for_seg(id0, id1);
         let ret = thr.upload_segment(id0, id1, offset, resp_tx);
@@ -31,5 +27,11 @@ impl MetaStore{
             id0, id1, offset, ret);
         }
         return ret;
+    }
+}
+
+impl Drop for MetaStore{
+    fn drop(&mut self){
+        self.meta_pool.stop();
     }
 }
