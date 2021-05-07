@@ -665,7 +665,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("heartbeat: got error for heartbeat: {}, err: {}", req_str, err);
+                println!("heartbeat: got error for heartbeat: {}, resp: {}, err: {}", req_str, resp_text.body, err);
                 return Err(Errno::Eintr);
             }
         }
