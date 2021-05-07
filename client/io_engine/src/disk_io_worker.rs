@@ -211,8 +211,8 @@ impl DiskIoWorker {
         if let Some(h) = self.handles.get_mut(&d) {
             let ret = h.file.seek(SeekFrom::Start(msg.offset));
             match ret {
-                Ok(ret) => {
-                    println!("do_read: succeed to seek to {} for {:?}", ret, msg);
+                Ok(_ret) => {
+                    //println!("do_read: succeed to seek to {} for {:?}", ret, msg);
                 }
                 Err(err) => {
                     println!("do_read: fail to seek to {} for {:?}, err: {}", msg.offset, msg, err);
