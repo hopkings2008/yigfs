@@ -165,6 +165,14 @@ impl SegSyncHandler{
                 self.seg_state_machines.remove(&seg_id);
                 return;
             }
+            // check whether open failed or not.
+            if !op.err.is_success(){
+                println!("handle_cache_open: failed to open id0: {}, id1: {}, dir: {}, err: {:?}",
+                op.id0, op.id1, s.get_dir(), op.err);
+                self.cache_store.close(op.id0, op.id1);
+                self.seg_state_machines.remove(&seg_id);
+                return;
+            }
             // get next state to process.
             let next_state = s.get_next_state();
             match next_state {
@@ -281,6 +289,14 @@ impl SegSyncHandler{
                  self.seg_state_machines.remove(&seg_id);
                  return;
             }
+            // check whether former write op is successful or not.
+            if !op.err.is_success(){
+                println!("handle_backend_store_write: write failed for id0: {}, id1: {} with offset: {}, err: {:?}",
+                op.id0, op.id1, s.get_offset(), op.err);
+                self.cache_store.close(op.id0, op.id1);
+                self.seg_state_machines.remove(&seg_id);
+                return;
+            }
             // get next state to process.
             let next_state = s.get_next_state();
             match next_state {
@@ -331,6 +347,14 @@ impl SegSyncHandler{
                  self.cache_store.close(op.id0, op.id1);
                  self.seg_state_machines.remove(&seg_id);
                  return;
+            }
+            // check whether former op is successful or not.
+            if !op.err.is_success(){
+                println!("handle_meta_store_upload_seg: failed to upload meta offset: {} for id0: {}, id1: {}, err: {:?}",
+                s.get_offset(), op.id0, op.id1, op.err);
+                self.cache_store.close(op.id0, op.id1);
+                self.seg_state_machines.remove(&seg_id);
+                return;
             }
             // get next state to process.
             let next_state = s.get_next_state();
