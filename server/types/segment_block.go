@@ -29,11 +29,17 @@ type GetIncompleteUploadSegsReq struct {
 
 type GetIncompleteUploadSegsResp struct {
 	Result YigFsMetaError `json:"result"`
-	Segments []*IncompleteUploadSegInfo `json:"segments"`
+	UploadSegments []*IncompleteUploadSegInfo `json:"upload_segments"`
+	RemoveSegments []*RemoveSegInfo `json:"remove_segments"`
 }
 
 type IncompleteUploadSegInfo struct {
 	SegmentId0   uint64 `json:"seg_id0"`
-    SegmentId1   uint64 `json:"seg_id1"`
-    NextOffset   int  `json:"next_offset"`
+	SegmentId1   uint64 `json:"seg_id1"`
+	NextOffset   int  `json:"next_offset"`
+}
+
+type RemoveSegInfo struct {
+	SegmentId0   uint64 `json:"seg_id0"`
+	SegmentId1   uint64 `json:"seg_id1"`
 }

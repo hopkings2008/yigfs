@@ -22,6 +22,8 @@ pub enum Errno{
     Eaccess = 9,
     // range error
     Erange = 10,
+    // offset err
+    Eoffset = 11,
 }
 
 impl Errno {

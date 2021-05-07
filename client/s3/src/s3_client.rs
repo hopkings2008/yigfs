@@ -2,6 +2,7 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::io::BufReader;
 use std::convert::From;
+use std::collections::HashMap;
 use crate::signature::AwsCredentials;
 use crate::signature::SignedRequest;
 use crate::types::S3ObjectInfo;
@@ -29,6 +30,21 @@ impl S3Client {
             endpoint: endpoint.to_string(),
             ak : ak.to_string(),
             sk: sk.to_string(),
+        }
+    }
+
+    pub fn get_next_position(&self, headers: HashMap<String, String>, mut append_resp: AppendS3ObjectResp) -> AppendS3ObjectResp {
+        let next_append_position = headers.get("x-amz-next-append-position");
+        match next_append_position {
+            Some(position) => {
+                append_resp.next_append_position = position.parse::<u64>().unwrap();
+                return append_resp
+            }
+            None => {
+                println!("Err next append object position is None.");
+                append_resp.err = Errno::Eintr;
+                return append_resp
+            }
         }
     }
 
@@ -83,7 +99,7 @@ impl S3Client {
         }
     }
 
-    pub async fn append_object_by_path(&self, bucket: &str, object: &str, append_position: &u64, object_path: &str) -> Result<AppendS3ObjectResp, Errno> {
+    pub async fn append_object_by_path(&self, bucket: &str, object: &str, append_position: &u64, object_path: &str) -> AppendS3ObjectResp {
         // add the body
         let f = File::open(object_path).expect("Error to open the object file");
         let mut reader = BufReader::new(f);
@@ -112,39 +128,39 @@ impl S3Client {
         let mut client = HttpClient::new(retry_times);
         client.set_headers(request.headers);
         
+        let mut rtext = AppendS3ObjectResp {
+            bucket: bucket.to_string(),
+            name: object.to_string(),
+            next_append_position: 0,
+            err: Errno::Esucc,
+        };
+
         let resp = client.request(&final_url, &body, &HttpMethod::Post, true).await;
         match resp {
             Ok(resp) => {
                 if resp.status == 403 {
-                    return Err(Errno::Eaccess)
+                    rtext.err = Errno::Eaccess;
+                    return rtext
+                } else if resp.status == 409 {
+                    println!("The value of position does not match the length of the current Object.");
+                    rtext.err = Errno::Eoffset;
+                    return self.get_next_position(resp.headers, rtext)
                 } else if resp.status >= 300 {
                     println!("Failed to append object by path, resp status is: {}, body is: {}", resp.status, resp.body);
-                    return Err(Errno::Eintr)
+                    rtext.err = Errno::Eintr;
+                    return rtext
                 }
 
-                let next_append_position = resp.headers.get("x-amz-next-append-position");
-                match next_append_position {
-                    Some(position) => {
-                        let rtext = AppendS3ObjectResp {
-                            bucket: bucket.to_string(),
-                            name: object.to_string(),
-                            next_append_position: position.parse::<u64>().unwrap(),
-                        };
-                        return Ok(rtext);
-                    }
-                    None => {
-                        println!("Err next append object position is None.");
-                        return Err(Errno::Eintr)
-                    }
-                }
+                return self.get_next_position(resp.headers, rtext)
             }
             Err(_) => {
-                return Err(Errno::Eintr)
+                rtext.err =Errno::Eintr;
+                return rtext
             }
         }
     }
 
-    pub async fn append_object(&self, bucket: &str, object: &str, append_position: &u64, data: &[u8]) -> Result<AppendS3ObjectResp, Errno> {
+    pub async fn append_object(&self, bucket: &str, object: &str, append_position: &u64, data: &[u8]) -> AppendS3ObjectResp {
         // create url
         let params = String::from("?append");
         let path = format!("/{}/{}", bucket, object);
@@ -167,34 +183,34 @@ impl S3Client {
         let mut client = HttpClient::new(retry_times);
         client.set_headers(request.headers);
 
+        let mut rtext = AppendS3ObjectResp {
+            bucket: bucket.to_string(),
+            name: object.to_string(),
+            next_append_position: 0,
+            err: Errno::Esucc,
+        };
+
         let resp = client.request(&final_url, data, &HttpMethod::Post, true).await;
         match resp {
             Ok(resp) => {
                 if resp.status == 403 {
-                    return Err(Errno::Eaccess)
+                    rtext.err = Errno::Eaccess;
+                    return rtext
+                } else if resp.status == 409 {
+                    println!("The value of position does not match the length of the current Object.");
+                    rtext.err = Errno::Eoffset;
+                    return self.get_next_position(resp.headers, rtext)
                 } else if resp.status >= 300 {
                     println!("Failed to append object, resp status is: {}, body is: {}", resp.status, resp.body);
-                    return Err(Errno::Eintr)
+                    rtext.err = Errno::Eintr;
+                    return rtext
                 }
 
-                let next_append_position = resp.headers.get("x-amz-next-append-position");
-                match next_append_position {
-                    Some(position) => {
-                        let rtext = AppendS3ObjectResp {
-                            bucket: bucket.to_string(),
-                            name: object.to_string(),
-                            next_append_position: position.parse::<u64>().unwrap(),
-                        };
-                        return Ok(rtext);
-                    }
-                    None => {
-                        println!("Err next append object position is None.");
-                        return Err(Errno::Eintr)
-                    }
-                }
+                return self.get_next_position(resp.headers, rtext)
             }
             Err(_) => {
-                return Err(Errno::Eintr)
+                rtext.err = Errno::Eintr;
+                return rtext
             }
         }
     }

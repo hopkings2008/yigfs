@@ -182,14 +182,14 @@ impl YigIoWorker{
     fn write(&self, bucket: &String, object: &String, offset: u64, data: &[u8]) -> Result<u64, Errno>{
         let ret = self.exec.get_runtime().
         block_on(self.s3_client.append_object(bucket, object, &offset, data));
-        match ret {
-            Ok(ret) => {
+        match ret.err {
+            Errno::Esucc => {
                 return Ok(ret.next_append_position);
             }
-            Err(err) => {
+            _ => {
                 println!("failed to append({}/{}, offset: {}, size: {}, err: {:?}",
-                bucket, object, offset, data.len(), err);
-                return Err(err);
+                bucket, object, offset, data.len(), ret.err);
+                return Err(ret.err);
             }
         }
     }

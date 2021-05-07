@@ -25,11 +25,17 @@ func(yigFs *YigFsStorage) GetIncompleteUploadSegs(ctx context.Context, seg *type
 	if err != nil {
 		return
 	}
-	if len(segs.Segments) == 0 {
+
+	if len(segs.UploadSegments) == 0 {
 		helper.Logger.Warn(ctx, fmt.Sprintf("GetIncompleteUploadSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
 			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
-		segs.Segments = make([]*types.IncompleteUploadSegInfo, 0)
-		return
+		segs.UploadSegments = make([]*types.IncompleteUploadSegInfo, 0)
+	}
+
+	if len(segs.RemoveSegments) == 0 {
+		helper.Logger.Warn(ctx, fmt.Sprintf("GetRemoveSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+		segs.RemoveSegments = make([]*types.RemoveSegInfo, 0)
 	}
 
 	return

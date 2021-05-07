@@ -108,7 +108,7 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetI
 				NextOffset: latestOffset,
 			}
 
-			segsResp.Segments = append(segsResp.Segments, segInfo)
+			segsResp.UploadSegments = append(segsResp.UploadSegments, segInfo)
 		}
 	}
 
@@ -118,7 +118,7 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetI
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.Segments)))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.UploadSegments)))
 	return
 }
 

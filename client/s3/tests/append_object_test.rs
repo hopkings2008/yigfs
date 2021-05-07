@@ -1,5 +1,6 @@
 use common::runtime::Executor;
 use s3::s3_client::S3Client;
+use common::error::Errno;
 
 #[test]
 fn test_append_object_by_path()->Result<(), String> {
@@ -15,13 +16,13 @@ fn test_append_object_by_path()->Result<(), String> {
 
     let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
     let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&target_bucket, &target_object, &append_position, &object_path));
-    match resp {
-        Ok(result) => {
-            println!("test_append_object_by_path resp is {:?}", result);
+    match resp.err {
+        Errno::Esucc => {
+            println!("test_append_object_by_path resp is {:?}", resp);
             return Ok(());
         }
-        Err(error) => {
-            return Err(format!("Failed to append object by path, error {:?}", error));
+        _ => {
+            return Err(format!("Failed to append object by path, resp {:?}", resp));
         }
     }
 }
@@ -40,13 +41,13 @@ fn test_append_object()->Result<(), String> {
 
     let s3_client = S3Client::new(&region, &endpoint, &ak, &sk);
     let resp = exec.get_runtime().block_on(s3_client.append_object(&target_bucket, &target_object, &append_position, &data));
-    match resp {
-        Ok(result) => {
-            println!("test_append_object resp is {:?}", result);
+    match resp.err {
+        Errno::Esucc => {
+            println!("test_append_object resp is {:?}", resp);
             return Ok(());
         }
-        Err(error) => {
-            return Err(format!("Failed to append object, error {:?}", error));
+        _ => {
+            return Err(format!("Failed to append object, resp {:?}", resp));
         }
     }
 }
