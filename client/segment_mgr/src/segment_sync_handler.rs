@@ -305,7 +305,7 @@ impl SegSyncHandler{
                     s.set_state(SegState::MetaUpload);
                     // update the segment offset.
                     s.set_offset(offset);
-                    let ret = self.meta_store.upload_segment_async(op.id0, op.id1, offset-1, self.meta_op_tx.clone());
+                    let ret = self.meta_store.upload_segment_async(op.id0, op.id1, offset, self.meta_op_tx.clone());
                     if !ret.is_success() {
                         println!("handle_backend_store_write: failed to send update segment for id0: {}, id1: {}, offset: {}, err: {:?}",
                         op.id0, op.id1, offset, ret);
