@@ -138,6 +138,7 @@ impl YigIoWorker{
                     Ok(ret) => {
                         resp.offset = ret - msg_write.data.len() as u64;
                         resp.nwrite = msg_write.data.len() as u32;
+                        resp.err = Errno::Esucc;
                     }
                     Err(err) => {
                         println!("failed to write to yig for {}/{}, offset: {}, data len: {}, err: {:?}",
