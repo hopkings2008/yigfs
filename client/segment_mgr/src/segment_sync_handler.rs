@@ -116,8 +116,8 @@ impl SegSyncHandler{
                 // we will skip the op if it is being processed.
                 let seg_id = NumberOp::to_u128(op.id0, op.id1);
                 if self.seg_state_machines.contains_key(&seg_id) {
-                    println!("SegSyncHandler::do_op: seg(id0: {}, id1: {}) is being processed, skip upload op",
-                op.id0, op.id1);
+                    //println!("SegSyncHandler::do_op: seg(id0: {}, id1: {}) is being processed, skip upload op",
+                //op.id0, op.id1);
                     return;
                 }
                 let mut seg_state = SegStateMachine::new(

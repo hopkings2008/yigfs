@@ -246,7 +246,7 @@ impl DiskIoWorker {
                         let vdata = data[..ret].to_vec();
                         resp_data.extend(vdata);
                         if total >= msg.size {
-                            println!("do_read: finish to read {} data for {:?}.", total, msg);
+                            //println!("do_read: finish to read {} data for {:?}.", total, msg);
                             break;
                         }
                     }
