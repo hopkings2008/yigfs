@@ -11,6 +11,7 @@ use crossbeam_channel::bounded;
 use crossbeam_channel::Sender;
 use std::sync::Arc;
 
+// make sure that YigBackend is thread safe.
 pub struct YigBackend{
     bucket: String,
     yig_pool: IoThreadPool,
