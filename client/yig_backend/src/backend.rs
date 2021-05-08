@@ -90,6 +90,10 @@ impl BackendStore for YigBackend{
                 match ret {
                     MsgFileOpResp::OpRespWrite(ret) => {
                         result.nwrite = ret.nwrite;
+                        if ret.err.is_bad_offset() {
+                            result.offset = ret.offset;
+                            result.nwrite = 0;
+                        }
                         result.err = ret.err;
                     }
                     _ => {

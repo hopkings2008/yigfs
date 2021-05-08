@@ -47,6 +47,7 @@ impl Leader for LeaderLocal {
             let seg_dir = self.segment_mgr.get_segment_dir(seg.seg_id0, seg.seg_id1);
             let ret = self.cache_store.open(seg.seg_id0, seg.seg_id1, &seg_dir);
             if ret.is_success(){
+                // try to perform sync from backend store.
                 continue;
             }
             println!("LeaderLocal open: seg(id0: {}, id1: {}) for ino: {} failed, err: {:?}",

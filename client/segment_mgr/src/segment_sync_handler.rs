@@ -245,6 +245,7 @@ impl SegSyncHandler{
                         }
                         return;
                     }
+                    // no more data read... this will return early in eof.
                 }
                 _ => {
                     println!("SegSyncHandler::handle_cache_read: got invalid state: {:?} for seg id0: {}, id1: {}",
@@ -291,6 +292,21 @@ impl SegSyncHandler{
             }
             // check whether former write op is successful or not.
             if !op.err.is_success(){
+                // check whether the former input offset is not the size of the backend object.
+                if op.err.is_bad_offset() {
+                    // reset the offset to read from cache and write again.
+                    s.set_state(SegState::CacheRead);
+                    s.set_offset(op.offset);
+                    let ret = self.cache_store.read_async(op.id0, op.id1, s.get_dir(), 
+                    op.offset, 4<<20, self.cache_op_tx.clone());
+                    if !ret.is_success(){
+                        println!("handle_backend_store_write: failed to perform cache read for seg id0: {}, id1: {}, dir: {}, offset: {}, err: {:?}",
+                        op.id0, op.id1, op.offset, s.get_dir(), ret);
+                        self.cache_store.close(op.id0, op.id1);
+                        self.seg_state_machines.remove(&seg_id);
+                        return;
+                    }
+                }
                 println!("handle_backend_store_write: write failed for id0: {}, id1: {} with offset: {}, err: {:?}",
                 op.id0, op.id1, s.get_offset(), op.err);
                 self.cache_store.close(op.id0, op.id1);

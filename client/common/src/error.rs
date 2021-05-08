@@ -92,4 +92,15 @@ impl Errno {
             }
         }
     }
+
+    pub fn is_bad_offset(&self) -> bool {
+        match *self {
+            Errno::Eoffset => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
 }

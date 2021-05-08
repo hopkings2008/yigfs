@@ -134,16 +134,21 @@ impl YigIoWorker{
                 };
                 let ret = self.write(&msg_write.dir, &obj, msg_write.offset,
                      msg_write.data.as_slice());
-                match ret {
-                    Ok(ret) => {
-                        resp.offset = ret - msg_write.data.len() as u64;
+                match ret.err {
+                    Errno::Esucc => {
+                        resp.offset = ret.offset - msg_write.data.len() as u64;
                         resp.nwrite = msg_write.data.len() as u32;
                         resp.err = Errno::Esucc;
                     }
-                    Err(err) => {
+                    Errno::Eoffset => {
+                        resp.offset = ret.offset;
+                        resp.nwrite = 0;
+                        resp.err = Errno::Eoffset;
+                    }
+                    _ => {
                         println!("failed to write to yig for {}/{}, offset: {}, data len: {}, err: {:?}",
-                        msg_write.dir, obj, msg_write.offset, msg_write.data.len(), err);
-                        resp.err = err;
+                        msg_write.dir, obj, msg_write.offset, msg_write.data.len(), ret.err);
+                        resp.err = ret.err;
                     }
                 }
                 let ret = msg_write.resp_sender.send(MsgFileOpResp::OpRespWrite(resp));
@@ -179,17 +184,32 @@ impl YigIoWorker{
         }
     }
 
-    fn write(&self, bucket: &String, object: &String, offset: u64, data: &[u8]) -> Result<u64, Errno>{
+    fn write(&self, bucket: &String, object: &String, offset: u64, data: &[u8]) -> YigWriteResult{
+        let mut result  = YigWriteResult{
+            err: Errno::Eintr,
+            offset: 0,
+        };
         let ret = self.exec.get_runtime().
         block_on(self.s3_client.append_object(bucket, object, &offset, data));
         match ret.err {
             Errno::Esucc => {
-                return Ok(ret.next_append_position);
+                result.err = Errno::Esucc;
+                result.offset = ret.next_append_position;
+                result
+            }
+            Errno::Eoffset => {
+                result.err = Errno::Eoffset;
+                result.offset = ret.next_append_position;
+                println!("YigIoWorker: miss matched offset: {}, should be from offset: {} for object: {}",
+                offset, result.offset, object);
+                result
             }
             _ => {
                 println!("failed to append({}/{}, offset: {}, size: {}, err: {:?}",
                 bucket, object, offset, data.len(), ret.err);
-                return Err(ret.err);
+                result.err = ret.err;
+                result.offset = 0;
+                result
             }
         }
     }
@@ -209,6 +229,13 @@ impl YigIoWorker{
             }
         }
     }
+}
+
+struct YigWriteResult {
+    // write result.
+    pub err: Errno,
+    // next_offset.
+    pub offset: u64,
 }
 
 pub struct YigIoWorkerFactory{
