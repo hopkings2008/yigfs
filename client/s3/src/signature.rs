@@ -5,7 +5,8 @@ use chrono::{DateTime, Utc, NaiveDate};
 use digest::Digest;
 use hex;
 use hmac::{Hmac, Mac, NewMac};
-
+use md5::Md5;
+use base64;
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use sha2::Sha256;
 
@@ -331,6 +332,10 @@ impl SignedRequest {
 
         self.remove_header("x-amz-content-sha256");
         self.add_header("x-amz-content-sha256", &digest);
+
+        // add md5 header
+        let request_md5 = Md5::digest(payload);
+        self.add_header("Content-Md5", &base64::encode(&*request_md5));
 
         // add host header
         self.remove_header("host");
