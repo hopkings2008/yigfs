@@ -43,7 +43,7 @@ impl SegmentMgr {
             let mut segment : Segment = Default::default();
             segment.seg_id0 = s.seg_id0;
             segment.seg_id1 = s.seg_id1;
-            segment.max_size = s.max_size;
+            segment.capacity = s.capacity;
             segment.leader = s.leader;
             for b in s.blocks {
                 let block = Block{
@@ -72,7 +72,7 @@ impl SegmentMgr {
         }
         let mut seg = Segment::new(&l);
         let idx = self.get_segment_dir_idx(seg.seg_id0, seg.seg_id1);
-        seg.max_size = self.data_dirs[idx].size;
+        seg.capacity = self.data_dirs[idx].size;
         seg
     }
 
