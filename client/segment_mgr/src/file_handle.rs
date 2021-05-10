@@ -336,7 +336,7 @@ impl HandleMgr {
                 found = true;
                 id0 = l.seg_id0;
                 id1 = l.seg_id1;
-                max_size = l.max_size;
+                max_size = l.capacity;
             }
         }
         if found {

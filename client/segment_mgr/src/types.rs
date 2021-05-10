@@ -17,7 +17,9 @@ pub struct Segment {
     // seg_id will be generated from UUID. And UUID is u128, so we need two i64s.
     pub seg_id0: u64,
     pub seg_id1: u64,
-    pub max_size: u64,
+    pub capacity: u64,
+    pub size: u64,
+    pub backend_size: u64,
     pub leader: String,
     pub blocks: Vec<Block>,
     // ino --> largest_offset
@@ -29,7 +31,9 @@ impl Default for Segment {
         Segment{
             seg_id0: 0,
             seg_id1: 0,
-            max_size: 0,
+            capacity: 0,
+            size: 0,
+            backend_size: 0,
             leader: Default::default(),
             blocks: Default::default(),
             file_largest_offsets: HashMap::new(),
@@ -43,18 +47,22 @@ impl Segment {
         Segment{
             seg_id0: ids[0],
             seg_id1: ids[1],
-            max_size: 0,
+            capacity: 0,
+            size: 0,
+            backend_size: 0,
             leader: leader.clone(),
             blocks: Vec::<Block>::new(),
             file_largest_offsets: HashMap::new(),
         }
     }
 
-    pub fn rich_new(id0: u64, id1: u64, max_size: u64, leader: String) -> Self{
+    pub fn rich_new(id0: u64, id1: u64, capacity: u64, leader: String) -> Self{
         Segment{
             seg_id0: id0,
             seg_id1: id1,
-            max_size: max_size,
+            capacity: capacity,
+            size: 0,
+            backend_size: 0,
             leader: leader,
             blocks: Vec::<Block>::new(),
             file_largest_offsets: HashMap::new(),
@@ -65,7 +73,9 @@ impl Segment {
         let mut s = Segment{
             seg_id0: self.seg_id0,
             seg_id1: self.seg_id1,
-            max_size: self.max_size,
+            capacity: self.capacity,
+            size: self.size,
+            backend_size: self.backend_size,
             leader: self.leader.clone(),
             blocks: Vec::<Block>::new(),
             file_largest_offsets: HashMap::new(),
@@ -143,7 +153,7 @@ impl Segment {
         let mut meta_seg = MetaSegment {
             seg_id0: self.seg_id0,
             seg_id1: self.seg_id1,
-            max_size: self.max_size,
+            capacity: self.capacity,
             leader: self.leader.clone(),
             blocks: Vec::new(),
         };

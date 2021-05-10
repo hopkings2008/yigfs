@@ -382,7 +382,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             let mut segment : Segment = Default::default();
             segment.seg_id0 = s.seg_id0;
             segment.seg_id1 = s.seg_id1;
-            segment.max_size = s.max_size;
+            segment.capacity = s.capacity;
             segment.leader = s.leader;
             for b in s.blocks {
                 let block = Block{
@@ -406,7 +406,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         let mut s = MsgSegment{
             seg_id0: seg.seg_id0,
             seg_id1: seg.seg_id1,
-            max_size: seg.max_size,
+            capacity: seg.capacity,
             leader: seg.leader.clone(),
             blocks: Vec::new(),
         };
@@ -709,7 +709,7 @@ impl MetaServiceMgrImpl {
         let mut m = MsgSegment {
             seg_id0: s.seg_id0,
             seg_id1: s.seg_id1,
-            max_size: s.max_size,
+            capacity: s.capacity,
             leader: s.leader.clone(),
             blocks: Vec::new(),
         };

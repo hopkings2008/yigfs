@@ -194,7 +194,7 @@ impl Leader for LeaderLocal {
                         self.handle_mgr.add_segment(ino, &seg);
                         id0 = seg.seg_id0;
                         id1 = seg.seg_id1;
-                        seg_max_size = seg.max_size;
+                        seg_max_size = seg.capacity;
                         println!("LeadLocal: write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
                     id0, id1, ino, offset);
                         continue;
