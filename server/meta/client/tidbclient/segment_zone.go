@@ -79,8 +79,7 @@ func(t *TidbClient) GetSegsByLeader(ctx context.Context, seg *types.GetIncomplet
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get segments by leader, zone: %v, region: %v, bucket: %v, machine: %v", 
-		seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get segments by leader, number: %v", len(segsResp)))
 	return
 }
 

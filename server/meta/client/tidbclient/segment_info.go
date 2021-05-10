@@ -155,7 +155,7 @@ func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.G
 	}()
 
 	var capacity, size, backendSize int
-	var maxRemainingCapacity, slowestGrowingSegCapacity int 
+	var maxRemainingCapacity, segCapacity, segSize, segBackendSize int 
 	var slowestGrowingSegIndex int = -1
 	for i, seg := range segIds {
 		row := stmt.QueryRow(segReq.Region, segReq.BucketName, seg.SegmentId0, seg.SegmentId1, types.NotDeleted)
@@ -174,14 +174,18 @@ func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.G
 
 		if i == 0 {
 			maxRemainingCapacity = capacity - size
-			slowestGrowingSegCapacity = capacity
+			segCapacity = capacity
 			slowestGrowingSegIndex = 0
+			segSize = size
+			segBackendSize = backendSize
 		} else {
 			remainingCapacity := capacity - size
 			if remainingCapacity > maxRemainingCapacity {
 				maxRemainingCapacity = remainingCapacity
-				slowestGrowingSegCapacity = capacity
+				segCapacity = capacity
 				slowestGrowingSegIndex = i
+				segSize = size
+				segBackendSize = backendSize
 			}
 		}
 	}
@@ -193,9 +197,9 @@ func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.G
 		resp = &types.GetTheSlowestGrowingSeg {
 			SegmentId0: segIds[slowestGrowingSegIndex].SegmentId0,
 			SegmentId1: segIds[slowestGrowingSegIndex].SegmentId1,
-			Capacity: slowestGrowingSegCapacity,
-			BackendSize: backendSize,
-			Size: size,
+			Capacity: segCapacity,
+			BackendSize: segBackendSize,
+			Size: segSize,
 		}
 	}
 
