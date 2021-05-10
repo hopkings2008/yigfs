@@ -15,6 +15,7 @@ type GetSegmentReq struct {
 	Offset     int64          `json:"offset"`
 	Size       int          `json:"size"`
 	ZoneId     string 	`json:"zone"`
+	Machine string `json:"machine"`
 }
 
 type GetSegmentResp struct {
@@ -26,7 +27,9 @@ type SegmentInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
 	Leader string `json:"leader"`
-	MaxSize int `json:"max_size,omitempty"`
+	Capacity int `json:"capacity,omitempty"`
+	BackendSize int `json:"backend_size"`
+	Size int `json:"size"`
 	Blocks []*BlockInfo `json:"blocks"`
 }
 
@@ -54,7 +57,7 @@ type CreateBlocksInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
 	Leader string `json:"leader,omitempty"`
-	MaxSize int `json:"max_size"`
+	Capacity int `json:"capacity"`
 	Blocks []*BlockInfo `json:"blocks"`
 }
 
@@ -108,4 +111,13 @@ type DescriptBlockInfo struct {
 	Generation uint64 `json:"generation,omitempty"`
 	SegmentId0 uint64 `json:"seg_id0,omitempty"`
 	SegmentId1 uint64 `json:"seg_id1,omitempty"`
+}
+
+type GetTheSlowestGrowingSeg struct {
+	SegmentId0 uint64 `json:"seg_id0"`
+	SegmentId1 uint64 `json:"seg_id1"`
+	Leader string `json:"leader"`
+	Capacity int `json:"capacity,omitempty"`
+	BackendSize int `json:"backend_size"`
+	Size int `json:"size"`
 }

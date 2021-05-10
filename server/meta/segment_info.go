@@ -7,10 +7,6 @@ import (
 )
 
 
-func(m *Meta) GetSegmentInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error) {
-	return m.Client.GetSegmentInfo(ctx, segment)
-}
-
 func(m *Meta) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
 	return m.Client.CreateSegmentInfo(ctx, segment)
 }
@@ -19,10 +15,14 @@ func(m *Meta) UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockI
 	return m.Client.UpdateSegBlockInfo(ctx, seg)
 }
 
-func(m *Meta) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
-	return m.Client.GetIncompleteUploadSegs(ctx, seg)
+func(m *Meta) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.GetIncompleteUploadSegsReq, segs []*types.IncompleteUploadSegInfo) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
+	return m.Client.GetIncompleteUploadSegs(ctx, segInfo, segs)
 }
 
-func(m *Meta) UpdateSegLatestEndAddr(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
-	return m.Client.UpdateSegLatestEndAddr(ctx, seg)
+func(m *Meta) UpdateSegSize(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
+	return m.Client.UpdateSegSize(ctx, seg)
+}
+
+func(m *Meta) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error) {
+	return m.Client.GetTheSlowestGrowingSeg(ctx, segReq, segIds)
 }

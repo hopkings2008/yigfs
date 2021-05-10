@@ -53,7 +53,7 @@ func (yigFs *YigFsStorage) GetFileSegmentsInfo(ctx context.Context, seg *types.G
 		}
 	}
 
-	resp = &types.GetSegmentResp{}
+	resp = &types.GetSegmentResp {}
 
 	if checkOffset > 0 {
 		var includeSegs = make(map[interface{}][]int64)
@@ -98,8 +98,7 @@ func (yigFs *YigFsStorage) GetFileSegmentsInfo(ctx context.Context, seg *types.G
 			}
 		}
 
-		helper.Logger.Error(ctx, fmt.Sprintf("req: greaterSegs: %v, includeSegs: %v", greaterSegs, includeSegs))
-
+		helper.Logger.Info(ctx, fmt.Sprintf("req: greaterSegs: %v, includeSegs: %v", greaterSegs, includeSegs))
 		getGreatherBlocksResp, err := yigFs.MetaStorage.Client.GetSegsBlockInfo(ctx, seg, greaterSegs, greaterOffset)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("getGreaterOffsetIndexSegs: Failed to get blocks info, region: %s, bucket: %s, ino: %d, generation: %d",
@@ -108,6 +107,7 @@ func (yigFs *YigFsStorage) GetFileSegmentsInfo(ctx context.Context, seg *types.G
 		}
 
 		resp.Segments = getGreatherBlocksResp.Segments
+	
 	} else {
 		greaterSegs, greaterOffset, err := getGreaterOffsetIndexSegs(ctx, seg, checkOffset, yigFs)
 		if err != nil {
@@ -289,17 +289,15 @@ func checkCoveredExistedBlocksAndDeleted(ctx context.Context, blockInfo *types.D
 	return
 }
 
-func insertSegBlockAndCheckMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (blockId int64, isCanMerge bool, err error) {
-	blockId, isCanMerge, err = yigFs.MetaStorage.Client.InsertSegmentBlock(ctx, blockInfo, block)
+func insertSegAndFileBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (err error) {
+	// insert segment block
+	blockId, err := yigFs.MetaStorage.Client.InsertSegmentBlock(ctx, blockInfo, block)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insertSegBlockAndCheckMerge, offset: %v", block.Offset))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to InsertSegmentBlock, offset: %v", block.Offset))
 		return
 	}
 
-	return
-}
-
-func mergeOrInsertFileBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, isCanMerge bool, yigFs *YigFsStorage) (err error) {
+	//insert file block
 	blockReq := &types.FileBlockInfo{
 		Region:     blockInfo.Region,
 		BucketName: blockInfo.BucketName,
@@ -307,43 +305,86 @@ func mergeOrInsertFileBlock(ctx context.Context, blockInfo *types.DescriptBlockI
 		Generation: blockInfo.Generation,
 		SegmentId0: blockInfo.SegmentId0,
 		SegmentId1: blockInfo.SegmentId1,
+		BlockId: blockId,
+		Size: block.Size,
+		Offset: block.Offset,
+		FileBlockEndAddr: block.FileBlockEndAddr,
 	}
-
-	if isCanMerge {
-		isMerge, mergeBlock, err := yigFs.MetaStorage.Client.GetMergeBlock(ctx, blockInfo, block)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("mergeOrInsertFileBlock: Failed to get merge block, ofset:%v", block.Offset))
-			return err
-		}
-
-		if isMerge {
-			blockReq.BlockId = mergeBlock.BlockId
-			blockReq.Size = mergeBlock.Size + block.Size
-			blockReq.Offset = mergeBlock.Offset
-			blockReq.FileBlockEndAddr = mergeBlock.FileBlockEndAddr + int64(block.Size)
-
-			err = yigFs.MetaStorage.Client.UpdateBlock(ctx, blockReq)
-			if err != nil {
-				return err
-			}
-
-			helper.Logger.Info(ctx, fmt.Sprintf("Succeed to merge block, offset: %v, blockId: %v", block.Offset, block.BlockId))
-			return nil
-		}
-	}
-
-	// if not merge, insert it.
-	blockReq.BlockId = block.BlockId
-	blockReq.Size = block.Size
-	blockReq.Offset = block.Offset
-	blockReq.FileBlockEndAddr = block.FileBlockEndAddr
-
 	err = yigFs.MetaStorage.Client.CreateFileBlock(ctx, blockReq)
 	if err != nil {
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert block, offset: %v, blockId: %v", block.Offset, block.BlockId))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert file block, offset: %v, blockId: %v", block.Offset, block.BlockId))
+	return
+}
+
+func mergeSegAndFileBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block, mergeSegBlock *types.BlockInfo, 
+	mergeFileBlock *types.FileBlockInfo, yigFs *YigFsStorage) (err error) {
+	// merge segment block
+	mergeSegBlockReq := &types.BlockInfo {
+		Size: mergeSegBlock.Size + block.Size,
+		SegEndAddr: block.SegStartAddr + block.Size,
+		BlockId: block.BlockId,
+	}
+	err = yigFs.MetaStorage.Client.MergeSegmentBlock(ctx, blockInfo, mergeSegBlockReq)
+	if err != nil {
+		return err
+	}
+
+	// merge file block
+	blockReq := &types.FileBlockInfo{
+		Region:     blockInfo.Region,
+		BucketName: blockInfo.BucketName,
+		Ino:        blockInfo.Ino,
+		Generation: blockInfo.Generation,
+		Offset: mergeFileBlock.Offset,
+		BlockId: block.BlockId,
+		Size: mergeFileBlock.Size + block.Size,
+		FileBlockEndAddr: mergeFileBlock.FileBlockEndAddr + int64(block.Size),
+	}
+	err = yigFs.MetaStorage.Client.UpdateBlock(ctx, blockReq)
+	if err != nil {
+		return err
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to merge file and segment block, offset: %v, blockId: %v", block.Offset, block.BlockId))
+	return nil
+}
+
+func insertOrMergeFileandSegBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (err error) {
+	// check whether the block can be merge in segment_blocks table or not.
+	isCanMerge, segBlock, err := yigFs.MetaStorage.Client.IsBlockCanMerge(ctx, blockInfo, block)
+	if err != nil {
+		return err
+	}
+
+	if isCanMerge {
+		// if can merge, then check whether the block can be merge in file_blocks table or not.
+		block.BlockId = segBlock.BlockId
+		isExisted, fileBlock, err := yigFs.MetaStorage.Client.GetMergeBlock(ctx, blockInfo, block)
+		if err != nil {
+			return err
+		}
+
+		if isExisted {
+			// if can merge, then merge it into segment_blocks table and file_blocks table.
+			err = mergeSegAndFileBlock(ctx, blockInfo, block, segBlock, fileBlock, yigFs)
+			if err != nil {
+				return err
+			}
+
+			helper.Logger.Info(ctx, fmt.Sprintf("Succeed to merge the block into file_blocks and segment_blocks tables, offset: %v", block.Offset))
+			return nil
+		}
+	}
+
+	// if it not merge in segment_blocks table or file_blocks table, then insert it into segment_blocks table and file_blocks table.
+	err = insertSegAndFileBlock(ctx, blockInfo, block, yigFs)
+	if err != nil {
+		return err
+	}
+
 	return
 }
 
@@ -351,10 +392,10 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	// Perform the following operations for each block:
 	// 1. get existed blocks fully covered by the uploading block, then deleted them.
 	// 2. deal partial overlap blocks by the uploading block.
-	// 3. insert the uploading block to segment_blocks table, and check it can be merged or not.
-	// 4. deal fully covered uploading blocks.
-	// 5. if step2 can be merge, then check the block in file_blocks table can be merged or not.
-	// if the block can be merge, merge it; else insert it.
+	// 3. deal fully covered uploading blocks.
+	// 4. check the uploading block in segment_blocks table and file_blocks table can be merged or not.
+	// if it can merge, merge it into segment_blocks table and file_blocks table.
+	// else insert it into segment_blocks table and file_blocks table.
 
 	blocksNum := len(seg.Segment.Blocks)
 	if blocksNum == 0 {
@@ -363,7 +404,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	}
 
 	// if the seg leader is not existed, create it.
-	// update max_end_addr for segment_info.
+	// update size for segment_info.
 	waitgroup.Add(1)
 	go func() {
 		defer waitgroup.Done()
@@ -387,7 +428,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 		segInfo := &types.UpdateSegBlockInfo{
 			SegmentId0: seg.Segment.SegmentId0,
 			SegmentId1: seg.Segment.SegmentId1,
-			MaxEndAddr: maxEnd,
+			Size: maxEnd,
 		}
 
 		updateReq := &types.UpdateSegBlockInfoReq{
@@ -397,7 +438,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 			SegBlockInfo: segInfo,
 		}
 
-		err = yigFs.MetaStorage.Client.UpdateSegLatestEndAddr(ctx, updateReq)
+		err = yigFs.MetaStorage.Client.UpdateSegSize(ctx, updateReq)
 		if err != nil {
 			return
 		}
@@ -435,25 +476,17 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 			}
 		}()
 
-		// 3. insert the uploading block to segment_blocks table, and check it can be merged or not.
-		blockId, isCanMerge, err := insertSegBlockAndCheckMerge(ctx, blockInfo, block, yigFs)
-		if err != nil {
-			helper.Logger.Error(ctx, "Failed to insert seg block.")
-			waitgroup.Wait()
-			return err
-		}
-		block.BlockId = blockId
-
-		// 4. deal fully covered uploading blocks.
+		// 3. deal fully covered uploading blocks.
 		err = dealFullCoveredUploadingBlocks(ctx, blockInfo, block, yigFs)
 		if err != nil {
 			waitgroup.Wait()
 			return err
 		}
 
-		// 5. if step2 can be merge, then check the block in file_blocks table can be merged or not.
-		// if the block can be merge, merge it; else insert it.
-		err = mergeOrInsertFileBlock(ctx, blockInfo, block, isCanMerge, yigFs)
+		// 4. check the uploading block in segment_blocks table and file_blocks table can be merged or not.
+		// if it can merge, merge it into segment_blocks table and file_blocks table.
+		// else insert it into segment_blocks table and file_blocks table.
+		err = insertOrMergeFileandSegBlock(ctx, blockInfo, block, yigFs)
 		if err != nil {
 			waitgroup.Wait()
 			return err
@@ -465,7 +498,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	return
 }
 
-func (yigFs *YigFsStorage) UpdateFileSizeAndBlock(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+func(yigFs *YigFsStorage) UpdateFileSizeAndBlock(ctx context.Context, file *types.GetFileInfoReq) (err error) {
 	// get all block size and blocks number.
 	allSize, allNumber, err := yigFs.MetaStorage.Client.GetFileBlockSize(ctx, file)
 	if err != nil {
@@ -477,5 +510,59 @@ func (yigFs *YigFsStorage) UpdateFileSizeAndBlock(ctx context.Context, file *typ
 		return
 	}
 
+	return
+}
+
+func(yigFs *YigFsStorage) GetTheSlowestGrowingSeg(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error) {
+	resp = &types.GetSegmentResp{}
+	segReq := &types.GetIncompleteUploadSegsReq {
+		ZoneId: seg.ZoneId,
+		Region: seg.Region,
+		BucketName: seg.BucketName,
+		Machine: seg.Machine,
+	}
+	segIds, err := yigFs.MetaStorage.Client.GetSegsByLeader(ctx, segReq)
+	switch err {
+	case ErrYigFsNoTargetSegment:
+		resp.Segments = make([]*types.SegmentInfo, 0)
+		helper.Logger.Warn(ctx, fmt.Sprintf("getSegsByLeader is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+		return resp, nil
+	case nil:
+		// 1. get the slowest growing segment.
+		isExisted, segInfo, getErr := yigFs.MetaStorage.Client.GetTheSlowestGrowingSeg(ctx, seg, segIds)
+		if err != nil {
+			return resp, getErr
+		}
+
+		if !isExisted {
+			resp.Segments = make([]*types.SegmentInfo, 0)
+			helper.Logger.Warn(ctx, fmt.Sprintf("getTheSlowestGrowingSeg is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+				seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+			return resp, nil
+		}
+
+		// 2. get all the blocks info for the slowest growing segment. 
+		segInfo.Leader = seg.Machine
+		resp, err = yigFs.MetaStorage.Client.GetBlocksBySegId(ctx, segInfo)
+		if err != nil {
+			return
+		}
+
+		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get the slowest growing seg, zone: %v, region: %s, bucket: %s, machine: %v",
+			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+		return
+	default:
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the slowest growing seg, zone: %v, region: %s, bucket: %s, machine: %v",
+			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+		return
+	}
+}
+
+func(yigFs *YigFsStorage) IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error) {
+	isExisted, err = yigFs.MetaStorage.Client.IsFileHasSegments(ctx, seg)
+	if err != nil {
+		return
+	}
 	return
 }

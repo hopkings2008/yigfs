@@ -50,7 +50,15 @@ func(m *Meta) GetFileBlockSize(ctx context.Context, file *types.GetFileInfoReq) 
 func(m *Meta) GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error) {
 	return m.Client.GetIncludeOffsetIndexSegs(ctx, seg, checkOffset)
 }
+
 func(m *Meta) GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error) {
 	return m.Client.GetGreaterOffsetIndexSegs(ctx, seg, checkOffset)
 }
 
+func(m *Meta) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlowestGrowingSeg) (resp *types.GetSegmentResp, err error) {
+	return m.Client.GetBlocksBySegId(ctx, seg)
+}
+
+func(m *Meta) IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error) {
+	return m.Client.IsFileHasSegments(ctx, seg)
+}

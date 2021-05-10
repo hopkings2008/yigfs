@@ -160,6 +160,7 @@ func Test_CreateFiles(t *testing.T) {
 
 func Test_WriteFile(t *testing.T) {
 	r := require.New(t)
+	
 	// get target file
 	file := &types.GetDirFileInfoReq{
 		Region: Region,
@@ -172,7 +173,7 @@ func Test_WriteFile(t *testing.T) {
 	r.Nil(err)
 	r.Equal(getDirFileResp.Result.ErrCode, 0)
 	t.Logf("Test_WriteFile Succeed to get dir file attr, resp: %s", getDirFileInfo)
-
+	
 	// upload block
 	createSegmentReq := &types.CreateSegmentReq {
 		Region: Region,
@@ -186,7 +187,7 @@ func Test_WriteFile(t *testing.T) {
 	segment := &types.CreateBlocksInfo {
 		SegmentId0: SegmentId0,
 		SegmentId1: SegmentId1,
-		MaxSize: SegMaxSize,
+		Capacity: Capacity,
 	}
 
 	offset := Offset
@@ -205,8 +206,10 @@ func Test_WriteFile(t *testing.T) {
 		if i != 0 {
 			segment.Blocks = segment.Blocks[1:]
 			createSegmentReq.Segment = *segment
+			t.Logf("block info: %v", block)
 		} else {
 			createSegmentReq.Segment = *segment
+			t.Logf("block info: %v", block)
 		}
 
 		t.Logf("Ready to upload block, req: %v", createSegmentReq.Segment)
@@ -221,6 +224,23 @@ func Test_WriteFile(t *testing.T) {
 		endAddr += Size
 	}
 
+	// get segments
+	getSegmentReq := &types.GetSegmentReq {
+		ZoneId: ZoneIdNew,
+		Region:     Region,
+		BucketName: BucketName,
+		Ino:        getDirFileResp.File.Ino,
+		Generation: Generation,
+		Machine: Machine2,
+		Offset:     0,
+		Size: 0,
+	}
+	
+	getSegResp, getSegInfo, err := GetSegmentInfo(getSegmentReq)
+	r.Nil(err)
+	r.Equal(getSegResp.Result.ErrCode, 0)
+	t.Logf("Succeed to get segment info from new zone, result: %s", getSegInfo)
+	
 	segment.SegmentId0 ++
 	segment.SegmentId1 ++
 
@@ -245,20 +265,13 @@ func Test_WriteFile(t *testing.T) {
 	r.Nil(err)
 	r.Equal(createSegResp.Result.ErrCode, 0)
 	t.Logf("Succeed to upload block, resp: %s", createSegInfo)
-
+	
 	// get segments
-	getSegmentReq := &types.GetSegmentReq {
-		ZoneId: ZoneId,
-		Region:     Region,
-		BucketName: BucketName,
-		Ino:        getDirFileResp.File.Ino,
-		Generation: Generation,
-		Offset:     0,
-		Size: 0,
-	}
-
-	getSegResp, getSegInfo, err := GetSegmentInfo(getSegmentReq)
+	getSegmentReq.ZoneId = ZoneId
+	getSegmentReq.Machine = Machine
+	getSegResp, getSegInfo, err = GetSegmentInfo(getSegmentReq)
 	r.Nil(err)
+	r.Equal(getSegResp.Result.ErrCode, 0)
 	t.Logf("Succeed to get segment info, result: %s", getSegInfo)
 
 	blockNum := getBlockNumber(getSegResp)
@@ -286,13 +299,47 @@ func Test_WriteFile(t *testing.T) {
 	r.Equal(blockNum, int64(5))
 }
 
+func Test_GetSegmentsForNewFile(t *testing.T) {
+	r := require.New(t)
+	
+	// get target file
+	file := &types.GetDirFileInfoReq{
+		Region: Region,
+		BucketName: BucketName,
+		ParentIno: FileParentIno,
+		FileName: "test.txt2",
+	}
+
+	getDirFileResp, getDirFileInfo, err := GetDirFileAttr(file)
+	r.Nil(err)
+	r.Equal(getDirFileResp.Result.ErrCode, 0)
+	t.Logf("Test_GetSegmentsForNewFile Succeed to get dir file attr, resp: %s", getDirFileInfo)
+
+	// get segments
+	getSegmentReq := &types.GetSegmentReq {
+		ZoneId: ZoneId,
+		Region:     Region,
+		BucketName: BucketName,
+		Ino:        getDirFileResp.File.Ino,
+		Generation: Generation,
+		Machine: Machine,
+		Offset:     0,
+		Size: 0,
+	}
+	
+	getSegResp, getSegInfo, err := GetSegmentInfo(getSegmentReq)
+	r.Nil(err)
+	r.Equal(getSegResp.Result.ErrCode, 0)
+	t.Logf("Succeed to Test_GetSegmentsForNewFile, result: %s", getSegInfo)
+}
+
 func Test_UpdateSegBlockInfo(t *testing.T) {
 	r := require.New(t)
 
 	block := &types.UpdateSegBlockInfo {
 		SegmentId0: SegmentId0,
 		SegmentId1: SegmentId1,
-		LatestOffset: LatestedOffset,
+		BackendSize: LatestedOffset,
 	}
 
 	segReq := &types.UpdateSegBlockInfoReq {
@@ -416,13 +463,12 @@ func Test_UpdateSegments(t *testing.T) {
 	startAddr := SegStartAddr
 	endAddr := SegEndAddr
 
-
 	for i := 0; i < 50; i++ {
 		segment := &types.CreateBlocksInfo {
 			SegmentId0: segId0,
 			SegmentId1: segId1,
 			Leader: Machine,
-			MaxSize: SegMaxSize,
+			Capacity: Capacity,
 		}
 
 		block := &types.BlockInfo {

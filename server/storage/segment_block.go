@@ -6,6 +6,7 @@ import (
 
 	"github.com/hopkings2008/yigfs/server/types"
 	"github.com/hopkings2008/yigfs/server/helper"
+	. "github.com/hopkings2008/yigfs/server/error"
 )
 
 
@@ -21,22 +22,35 @@ func(yigFs *YigFsStorage) UpdateSegBlockInfo(ctx context.Context, seg *types.Upd
 }
 
 func(yigFs *YigFsStorage) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segs *types.GetIncompleteUploadSegsResp, err error) {
-	segs, err = yigFs.MetaStorage.Client.GetIncompleteUploadSegs(ctx, seg)
-	if err != nil {
-		return
-	}
-
-	if len(segs.UploadSegments) == 0 {
+	getSegsResp, err := yigFs.MetaStorage.Client.GetSegsByLeader(ctx, seg)
+	switch err {
+	case ErrYigFsNoTargetSegment:
+		segs.UploadSegments = make([]*types.IncompleteUploadSegInfo, 0)
+		segs.RemoveSegments = make([]*types.RemoveSegInfo, 0)
 		helper.Logger.Warn(ctx, fmt.Sprintf("GetIncompleteUploadSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
 			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
-		segs.UploadSegments = make([]*types.IncompleteUploadSegInfo, 0)
-	}
+		return
+	case nil:
+		segs, err = yigFs.MetaStorage.Client.GetIncompleteUploadSegs(ctx, seg, getSegsResp)
+		if err != nil {
+			return
+		}
 
-	if len(segs.RemoveSegments) == 0 {
-		helper.Logger.Warn(ctx, fmt.Sprintf("GetRemoveSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+		if len(segs.UploadSegments) == 0 {
+			helper.Logger.Warn(ctx, fmt.Sprintf("GetIncompleteUploadSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+				seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+			segs.UploadSegments = make([]*types.IncompleteUploadSegInfo, 0)
+		}
+
+		if len(segs.RemoveSegments) == 0 {
+			helper.Logger.Warn(ctx, fmt.Sprintf("GetRemoveSegs is None, zone: %v, region: %v, bucket: %v, machine: %v", 
+				seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
+			segs.RemoveSegments = make([]*types.RemoveSegInfo, 0)
+		}
+		return
+	default:
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetIncompleteUploadSegs, zone: %v, region: %v, bucket: %v, machine: %v", 
 			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
-		segs.RemoveSegments = make([]*types.RemoveSegInfo, 0)
+		return
 	}
-
-	return
 }

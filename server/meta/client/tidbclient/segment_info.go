@@ -10,144 +10,197 @@ import (
 	"github.com/hopkings2008/yigfs/server/helper"
 )
 
-func GetSegmentLeaderSql() (sqltext string) {
-	sqltext = "select leader, max_size from segment_info where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+func GetSegmentInfoSql() (sqltext string) {
+	sqltext = "select capacity, backend_size, size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=?"
 	return sqltext
 }
 
 func CreateSegmentInfoSql() (sqltext string) {
-	sqltext = "insert into segment_info(zone_id, region, bucket_name, seg_id0, seg_id1, leader, max_size) values(?,?,?,?,?,?,?)"
+	sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity) values(?,?,?,?,?)"
 	return sqltext
 }
 
-func (t *TidbClient) GetSegmentInfo(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error) {
-	resp = &types.LeaderInfo {}
-
-	sqltext := GetSegmentLeaderSql()
-	row := t.Client.QueryRow(sqltext, segment.ZoneId, segment.Region, segment.BucketName, segment.SegmentId0, segment.SegmentId1)
-	err = row.Scan (
-		&resp.Leader,
-		&resp.MaxSize,
-	)
-
-	if err == sql.ErrNoRows {
-		err = ErrYigFsNoSuchLeader
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the segment leader, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	resp.ZoneId = segment.ZoneId
-	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get the segment leader from tidb, sqltext: %v", sqltext))
-	return
-}
-
 func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
-	sqltext := CreateSegmentInfoSql()
+	sqltext := CreateSegmentZoneSql()
 	args := []interface{}{segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0,
-		segment.Segment.SegmentId1, segment.Machine, segment.Segment.MaxSize}
-		
+		segment.Segment.SegmentId1, segment.Machine}
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment leader to tidb, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment zone to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create segment leader to tidb, sqltext: %v", sqltext))
+	sqltext = CreateSegmentInfoSql()
+	args = []interface{}{segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, segment.Segment.Capacity}
+	_, err = t.Client.Exec(sqltext, args...)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment info to tidb, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create segment info and zone to tidb, sqltext: %v", sqltext))
 	return
 }
 
 func (t *TidbClient) UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
-	sqltext := "update segment_info set latest_offset=? where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-	_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.LatestOffset, seg.ZoneId, seg.Region, seg.BucketName, 
-		seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
+	sqltext := "update segment_info set backend_size=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.BackendSize, seg.Region, seg.BucketName, seg.SegBlockInfo.SegmentId0, 
+		seg.SegBlockInfo.SegmentId1, types.NotDeleted)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update seg block info to tidb, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update segment block info to tidb, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update seg block info to tidb, latest offset: %v", seg.SegBlockInfo.LatestOffset))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update segment block info to tidb, backend_size: %v", seg.SegBlockInfo.BackendSize))
 	return
 }
 
-func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
+func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.GetIncompleteUploadSegsReq, 
+	segs []*types.IncompleteUploadSegInfo) (segsResp *types.GetIncompleteUploadSegsResp, err error) {
 	segsResp = &types.GetIncompleteUploadSegsResp{}
-	sqltext := "select seg_id0, seg_id1, latest_offset, max_end_addr from segment_info where zone_id=? and region=? and bucket_name=? and leader=? and is_deleted=?"
-	rows, err := t.Client.Query(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Machine, types.NotDeleted)
-	if err == sql.ErrNoRows {
-		err = nil
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, err: %v", err))
-		return
-	}
-	defer rows.Close()
-
-	var segId0, segId1 uint64
-	var latestOffset, maxEndAddr int
-
-	for rows.Next() {
-		err = rows.Scan(
-			&segId0,
-			&segId1,
-			&latestOffset,
-			&maxEndAddr)
+	sqltext := "select backend_size, size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	var stmt *sql.Stmt
+	stmt, err = t.Client.Prepare(sqltext)
 		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query incomplete segs getting by leader, err: %v", err))
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare get incomplete upload segments, err: %v", err))
+			err = ErrYIgFsInternalErr
 			return
 		}
 
-		if latestOffset < maxEndAddr {
-			segInfo := &types.IncompleteUploadSegInfo{
-				SegmentId0: segId0,
-				SegmentId1: segId1,
-				NextOffset: latestOffset,
-			}
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close get incomplete upload segments stmt, err: %v", err))
+			err = ErrYIgFsInternalErr
+		}
+	}()
 
+	var backendSize, size int
+	for _, seg := range segs {
+		row := stmt.QueryRow(segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, types.NotDeleted)
+		err = row.Scan (
+			&backendSize,
+			&size,
+		)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		if backendSize < size {
+			segInfo := &types.IncompleteUploadSegInfo{
+				SegmentId0: seg.SegmentId0,
+				SegmentId1: seg.SegmentId1,
+				NextOffset: backendSize,
+			}
 			segsResp.UploadSegments = append(segsResp.UploadSegments, segInfo)
 		}
-	}
-
-	err = rows.Err()
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for incomplete segs getting by leader, err: %v", err))
-		return
 	}
 
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.UploadSegments)))
 	return
 }
 
-func (t *TidbClient) UpdateSegLatestEndAddr(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
-	sqltext := "select max_end_addr from segment_info where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-	var maxEndAddr int
-	row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
+func (t *TidbClient) UpdateSegSize(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
+	sqltext := "select size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	var size int
+	row := t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
 	err = row.Scan (
-		&maxEndAddr,
+		&size,
 	)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("UpdateSegLatestEndAddr: Failed to get the latest_end_add, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("UpdateSegSize: Failed to get the segment size, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	if seg.SegBlockInfo.MaxEndAddr > maxEndAddr {
-		sqltext = "update segment_info set max_end_addr=? where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-		_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.MaxEndAddr, seg.ZoneId, seg.Region, seg.BucketName, 
+	if seg.SegBlockInfo.Size > size {
+		sqltext = "update segment_info set size=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+		_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.Size, seg.Region, seg.BucketName, 
 			seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
 		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to update seg latest end addr, err: %v", err))
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to update segment size, err: %v", err))
 			err = ErrYIgFsInternalErr
 			return
 		}
-		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update seg latest end addr, latest end addr: %v", seg.SegBlockInfo.MaxEndAddr))
+		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update the segment size, size: %v", seg.SegBlockInfo.Size))
 	}
 
-	helper.Logger.Info(ctx, "Succeed to update seg latest end addr")
+	helper.Logger.Info(ctx, "Succeed to update segment size")
 	return
 }
+
+func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, 
+	segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error) {
+	resp = &types.GetTheSlowestGrowingSeg{}
+	sqltext := "select capacity, backend_size, size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	var stmt *sql.Stmt
+	stmt, err = t.Client.Prepare(sqltext)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare get the segment info, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close get the segment info stmt, err: %v", err))
+			err = ErrYIgFsInternalErr
+		}
+	}()
+
+	var capacity, size, backendSize int
+	var maxRemainingCapacity, slowestGrowingSegCapacity int 
+	var slowestGrowingSegIndex int = -1
+	for i, seg := range segIds {
+		row := stmt.QueryRow(segReq.Region, segReq.BucketName, seg.SegmentId0, seg.SegmentId1, types.NotDeleted)
+		err = row.Scan (
+			&capacity,
+			&backendSize,
+			&size,
+		)
+		if err == sql.ErrNoRows {
+			continue
+		} else if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the segment info, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		if i == 0 {
+			maxRemainingCapacity = capacity - size
+			slowestGrowingSegCapacity = capacity
+			slowestGrowingSegIndex = 0
+		} else {
+			remainingCapacity := capacity - size
+			if remainingCapacity > maxRemainingCapacity {
+				maxRemainingCapacity = remainingCapacity
+				slowestGrowingSegCapacity = capacity
+				slowestGrowingSegIndex = i
+			}
+		}
+	}
+
+	if slowestGrowingSegIndex == -1 {
+		return
+	} else {
+		isExisted = true
+		resp = &types.GetTheSlowestGrowingSeg {
+			SegmentId0: segIds[slowestGrowingSegIndex].SegmentId0,
+			SegmentId1: segIds[slowestGrowingSegIndex].SegmentId1,
+			Capacity: slowestGrowingSegCapacity,
+			BackendSize: backendSize,
+			Size: size,
+		}
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get slowest growing seg, seg_id0: %v, seg_id1: %v", resp.SegmentId0, resp.SegmentId1))
+	return
+}
+
 

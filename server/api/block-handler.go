@@ -113,7 +113,7 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 		segmentInfo := types.CreateBlocksInfo {
 			SegmentId0: segment.SegmentId0,
 			SegmentId1: segment.SegmentId1,
-			MaxSize: segment.MaxSize,
+			Capacity: segment.Capacity,
 			Blocks: segment.Blocks,
 		}
 
@@ -181,7 +181,7 @@ func(yigFs MetaAPIHandlers) GetSegmentsHandler(ctx iris.Context) {
 	}
 
 	// check request params
-	if segReq.BucketName == "" || segReq.Ino == 0 || segReq.ZoneId == "" {
+	if segReq.BucketName == "" || segReq.Ino == 0 || segReq.ZoneId == "" || segReq.Machine == "" {
 		helper.Logger.Error(reqContext, "Some GetSegmentInfo required parameters are missing.")
 		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
 		ctx.JSON(resp)
@@ -195,12 +195,30 @@ func(yigFs MetaAPIHandlers) GetSegmentsHandler(ctx iris.Context) {
 	uuidStr := uuid.New()
 	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
-	// get file segment from tidb
-	resp, err := yigFs.YigFsAPI.GetFileSegmentsInfo(reqContext, segReq)
+	// check whether the file has segments.
+	isExisted, err := yigFs.YigFsAPI.IsFileHasSegments(reqContext, segReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
 		return
+	}
+
+	if isExisted {
+		// if the file has segments, return these segments info.
+		resp, err = yigFs.YigFsAPI.GetFileSegmentsInfo(reqContext, segReq)
+		if err != nil {
+			resp.Result = GetErrInfo(err)
+			ctx.JSON(resp)
+			return
+		}
+	} else {
+		// if the file does not have segments, return the slowest growing segment checking by the machine.
+		resp, err = yigFs.YigFsAPI.GetTheSlowestGrowingSeg(reqContext, segReq)
+		if err != nil {
+			resp.Result = GetErrInfo(err)
+			ctx.JSON(resp)
+			return
+		}
 	}
 	
 	resp.Result = GetErrInfo(NoYigFsErr)

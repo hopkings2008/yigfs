@@ -21,6 +21,7 @@ const (
 	BucketName = "test_bucket"
 	Generation = 0
 	ZoneId = "cd77df31-08c1-407c-a561-4c0341c77fa4"
+	ZoneIdNew = "cd77df31-08c1-407c-a561-4c0341c77fa5"
 	Machine = "172.20.13.155"
 	ParentIno = 1
 	FileParentIno = 2
@@ -35,7 +36,7 @@ const (
 	SegmentId0 = 1
 	SegmentId1 = 1
 	Machine2 = "172.20.13.156"
-	SegMaxSize = 64 * 1024 * 1024
+	Capacity = 64 * 1024 * 1024
 	LatestedOffset = 256
 )
 

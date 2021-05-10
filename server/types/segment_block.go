@@ -15,8 +15,8 @@ type UpdateSegBlockInfoReq struct {
 type UpdateSegBlockInfo struct {
 	SegmentId0 uint64 `json:"seg_id0"`
 	SegmentId1 uint64 `json:"seg_id1"`
-	LatestOffset int `json:"latest_offset"`
-	MaxEndAddr int `json:"max_end_addr,omitempty"`
+	BackendSize int `json:"backend_size"`
+	Size int `json:"size,omitempty"`
 }
 
 type GetIncompleteUploadSegsReq struct {

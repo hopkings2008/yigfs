@@ -6,6 +6,7 @@ import (
 	//"database/sql"
 	"fmt"
 	"math/rand"
+	"sync"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -13,52 +14,76 @@ import (
 	"github.com/hopkings2008/yigfs/server/types"
 )
 
+
+var (
+	waitgroup sync.WaitGroup
+)
+
 func GetBlockInfoSql() (sqltext string) {
 	sqltext = "select seg_start_addr, seg_end_addr, size from segment_blocks where seg_id0=? and seg_id1=? and block_id=?;"
 	return sqltext
 }
 
-func(t *TidbClient) InsertSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
-	block *types.BlockInfo) (blockId int64, isCanMerge bool, err error) {
-	isCanMerge = false
+func(t *TidbClient) InsertSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (blockId int64, err error) {
 	sqltext := "insert into segment_blocks(seg_id0, seg_id1, block_id, seg_start_addr, seg_end_addr, size) values(?,?,?,?,?,?)"
-
 	node, err := snowflake.NewNode(rand.Int63n(10))
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create blockId, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
-	block_id := node.Generate()
+	newBlockId := node.Generate()
 
-	_, err = t.Client.Exec(sqltext, blockInfo.SegmentId0, blockInfo.SegmentId1, block_id, block.SegStartAddr, block.SegEndAddr, block.Size)
+	_, err = t.Client.Exec(sqltext, blockInfo.SegmentId0, blockInfo.SegmentId1, newBlockId, block.SegStartAddr, block.SegEndAddr, block.Size)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create the segment block, blockId: %d, err: %v", block_id, err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create the segment block, blockId: %d, err: %v", newBlockId, err))
+		err = ErrYIgFsInternalErr
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create the segment block, block_id: %d", block_id))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create the segment block, block_id: %d", newBlockId))
+	return int64(newBlockId), nil
+}
 
-	// check whether it can be merge or not.
-	sqltext = "select size from segment_blocks where seg_id0=? and seg_id1=? and seg_end_addr=?"
-	var size int
+func(t *TidbClient) MergeSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (err error) {
+	sqltext := "update segment_blocks set seg_end_addr=?, size=? where seg_id0=? and seg_id1=? and block_id=? and is_deleted=?"
+	_, err = t.Client.Exec(sqltext, block.SegEndAddr, block.Size, blockInfo.SegmentId0, blockInfo.SegmentId1, block.BlockId, types.NotDeleted)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to merge the segment block, blockId: %d, err: %v", block.BlockId, err))
+		err = ErrYIgFsInternalErr
+		return
+	}
 
-	row := t.Client.QueryRow(sqltext, blockInfo.SegmentId0, blockInfo.SegmentId1, block.SegStartAddr)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to merge the segment block, block_id: %d", block.BlockId))
+	return
+}
+
+func(t *TidbClient) IsBlockCanMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
+	block *types.BlockInfo) (isCanMerge bool, resp *types.BlockInfo, err error) {
+	resp = &types.BlockInfo{}
+	isCanMerge = false
+	sqltext := "select block_id, size from segment_blocks where seg_id0=? and seg_id1=? and seg_end_addr=? and is_deleted=?"
+
+	row := t.Client.QueryRow(sqltext, blockInfo.SegmentId0, blockInfo.SegmentId1, block.SegStartAddr, types.NotDeleted)
 	err = row.Scan(
-		&size,)
+		&resp.BlockId,
+		&resp.Size,
+	)
 	
 	if err == sql.ErrNoRows {
 		err = nil
-	} else if err != nil && err != sql.ErrNoRows{
-		helper.Logger.Info(ctx, fmt.Sprintf("Failed to get the merge block, block_id: %d, seg_end_addr: %v", block.BlockId, block.SegStartAddr))
+		return
+	} else if err != nil {
+		helper.Logger.Info(ctx, fmt.Sprintf("Failed to check whether the segment block can be merge or not, block_id: %d, seg_end_addr: %v", block.BlockId, block.SegStartAddr))
 		err = ErrYIgFsInternalErr
 		return
 	} else {
 		isCanMerge = true
+		resp.SegEndAddr = block.SegStartAddr
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to check segment block whether can be merge, isCanMerge: %v", isCanMerge))
-	return int64(block_id), isCanMerge, nil
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to check whether the segment block can be merge or not, isCanMerge: %v", isCanMerge))
+	return
 }
 
 func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segmentMap map[interface{}][]int64, 
@@ -72,10 +97,41 @@ func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegment
 		segment := &types.SegmentInfo {
 			Blocks: []*types.BlockInfo{},
 		}
-
 		segmentIds := segmentId.([2]uint64)
 		segment.SegmentId0 = segmentIds[0]
 		segment.SegmentId1 = segmentIds[1]
+
+		waitgroup.Add(1)
+		go func() {
+			defer waitgroup.Done()
+			// get segment leader
+			sqltext := GetSegmentLeaderSql()
+			row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
+			err = row.Scan (
+				&segment.Leader,
+			)
+			if err == sql.ErrNoRows {
+				segment.Leader = seg.Machine
+			} else if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("GetFileSegmentInfo: Failed to get the segment leader, err: %v", err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+
+			// get segment info
+			sqltext = GetSegmentInfoSql()
+			row = t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
+			err = row.Scan (
+				&segment.Capacity,
+				&segment.BackendSize,
+				&segment.Size,
+			)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("GetFileSegmentInfo: Failed to get the segment capacity, err: %v", err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+		}()
 
 		// get block info
 		sqltext := GetBlockInfoSql()
@@ -111,23 +167,10 @@ func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegment
 			block.Offset = offsetMap[blockId]
 			segment.Blocks = append(segment.Blocks, block)
 		}
-		
-		// get segment leader and max_size
-		sqltext = GetSegmentLeaderSql()
-		row := t.Client.QueryRow(sqltext, seg.ZoneId, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
-		err = row.Scan (
-			&segment.Leader,
-			&segment.MaxSize,
-		)
 
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("GetFileSegmentInfo: Failed to get the segment leader, err: %v", err))
-			err = ErrYIgFsInternalErr
-			return
-		}
-
+		waitgroup.Wait()
 		resp.Segments = append(resp.Segments, segment)
 	}
-	
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segments blocks info, number: %v", len(resp.Segments)))
 	return
 }
