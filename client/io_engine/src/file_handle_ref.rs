@@ -1,14 +1,17 @@
 use std::fs::File;
 
+// such as segment file handle.
 pub struct FileHandleRef{
     pub file: File,
+    pub size: u64,
     pub handle_ref: Ref,
 }
 
 impl FileHandleRef {
-    pub fn new(f: File) -> Self{
+    pub fn new(f: File, size: u64) -> Self{
         FileHandleRef{
             file: f,
+            size: size,
             handle_ref: Ref::new(),
         }
     }

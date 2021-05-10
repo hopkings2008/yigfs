@@ -313,6 +313,7 @@ pub struct SegDownload{
     pub id0: u64,
     pub id1: u64,
     pub dir: String,
+    pub capacity: u64,
     pub offset: u64, // from where to download.
 }
 #[derive(Debug)]

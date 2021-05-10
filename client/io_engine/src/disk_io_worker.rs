@@ -99,7 +99,19 @@ impl DiskIoWorker {
                 return;
             }
         }
-        self.handles.insert(d, FileHandleRef::new(f));
+        let file_size: u64;
+        let ret = f.metadata();
+        match ret {
+            Ok(ret) => {
+                file_size = ret.len();
+            }
+            Err(err) => {
+                println!("faild to get file size for {}, err: {}", name, err);
+                msg.response(Errno::Eintr);
+                return;
+            }
+        }
+        self.handles.insert(d, FileHandleRef::new(f, file_size));
         msg.response(Errno::Esucc);
         return;
     }
@@ -119,7 +131,20 @@ impl DiskIoWorker {
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name);
             match ret {
                 Ok(f) => {
-                    self.handles.insert(d, FileHandleRef::new(f));
+                    let file_size: u64;
+                    let ret = f.metadata();
+                    match ret {
+                        Ok(ret) => {
+                            file_size = ret.len();
+                        }
+                        Err(err) => {
+                            println!("do_write: failed to get file size for {}, err: {}", name, err);
+                            resp_msg.err = Errno::Eintr;
+                            msg.response(resp_msg);
+                            return;
+                        }
+                    }
+                    self.handles.insert(d, FileHandleRef::new(f, file_size));
                 }
                 Err(err) => {
                     println!("do_write: failed to open({}), err: {}", name, err);
@@ -166,6 +191,7 @@ impl DiskIoWorker {
                 Ok(ret) => {
                     resp_msg.nwrite = ret as u32;
                     resp_msg.err = Errno::Esucc;
+                    rf.size += ret as u64;
                     msg.response(resp_msg);
                     return;
                 }
@@ -192,7 +218,25 @@ impl DiskIoWorker {
             let ret = OpenOptions::new().create(true).read(true).append(true).open(&name);
             match ret {
                 Ok(f) => {
-                    self.handles.insert(d, FileHandleRef::new(f));
+                    let file_size: u64;
+                    let ret = f.metadata();
+                    match ret{
+                        Ok(ret) => {
+                            file_size = ret.len();
+                        }
+                        Err(err) => {
+                            println!("do_read: failed to get file size for {}, err: {}", name, err);
+                            let resp_msg = MsgFileReadData{
+                                id0: msg.id0,
+                                id1: msg.id1,
+                                data: None,
+                                err: Errno::Eintr,
+                            };
+                            msg.response(resp_msg);
+                            return;
+                        }
+                    }
+                    self.handles.insert(d, FileHandleRef::new(f, file_size));
                 }
                 Err(err) => {
                     println!("do_read: failed to open({}), err: {}", name, err);

@@ -7,7 +7,7 @@ use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
 use metaservice_mgr::meta_store::MetaStore;
 
-use crate::{segment_sync_handler::SegSyncHandler, types::{SegSyncOp, SegUpload}};
+use crate::{segment_sync_handler::SegSyncHandler, types::{SegDownload, SegSyncOp, SegUpload}};
 pub struct SegSyncer{
     op_tx: Sender<SegSyncOp>,
     stop_tx: Sender<u8>,
@@ -49,6 +49,27 @@ impl SegSyncer {
             Err(err) => {
                 println!("sync_segment: failed to send upload op for id0: {}, id1: {}, offset: {}, err: {}",
                 id0, id1, offset, err);
+                return Errno::Eintr;
+            }
+        }
+    }
+
+    pub fn download_segment(&self, dir: &String, id0: u64, id1: u64, offset: u64, capacity: u64) -> Errno {
+        let op = SegDownload{
+            id0: id0,
+            id1: id1,
+            dir: dir.clone(),
+            capacity: capacity,
+            offset: offset,
+        };
+        let ret = self.op_tx.send(SegSyncOp::OpDownload(op));
+        match ret {
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                println!("sync_segment: failed to perform download segment for id0: {}, id1: {}, offset: {}, err: {}",
+            id0, id1, offset, err);
                 return Errno::Eintr;
             }
         }

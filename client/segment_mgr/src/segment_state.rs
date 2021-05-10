@@ -43,7 +43,9 @@ pub struct SegStateMachine{
     id0: u64,
     id1: u64,
     dir: String,
+    capacity: u64,
     offset: u64, // records the offset to read/write for the segment.
+    op_size: u32, // the size to read/write.
     current_state: SegState,
     state_machine: HashMap<SegState, SegState>,
 }
@@ -54,7 +56,9 @@ impl SegStateMachine{
             id0: id0,
             id1: id1,
             dir: dir.clone(),
+            capacity: 0,
             offset: 0,
+            op_size: 0,
             current_state: SegState::Unknown,
             state_machine: HashMap::new(),
         }
@@ -70,11 +74,18 @@ impl SegStateMachine{
     pub fn prepare_for_download(&mut self){
         self.state_machine.insert(SegState::CacheOpen,SegState::BackendRead);
         self.state_machine.insert(SegState::BackendRead, SegState::CacheWrite);
-        self.state_machine.insert(SegState::BackendReadEof, SegState::CacheClose);
     }
 
     pub fn set_state(&mut self, state: SegState){
         self.current_state = state;
+    }
+
+    pub fn set_capacity(&mut self, capacity: u64){
+        self.capacity = capacity;
+    }
+
+    pub fn get_capacity(&self) -> u64 {
+        self.capacity
     }
 
     pub fn set_offset(&mut self, offset:u64) {
@@ -83,6 +94,14 @@ impl SegStateMachine{
 
     pub fn get_offset(&self) -> u64{
         self.offset
+    }
+
+    pub fn set_op_size(&mut self, size: u32){
+        self.op_size = size;
+    }
+
+    pub fn get_op_size(&self) -> u32{
+        self.op_size
     }
 
     pub fn get_dir(&self) -> &String{
