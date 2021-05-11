@@ -56,6 +56,8 @@ impl Leader for LeaderLocal {
                     Ok(ret) => {
                         if ret.size < seg.size {
                             // perform the download from backend store.
+                            println!("open: seg: id0: {}, id1: {}, cache size: {}, real size: {}",
+                            seg.seg_id0, seg.seg_id1, ret.size, seg.size);
                             let sync_offset = ret.size;
                             let ret = self.sync_mgr.download_segment(&seg_dir, seg.seg_id0, seg.seg_id1, sync_offset, seg.capacity);
                             if ret.is_success(){
