@@ -72,6 +72,7 @@ impl SegStateMachine{
     pub fn prepare_for_download(&mut self){
         self.state_machine.insert(SegState::CacheOpen,SegState::BackendRead);
         self.state_machine.insert(SegState::BackendRead, SegState::CacheWrite);
+        self.state_machine.insert(SegState::CacheWrite, SegState::BackendRead);
     }
 
     pub fn set_state(&mut self, state: SegState){
