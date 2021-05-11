@@ -113,6 +113,7 @@ impl YigIoWorker{
                 match ret {
                     Ok(ret) =>{
                         resp.data = Some(ret);
+                        resp.err = Errno::Esucc;
                     }
                     Err(err) => {
                         println!("YigIoWorker: OpRead: failed to read: {}/{}, offset: {}, size: {}, err: {:?}",
