@@ -257,7 +257,7 @@ impl DiskIoWorker {
         }
         if let Some(h) = self.handles.get_mut(&d) {
             // check whether we can serve this request or not.
-            if h.size < msg.offset {
+            if h.size <= msg.offset {
                 // cannot serve this request.
                 let resp_msg = MsgFileReadData{
                     id0: msg.id0,
