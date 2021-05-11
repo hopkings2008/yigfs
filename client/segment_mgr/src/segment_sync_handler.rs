@@ -2,6 +2,7 @@
 use crate::{segment_state::SegStateMachine, types::SegSyncOp};
 use crate::segment_state::SegState;
 use common::numbers::NumberOp;
+use common::error::Errno;
 use io_engine::types::{MsgFileOpResp, MsgFileOpenResp, MsgFileReadData, MsgFileWriteResp};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
@@ -295,7 +296,7 @@ impl SegSyncHandler{
                 }
             }
         }
-        println!("SegSyncHandler::handle_cache_read: got invalid op resp for seg id0: {}, id1: {}", op.id0, op.id1);
+        println!("SegSyncHandler::handle_cache_read: got invalid op state for seg id0: {}, id1: {}", op.id0, op.id1);
         // close the seg.
         self.cache_store.close(op.id0, op.id1);
     }
@@ -436,27 +437,19 @@ impl SegSyncHandler{
                  return;
             }
             // check whether former write op is successful or not.
-            if !op.err.is_success(){
-                // check whether the former input offset is not the size of the backend object.
-                if op.err.is_bad_offset() {
-                    // reset the offset to read from cache and write again.
-                    s.set_state(SegState::CacheRead);
-                    s.set_offset(op.offset);
-                    let ret = self.cache_store.read_async(op.id0, op.id1, s.get_dir(), 
-                    op.offset, s.get_op_size(), self.cache_op_tx.clone());
-                    if !ret.is_success(){
-                        println!("handle_backend_store_write: failed to perform cache read for seg id0: {}, id1: {}, dir: {}, offset: {}, err: {:?}",
-                        op.id0, op.id1, op.offset, s.get_dir(), ret);
-                        self.cache_store.close(op.id0, op.id1);
-                        self.seg_state_machines.remove(&seg_id);
-                        return;
-                    }
+            match op.err {
+                Errno::Esucc => {}
+                Errno::Eoffset => {
+                    println!("handle_backend_store_write: invalid offset: {} of write for id0: {}, id1: {}, need from offset: {}",
+                    s.get_offset(), op.id0, op.id1, op.offset);
                 }
-                println!("handle_backend_store_write: write failed for id0: {}, id1: {} with offset: {}, err: {:?}",
-                op.id0, op.id1, s.get_offset(), op.err);
-                self.cache_store.close(op.id0, op.id1);
-                self.seg_state_machines.remove(&seg_id);
-                return;
+                _ => {
+                    println!("handle_backend_store_write: write failed for id0: {}, id1: {} with offset: {}, err: {:?}",
+                    op.id0, op.id1, s.get_offset(), op.err);
+                    self.cache_store.close(op.id0, op.id1);
+                    self.seg_state_machines.remove(&seg_id);
+                    return;
+                }
             }
             // get next state to process.
             let next_state = s.get_next_state();
