@@ -45,6 +45,8 @@ impl SegmentMgr {
             segment.seg_id1 = s.seg_id1;
             segment.capacity = s.capacity;
             segment.leader = s.leader;
+            segment.size = s.size;
+            segment.backend_size = s.backend_size;
             for b in s.blocks {
                 let block = Block{
                     ino: ino,
