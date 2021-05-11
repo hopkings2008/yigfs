@@ -159,7 +159,7 @@ impl BackendStore for YigBackend{
                             return Ok(ret.data);
                         }
                         println!("YigBackend::read: failed to read bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
-                    self.bucket, id0, id1, offset, size, ret);
+                    self.bucket, id0, id1, offset, size, ret.err);
                         return Err(ret.err);
                     }
                     _ => {
