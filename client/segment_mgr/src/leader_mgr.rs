@@ -5,7 +5,7 @@ use common::runtime::Executor;
 use io_engine::backend_storage::BackendStore;
 use io_engine::cache_store::CacheStore;
 
-use crate::{leader::Leader, segment_mgr::SegmentMgr};
+use crate::{leader::Leader, segment_mgr::SegmentMgr, segment_sync::SegSyncer};
 use crate::leader_local::LeaderLocal;
 use crate::leader_not_support::LeaderNotSupport;
 
@@ -22,10 +22,12 @@ pub struct LeaderMgr {
 
 impl LeaderMgr {
     pub fn new(machine: &String, exec: &Executor, seg_mgr: Arc<SegmentMgr>, 
-        cache_store: Arc<dyn CacheStore>, backend_store: Arc<dyn BackendStore>) -> Self {
+        cache_store: Arc<dyn CacheStore>, backend_store: Arc<dyn BackendStore>,
+        sync_mgr: Arc<SegSyncer>) -> Self {
         let mut leaders = HashMap::<u8, Box<dyn Leader>>::new();
         leaders.insert(LeaderType::Unknown as u8, Box::new(LeaderNotSupport::new()));
-        leaders.insert(LeaderType::Local as u8, Box::new(LeaderLocal::new(machine,  exec, seg_mgr, cache_store, backend_store)));
+        leaders.insert(LeaderType::Local as u8, Box::new(LeaderLocal::new(machine,  exec, seg_mgr, 
+            cache_store, backend_store, sync_mgr)));
         LeaderMgr{
             machine: machine.clone(),
             leaders: leaders,

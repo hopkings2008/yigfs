@@ -1,6 +1,6 @@
 extern crate crossbeam_channel;
 
-use crate::io_worker::{IoWorker, IoWorkerFactory};
+use crate::{io_worker::{IoWorker, IoWorkerFactory}, types::{MsgFileStatOp, MsgFileStatResult}};
 use std::{collections::HashMap, io::{Read, Seek, Write}};
 use std::io::SeekFrom;
 use std::fs::{File, OpenOptions};
@@ -74,6 +74,9 @@ impl DiskIoWorker {
             }
             MsgFileOp::OpClose(msg) => {
                 self.do_close(msg);
+            }
+            MsgFileOp::OpStat(msg) => {
+                self.do_stat(msg);
             }
         }
     }
@@ -253,6 +256,18 @@ impl DiskIoWorker {
             }
         }
         if let Some(h) = self.handles.get_mut(&d) {
+            // check whether we can serve this request or not.
+            if h.size < msg.offset {
+                // cannot serve this request.
+                let resp_msg = MsgFileReadData{
+                    id0: msg.id0,
+                    id1: msg.id1,
+                    data: None,
+                    err: Errno::Eoffset,
+                };
+                msg.response(resp_msg);
+                return;
+            }
             let ret = h.file.seek(SeekFrom::Start(msg.offset));
             match ret {
                 Ok(_ret) => {
@@ -359,6 +374,29 @@ impl DiskIoWorker {
                 }
             }
         }
+    }
+
+    fn do_stat(&self, msg: &MsgFileStatOp){
+        let id = NumberOp::to_u128(msg.id0, msg.id1);
+        if let Some(f) = self.handles.get(&id) {
+            let result = MsgFileStatResult{
+                id0: msg.id0,
+                id1: msg.id1,
+                size: f.size,
+                err: Errno::Esucc,
+            };
+            msg.response(result);
+            return;
+        }
+
+        let result = MsgFileStatResult{
+            id0: msg.id0,
+            id1: msg.id1,
+            size: 0,
+            err: Errno::Eintr,
+        };
+        println!("do_stat: got unopened seg id0: {}, id1: {}", msg.id0, msg.id1);
+        msg.response(result);
     }
 
     fn exits(&mut self) {

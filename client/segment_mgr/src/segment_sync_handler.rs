@@ -173,6 +173,10 @@ impl SegSyncHandler{
             MsgFileOpResp::OpRespWrite(write_op) => {
                 self.handle_cache_write(write_op);
             }
+            MsgFileOpResp::OpRespStat(stat_op) => {
+                println!("handle_cache_op: got unsupported stat op for seg: id0: {}, id1: {}",
+                stat_op.id0, stat_op.id1);
+            }
         }
     }
 
@@ -356,6 +360,10 @@ impl SegSyncHandler{
             }
             MsgFileOpResp::OpRespWrite(write_op) => {
                 self.handle_backend_store_write(write_op);
+            }
+            MsgFileOpResp::OpRespStat(stat_op) => {
+                println!("handle_backend_store_op: got unsupported stat op for seg: id0: {}, id1: {}",
+                stat_op.id0, stat_op.id1);
             }
         }
     }

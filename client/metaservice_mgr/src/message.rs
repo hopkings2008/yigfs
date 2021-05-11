@@ -213,6 +213,8 @@ pub struct MsgSegment {
     pub seg_id0: u64,
     pub seg_id1: u64,
     pub capacity: u64,
+    pub size: u64,
+    pub backend_size: u64,
     pub leader: String,
     pub blocks: Vec<MsgBlock>,
 }
@@ -230,6 +232,7 @@ pub struct ReqGetSegments {
     pub region: String,
     pub bucket: String,
     pub zone: String,
+    pub machine: String,
     pub ino: u64,
     pub generation: u64,
     #[serde(skip_serializing_if = "Option::is_none")]

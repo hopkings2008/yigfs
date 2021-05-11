@@ -117,11 +117,40 @@ impl MsgFileReadOp {
 }
 
 #[derive(Debug)]
+pub struct MsgFileStatOp{
+    pub id0: u64,
+    pub id1: u64,
+    pub result_tx: Sender<MsgFileStatResult>,
+}
+
+impl MsgFileStatOp{
+    pub fn response(&self, msg: MsgFileStatResult){
+        let ret = self.result_tx.send(msg);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                println!("failed to send response for stat(id0: {}, id1: {}), err: {}",
+                self.id0, self.id1, err);
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct MsgFileStatResult{
+    pub id0: u64,
+    pub id1: u64,
+    pub size: u64,
+    pub err: Errno,
+}
+
+#[derive(Debug)]
 pub enum MsgFileOp {
     OpOpen(MsgFileOpenOp),
     OpWrite(MsgFileWriteOp),
     OpRead(MsgFileReadOp),
     OpClose(MsgFileCloseOp),
+    OpStat(MsgFileStatOp),
     //OpDel(MsgFileDelOp),
 }
 
@@ -130,4 +159,5 @@ pub enum MsgFileOpResp{
     OpRespOpen(MsgFileOpenResp),
     OpRespRead(MsgFileReadData),
     OpRespWrite(MsgFileWriteResp),
+    OpRespStat(MsgFileStatResult),
 }

@@ -12,6 +12,13 @@ pub struct CacheWriteResult {
     pub nwrite: u32,
 }
 
+#[derive(Debug, Default)]
+pub struct CacheStatResult{
+    pub id0: u64,
+    pub id1: u64,
+    pub size: u64,
+}
+
 pub trait CacheStore: Send + Sync{
     // return: file size
     fn open(&self, id0: u64, id1: u64, dir: &String) -> Errno;
@@ -25,6 +32,7 @@ pub trait CacheStore: Send + Sync{
     // read_resp is used for the cache thread to send read response throught it,
     // and can be used to implement the pipeline pattern.
     fn read_async(&self, id0: u64, id1: u64, dir: &String, offset: u64, size: u32, read_resp: Sender<MsgFileOpResp>) -> Errno;
+    fn stat(&self, id0: u64, id1: u64)-> Result<CacheStatResult, Errno>;
     fn close(&self, id0: u64, id1: u64) -> Errno;
 }
 

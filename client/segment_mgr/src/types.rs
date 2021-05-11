@@ -154,6 +154,8 @@ impl Segment {
             seg_id0: self.seg_id0,
             seg_id1: self.seg_id1,
             capacity: self.capacity,
+            size: self.size,
+            backend_size: self.backend_size,
             leader: self.leader.clone(),
             blocks: Vec::new(),
         };

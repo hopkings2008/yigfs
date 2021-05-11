@@ -93,6 +93,17 @@ impl Errno {
         }
     }
 
+    pub fn is_invalid_range(&self) -> bool {
+        match *self {
+            Errno::Erange => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
+
     pub fn is_bad_offset(&self) -> bool {
         match *self {
             Errno::Eoffset => {

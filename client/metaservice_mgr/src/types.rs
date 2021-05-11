@@ -100,6 +100,8 @@ pub struct Segment {
     pub seg_id0: u64,
     pub seg_id1: u64,
     pub capacity: u64,
+    pub size: u64,
+    pub backend_size: u64,
     pub leader: String,
     pub blocks: Vec<Block>,
 }

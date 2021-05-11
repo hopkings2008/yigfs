@@ -163,6 +163,9 @@ impl YigIoWorker{
             MsgFileOp::OpClose(msg_close) => {
                 println!("close: id0: {}, id1: {}", msg_close.id0, msg_close.id1);
             }
+            MsgFileOp::OpStat(msg_stat) => {
+                println!("stat: id0: {}, id1: {}", msg_stat.id0, msg_stat.id1);
+            }
         }
     }
 

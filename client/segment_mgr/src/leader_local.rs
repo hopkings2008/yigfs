@@ -3,7 +3,7 @@ use common::runtime::Executor;
 use common::error::Errno;
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
-use crate::leader::Leader;
+use crate::{leader::Leader, segment_sync::SegSyncer};
 use crate::file_handle::FileHandleMgr;
 use crate::types::{FileHandle, Block, BlockIo, Segment};
 use crate::segment_mgr::SegmentMgr;
@@ -13,6 +13,7 @@ pub struct LeaderLocal {
     cache_store: Arc<dyn CacheStore>,
     backend_store: Arc<dyn BackendStore>,
     exec: Executor,
+    sync_mgr: Arc<SegSyncer>,
     segment_mgr: Arc<SegmentMgr>,
     handle_mgr: FileHandleMgr,
 }
@@ -45,6 +46,25 @@ impl Leader for LeaderLocal {
         }
         for seg in &segments {
             let seg_dir = self.segment_mgr.get_segment_dir(seg.seg_id0, seg.seg_id1);
+            // check whether need to perform download from backend store.
+            let ret = self.cache_store.stat(seg.seg_id0, seg.seg_id1);
+            match ret {
+                Ok(ret) => {
+                    if ret.size < seg.size {
+                        // perform the download from backend store.
+                        let sync_offset = ret.size;
+                        let ret = self.sync_mgr.download_segment(&seg_dir, seg.seg_id0, seg.seg_id1, sync_offset, seg.capacity);
+                        if !ret.is_success(){
+                            println!("open: failed to perform segment sync for id0: {}, id1: {}, offset: {}, dir: {}, err: {:?}",
+                            seg.seg_id0, seg.seg_id1, sync_offset, seg_dir, ret);
+                        }
+                    }
+                }
+                Err(err) => {
+                    println!("open: failed to stat seg id0: {}, id1: {}, err: {:?}", seg.seg_id0, seg.seg_id1, err);
+                }
+            }
+            // currently, open in cache_store will create the seg file if it doesn't exist.
             let ret = self.cache_store.open(seg.seg_id0, seg.seg_id1, &seg_dir);
             if ret.is_success(){
                 // try to perform sync from backend store.
@@ -90,6 +110,7 @@ impl Leader for LeaderLocal {
                         to_read = b.size as u32;
                     }
                     // read the data.
+                    let mut need_read_backend_store = false;
                     let seg_dir = self.segment_mgr.get_segment_dir(s.seg_id0, s.seg_id1);
                     let seg_offset = b.seg_start_addr + start - b.offset;
                     let ret = self.cache_store.read(s.seg_id0, 
@@ -109,9 +130,35 @@ impl Leader for LeaderLocal {
                                 ino, s.seg_id0, s.seg_id1, offset, start, to_read);
                                 continue;
                             }
-                            println!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
-                            ino, offset, start, to_read, err);
-                            return Err(err);
+                            if err.is_bad_offset(){
+                                need_read_backend_store = true;
+                            } else {
+                                println!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
+                                ino, offset, start, to_read, err);
+                                return Err(err);
+                            }
+                        }
+                    }
+                    // need to read the backend store?
+                    if need_read_backend_store {
+                        let ret = self.backend_store.read(s.seg_id0, 
+                            s.seg_id1, seg_offset, to_read);
+                        match ret {
+                            Ok(ret) => {
+                                if let Some(d) = ret {
+                                    let l = d.len() as u32;
+                                    total_read -= l as u32;
+                                    start += l as u64;
+                                    data.extend(d);
+                                }
+                            }
+                            Err(err) => {
+                                if err.is_invalid_range() {
+                                    println!("LeadLocal: backend_read: ino: {}, offset: {}, start: {}, size: {} 
+                                    exceeds the backend store's range", ino, offset, start, to_read);
+                                    continue;
+                                }
+                            }
                         }
                     }
                     if total_read == 0 {
@@ -255,12 +302,15 @@ impl Leader for LeaderLocal {
 }
 
 impl LeaderLocal {
-    pub fn new(machine: &String, exec: &Executor, mgr: Arc<SegmentMgr>, cache: Arc<dyn CacheStore>, backend: Arc<dyn BackendStore>) -> Self {
+    pub fn new(machine: &String, exec: &Executor, mgr: Arc<SegmentMgr>, 
+        cache: Arc<dyn CacheStore>, backend: Arc<dyn BackendStore>,
+        sync_mgr: Arc<SegSyncer>) -> Self {
         LeaderLocal {
             machine: machine.clone(),
             cache_store: cache,
             backend_store: backend,
             exec: exec.clone(),
+            sync_mgr: sync_mgr,
             segment_mgr: mgr,
             handle_mgr: FileHandleMgr::create(),
         }

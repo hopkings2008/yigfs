@@ -1,5 +1,5 @@
 
-use crate::io_thread_pool::IoThreadPool;
+use crate::{cache_store::CacheStatResult, io_thread_pool::IoThreadPool, types::{MsgFileStatOp, MsgFileStatResult}};
 use crate::types::{MsgFileOp, MsgFileOpenOp, MsgFileWriteOp, MsgFileReadOp, MsgFileCloseOp, MsgFileOpResp};
 use crate::cache_store::{CacheStore, CacheStoreFactory, CacheStoreConfig, CacheWriteResult};
 use crate::disk_io_worker::DiskIoWorkerFactory;
@@ -213,6 +213,39 @@ impl CacheStore for DiskCache {
         }
         return Errno::Esucc;
     }
+
+    fn stat(&self, id0: u64, id1: u64) -> Result<CacheStatResult, Errno>{
+        let worker = self.disk_pool.get_thread(id0, id1);
+        let (tx, rx) = bounded::<MsgFileStatResult>(1);
+        let msg = MsgFileStatOp{
+            id0: id0,
+            id1: id1,
+            result_tx: tx,
+        };
+        let ret = worker.do_io(MsgFileOp::OpStat(msg));
+        if !ret.is_success(){
+            println!("disk_cache_store::stat: failed to perform stat for seg: id0: {}, id1: {}, err: {:?}",
+            id0, id1, ret);
+            return Err(ret);
+        }
+
+        let ret = rx.recv();
+        match ret {
+            Ok(ret) => {
+                return Ok(CacheStatResult{
+                    id0: ret.id0,
+                    id1: ret.id1,
+                    size: ret.size,
+                });
+            }
+            Err(err) => {
+                println!("disk_cache_store::stat failed to receive stat result for seg: id0: {}, id1: {}, err: {}",
+                id0, id1, err);
+                return Err(Errno::Eintr);
+            }
+        }
+    }
+
     fn close(&self, id0: u64, id1: u64) -> Errno{
         let worker = self.disk_pool.get_thread(id0, id1);
         let msg = MsgFileCloseOp{

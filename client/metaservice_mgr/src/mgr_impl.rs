@@ -329,6 +329,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             zone: self.zone.clone(),
             region: self.region.clone(),
             bucket: self.bucket.clone(),
+            machine: self.machine.clone(),
             ino: ino,
             generation: 0,
             offset: offset,
@@ -383,6 +384,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             segment.seg_id0 = s.seg_id0;
             segment.seg_id1 = s.seg_id1;
             segment.capacity = s.capacity;
+            segment.backend_size = s.backend_size;
+            segment.size = s.size;
             segment.leader = s.leader;
             for b in s.blocks {
                 let block = Block{
@@ -407,6 +410,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             seg_id0: seg.seg_id0,
             seg_id1: seg.seg_id1,
             capacity: seg.capacity,
+            size: seg.size,
+            backend_size: seg.backend_size,
             leader: seg.leader.clone(),
             blocks: Vec::new(),
         };
@@ -710,6 +715,8 @@ impl MetaServiceMgrImpl {
             seg_id0: s.seg_id0,
             seg_id1: s.seg_id1,
             capacity: s.capacity,
+            size: s.size,
+            backend_size: s.backend_size,
             leader: s.leader.clone(),
             blocks: Vec::new(),
         };

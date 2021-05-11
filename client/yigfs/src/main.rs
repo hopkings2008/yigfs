@@ -81,7 +81,7 @@ fn main() {
     let syncer = Arc::new(segment_syncer);
 
     let leader_mgr = LeaderMgr::new(&meta_service.get_machine_id(),
-    &exec, segment_mgr.clone(), cache_store.clone(), backend_store.clone());
+    &exec, segment_mgr.clone(), cache_store.clone(), backend_store.clone(), syncer.clone());
     // start heartbeat mgr.
     let heartbeat_mgr = Arc::new(HeartbeatMgr::new(cfg.heartbeat_config.timeout, 
         syncer.clone(), 

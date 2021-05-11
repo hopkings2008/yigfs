@@ -9,10 +9,8 @@ pub enum SegState{
     CacheOpen,
     CacheRead,
     CacheWrite,
-    CacheReadEof,
     CacheClose,
     BackendRead,
-    BackendReadEof,
     BackendWrite,
     MetaUpload,
 }
