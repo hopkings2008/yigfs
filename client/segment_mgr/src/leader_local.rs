@@ -46,28 +46,31 @@ impl Leader for LeaderLocal {
         }
         for seg in &segments {
             let seg_dir = self.segment_mgr.get_segment_dir(seg.seg_id0, seg.seg_id1);
-            // check whether need to perform download from backend store.
-            let ret = self.cache_store.stat(seg.seg_id0, seg.seg_id1);
-            match ret {
-                Ok(ret) => {
-                    if ret.size < seg.size {
-                        // perform the download from backend store.
-                        let sync_offset = ret.size;
-                        let ret = self.sync_mgr.download_segment(&seg_dir, seg.seg_id0, seg.seg_id1, sync_offset, seg.capacity);
-                        if !ret.is_success(){
-                            println!("open: failed to perform segment sync for id0: {}, id1: {}, offset: {}, dir: {}, err: {:?}",
-                            seg.seg_id0, seg.seg_id1, sync_offset, seg_dir, ret);
-                        }
-                    }
-                }
-                Err(err) => {
-                    println!("open: failed to stat seg id0: {}, id1: {}, err: {:?}", seg.seg_id0, seg.seg_id1, err);
-                }
-            }
             // currently, open in cache_store will create the seg file if it doesn't exist.
             let ret = self.cache_store.open(seg.seg_id0, seg.seg_id1, &seg_dir);
             if ret.is_success(){
                 // try to perform sync from backend store.
+                // check whether need to perform download from backend store.
+                let ret = self.cache_store.stat(seg.seg_id0, seg.seg_id1);
+                match ret {
+                    Ok(ret) => {
+                        if ret.size < seg.size {
+                            // perform the download from backend store.
+                            let sync_offset = ret.size;
+                            let ret = self.sync_mgr.download_segment(&seg_dir, seg.seg_id0, seg.seg_id1, sync_offset, seg.capacity);
+                            if ret.is_success(){
+                                println!("open: start performing downloading seg id0: {}, id1: {}, offset: {} in dir: {}",
+                                seg.seg_id0, seg.seg_id1, sync_offset, seg_dir);
+                            } else {
+                                println!("open: failed to perform segment sync for id0: {}, id1: {}, offset: {}, dir: {}, err: {:?}",
+                                seg.seg_id0, seg.seg_id1, sync_offset, seg_dir, ret);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        println!("open: failed to stat seg id0: {}, id1: {}, err: {:?}", seg.seg_id0, seg.seg_id1, err);
+                    }
+                }
                 continue;
             }
             println!("LeaderLocal open: seg(id0: {}, id1: {}) for ino: {} failed, err: {:?}",
