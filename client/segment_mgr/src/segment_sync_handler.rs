@@ -373,7 +373,7 @@ impl SegSyncHandler{
         let seg_id = NumberOp::to_u128(op.id0, op.id1);
         // check the whether read op is successful or not.
         if !op.err.is_success(){
-            if op.err.is_eof() {
+            if op.err.is_eof() || op.err.is_invalid_range() {
                 println!("handle_backend_store_read: got eof for seg: id0: {}, id1: {}", op.id0, op.id1);
             } else {
                 println!("handle_backend_store_read: read failed for seg: id0: {}, id1: {}, err: {:?}",
