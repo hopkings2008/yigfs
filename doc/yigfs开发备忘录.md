@@ -3,7 +3,8 @@
 1. meta server需要配置动态log
 2. 已经删除的block未写入gc
 3. list目录第一次比较慢的问题
-4. 新建一个文件，返回给client一个未满的segment
+4. 新建一个文件，返回给client一个未满的segment（需要返回增长速度最慢的segment，目前返回的是剩余空间最大的segment）
+5. heartBeat更新server状态
 
 ## client端：
 1. 枚举目录下的segment文件
