@@ -562,7 +562,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             segment: MsgSegmentOffset{
                 seg_id0: id0,
                 seg_id1: id1,
-                latest_offset: next_offset,
+                backend_size: next_offset,
             },
         };
         let req_body: String;

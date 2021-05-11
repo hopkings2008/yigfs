@@ -284,7 +284,7 @@ pub struct RespAddBock{
 pub struct MsgSegmentOffset{
     pub seg_id0: u64,
     pub seg_id1: u64,
-    pub latest_offset: u64,
+    pub backend_size: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
