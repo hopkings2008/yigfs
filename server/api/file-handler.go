@@ -327,15 +327,9 @@ func(yigFs MetaAPIHandlers) DeleteFileHandler(ctx iris.Context) {
 	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// check whether the machine is the file leader or not.
-	isMatch, err := yigFs.YigFsAPI.CheckFileLeader(reqContext, fileReq)
+	err := yigFs.YigFsAPI.CheckFileLeader(reqContext, fileReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
-		ctx.JSON(resp)
-		return
-	}
-
-	if !isMatch {
-		resp.Result = GetErrInfo(ErrYigFsMachineNotMatchFileLeader)
 		ctx.JSON(resp)
 		return
 	}

@@ -24,5 +24,5 @@ type YigFsLayer interface {
 	GetTheSlowestGrowingSeg(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)
 	IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error)
 	DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error)
-	CheckFileLeader(ctx context.Context, file *types.DeleteFileReq) (isMatch bool, err error)
+	CheckFileLeader(ctx context.Context, file *types.DeleteFileReq) (err error)
 }

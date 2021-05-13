@@ -108,7 +108,7 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 	}
 }
 
-func(yigFs *YigFsStorage) CheckFileLeader(ctx context.Context, file *types.DeleteFileReq) (isMatch bool, err error) {
+func(yigFs *YigFsStorage) CheckFileLeader(ctx context.Context, file *types.DeleteFileReq) (err error) {
 	leader := &types.GetLeaderReq {
 		ZoneId: file.ZoneId,
 		Region: file.Region,
@@ -128,20 +128,20 @@ func(yigFs *YigFsStorage) CheckFileLeader(ctx context.Context, file *types.Delet
 		}
 
 		if file.ZoneId == resp.LeaderInfo.ZoneId && file.Machine == resp.LeaderInfo.Leader {
-			isMatch = true
 			return
 		}
 
+		err = ErrYigFsMachineNotMatchFileLeader
 		helper.Logger.Error(ctx, fmt.Sprintf("The machine(%s/%s) is not the file leader, cannot delete the file! region: %s, bucket: %s, ino: %d," + 
 			" generation: %v", file.ZoneId, file.Machine, file.Region, file.BucketName, file.Ino, file.Generation))
 		return
 	case nil:
 		// if the file leader exist, check whether it match or not.
 		if file.ZoneId == resp.LeaderInfo.ZoneId && file.Machine == resp.LeaderInfo.Leader {
-			isMatch = true
 			return
 		}
 
+		err = ErrYigFsMachineNotMatchFileLeader
 		helper.Logger.Error(ctx, fmt.Sprintf("The machine(%s/%s) is not the file leader, cannot delete the file! region: %s, bucket: %s, ino: %d," + 
 			" generation: %v", file.ZoneId, file.Machine, file.Region, file.BucketName, file.Ino, file.Generation))
 		return
