@@ -22,8 +22,8 @@ func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLea
 		LeaderInfo: &types.LeaderInfo{},
 	}
 
-	sqltext := "select leader from file_leader where zone_id=? and region=? and bucket_name=? and ino=?"
-	row := t.Client.QueryRow(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino)
+	sqltext := "select leader from file_leader where zone_id=? and region=? and bucket_name=? and ino=? and generation=?"
+	row := t.Client.QueryRow(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation)
 	err = row.Scan (
 		&resp.LeaderInfo.Leader,
 	)

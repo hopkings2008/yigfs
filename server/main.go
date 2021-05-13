@@ -70,6 +70,8 @@ func main() {
 	app.Put("/v1/segment/block", apiHandlers.UpdateSegBlockInfoHandler)
 	// HeartBeat
 	app.Get("/v1/machine/heartbeat", apiHandlers.HeartBeatHandler)
+	// DeleteFile
+	app.Delete("/v1/file", apiHandlers.DeleteFileHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	isHTTP2 := false

@@ -292,3 +292,62 @@ func(yigFs MetaAPIHandlers) SetFileAttrHandler(ctx iris.Context) {
 	ctx.JSON(resp)
 	return
 }
+
+func(yigFs MetaAPIHandlers) DeleteFileHandler(ctx iris.Context) {
+	resp := &types.NonBodyResp {
+		Result: types.YigFsMetaError{},
+	}
+	defer GetSpendTime("DeleteFileHandler")()
+
+	r := ctx.Request()
+	reqContext := r.Context()
+
+	// get req
+	fileReq := &types.DeleteFileReq{}
+	if err := ctx.ReadJSON(&fileReq); err != nil {
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read DeleteFileReq from body, err: %v", err))
+		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	// check request params
+	if fileReq.BucketName == "" || fileReq.Machine == "" || fileReq.ZoneId =="" {
+		helper.Logger.Error(reqContext, "Some DeleteFileHandler required parameters are missing.")
+		resp.Result = GetErrInfo(ErrYigFsMissingRequiredParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	if fileReq.Region == "" {
+		fileReq.Region = "cn-bj-1"
+	}
+
+	uuidStr := uuid.New()
+	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// check whether the machine is the file leader or not.
+	isMatch, err := yigFs.YigFsAPI.CheckFileLeader(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	if !isMatch {
+		resp.Result = GetErrInfo(ErrYigFsMachineNotMatchFileLeader)
+		ctx.JSON(resp)
+		return
+	}
+
+	// delete file
+	err = yigFs.YigFsAPI.DeleteFile(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+	} else {
+		resp.Result = GetErrInfo(NoYigFsErr)
+	}
+	
+	ctx.JSON(resp)
+	return
+}

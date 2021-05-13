@@ -148,3 +148,54 @@ func(yigFs *YigFsStorage) SetFileAttr(ctx context.Context, file *types.SetFileAt
 	resp.File = getFileInfoReq
 	return resp, nil
 }
+
+func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error) {
+	segs, err := yigFs.MetaStorage.Client.GetFileSegmentsInfo(ctx, file)
+	if err != nil {
+		return
+	}
+
+	if err == ErrYigFsNoVaildSegments || len(segs) == 0 {
+		helper.Logger.Warn(ctx, fmt.Sprintf("The file does not have segs to delete, region: %v, bucket: %v, ino: %v, generation: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation))
+
+		// delete the file.
+		err = yigFs.MetaStorage.Client.DeleteFile(ctx, file)
+		if err != nil {
+			return
+		}
+		return
+	}
+
+	// delete blocks in file_blocks table.
+	waitgroup.Add(1)
+	var deleteFileBlocksErr error
+	go func() {
+		defer waitgroup.Done()
+		deleteFileBlocksErr = yigFs.MetaStorage.Client.DeleteFileBlocks(ctx, file, segs)
+		if deleteFileBlocksErr != nil {
+			return
+		}
+	}()
+
+	// delete blocks in segment_blocks table.
+	err = yigFs.MetaStorage.Client.DeleteBlocksBySegsId(ctx, segs)
+	if err != nil {
+		waitgroup.Wait()
+		return
+	}
+
+	waitgroup.Wait()
+	
+	if deleteFileBlocksErr != nil {
+		return
+	}
+
+	// delete file info.
+	err = yigFs.MetaStorage.Client.DeleteFile(ctx, file)
+	if err != nil {
+		return
+	}
+
+	return
+}

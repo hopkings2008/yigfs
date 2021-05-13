@@ -62,3 +62,11 @@ func(m *Meta) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlowestGrow
 func(m *Meta) IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error) {
 	return m.Client.IsFileHasSegments(ctx, seg)
 }
+
+func(m *Meta) GetFileSegmentsInfo(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}][]int64, err error) {
+	return m.Client.GetFileSegmentsInfo(ctx, file)
+}
+
+func(m *Meta) DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int64) (err error) {
+	return m.Client.DeleteFileBlocks(ctx, file, segs)
+}

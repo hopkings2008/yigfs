@@ -15,18 +15,18 @@ import (
 
 func GetDirFileInfoSql() (sqltext string) {
 	sqltext = "select ino, generation, size, type, ctime, mtime, atime, perm, nlink, uid, gid," + 
-		" blocks from file where region=? and bucket_name=? and parent_ino=? and file_name=?"
+		" blocks from file where region=? and bucket_name=? and parent_ino=? and file_name=?;"
 	return sqltext
 }
 
 func GetDirFileInoSql() (sqltext string) {
-	sqltext = "select ino from file where region=? and bucket_name=? and parent_ino=? and file_name=?"
+	sqltext = "select ino from file where region=? and bucket_name=? and parent_ino=? and file_name=?;"
 	return sqltext
 }
 
 func GetFileInfoSql() (sqltext string) {
 	sqltext = "select generation, parent_ino, file_name, size, type, ctime, mtime, atime, perm, nlink," + 
-		" uid, gid, blocks from file where region=? and bucket_name=? and ino=?"
+		" uid, gid, blocks from file where region=? and bucket_name=? and ino=?;"
 	return sqltext
 }
 
@@ -36,12 +36,17 @@ func GetFileExistedSql() (sqltext string) {
 }
 
 func GetFileSizeAndBlocksSql() (sqltext string) {
-	sqltext = "select size, blocks from file where region=? and bucket_name=? and ino=? and generation=?"
+	sqltext = "select size, blocks from file where region=? and bucket_name=? and ino=? and generation=?;"
 	return sqltext
 }
 
 func UpdateFileSizeAndBlocksSql() (sqltext string) {
-	sqltext = "update file set size=?, blocks=? where region=? and bucket_name=? and ino=? and generation=?"
+	sqltext = "update file set size=?, blocks=? where region=? and bucket_name=? and ino=? and generation=?;"
+	return sqltext
+}
+
+func DeleteFileSql() (sqltext string) {
+	sqltext = "delete from file where region=? and bucket_name=? and ino=? and generation=?;"
 	return sqltext
 }
 
@@ -417,5 +422,19 @@ func(t *TidbClient) GetFileSizeAndBlocksNum(ctx context.Context, file *types.Cre
 	}
 	
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get file size and blocks number from tidb, size: %v, blocks number: %v", size, blocksNum))
+	return
+}
+
+func(t *TidbClient) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error) {
+	sqltext := DeleteFileSql()
+	_, err = t.Client.Exec(sqltext, file.Region, file.BucketName, file.Ino, file.Generation)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the file, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the file, region: %v, bucket: %v, ino: %v, generation: %v", 
+		file.Region, file.BucketName, file.Ino, file.Generation))
 	return
 }

@@ -22,3 +22,7 @@ func(m *Meta) MergeSegmentBlock(ctx context.Context, blockInfo *types.DescriptBl
 func(m *Meta) IsBlockCanMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isCanMerge bool, resp *types.BlockInfo, err error) {
 	return m.Client.IsBlockCanMerge(ctx, blockInfo, block)
 }
+
+func(m *Meta) DeleteBlocksBySegsId(ctx context.Context, segs map[interface{}][]int64) (err error) {
+	return m.Client.DeleteBlocksBySegsId(ctx, segs)
+}

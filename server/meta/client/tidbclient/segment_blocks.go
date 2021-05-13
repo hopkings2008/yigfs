@@ -24,6 +24,11 @@ func GetBlockInfoSql() (sqltext string) {
 	return sqltext
 }
 
+func GetBlocksBySegId() (sqltext string) {
+	sqltext = "select seg_start_addr from segment_blocks where seg_id0=? and seg_id1=? and is_deleted=?;"
+	return sqltext
+}
+
 func(t *TidbClient) InsertSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (blockId int64, err error) {
 	sqltext := "insert into segment_blocks(seg_id0, seg_id1, block_id, seg_start_addr, seg_end_addr, size) values(?,?,?,?,?,?)"
 	node, err := snowflake.NewNode(rand.Int63n(10))
@@ -172,5 +177,63 @@ func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegment
 		resp.Segments = append(resp.Segments, segment)
 	}
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get segments blocks info, number: %v", len(resp.Segments)))
+	return
+}
+
+func(t *TidbClient) DeleteBlocksBySegsId(ctx context.Context, segs map[interface{}][]int64) (err error) {
+	var stmt *sql.Stmt
+	sqltext := "update segment_blocks set is_deleted=? where seg_id0=? and seg_id1=? and seg_start_addr=? and is_deleted=?"
+	stmt, err = t.Client.Prepare(sqltext)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare delete segment blocks, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close delete segment blocks stmt, err: %v", err))
+			err = ErrYIgFsInternalErr
+		}
+	}()
+
+	for segmentId, _:= range segs {
+		segIds := segmentId.([2]uint64)
+		sqltext := GetBlocksBySegId()
+		rows, err := t.Client.Query(sqltext, segIds[0], segIds[1], types.NotDeleted)
+		if err == sql.ErrNoRows {
+			return nil
+		} else if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks for the seg, err: %v", err))
+			return ErrYIgFsInternalErr
+		}
+		defer rows.Close()
+
+		var startAddr int
+		for rows.Next() {
+			err = rows.Scan(
+				&startAddr,
+			)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query segment blocks, segId0: %v, segId1: %v, err: %v", segIds[0], segIds[1], err))
+				return ErrYIgFsInternalErr
+			}
+	
+			_, err = stmt.Exec(types.Deleted, segIds[0], segIds[1], startAddr, types.NotDeleted)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the segment block, segId0: %v, segId1: %v, startAddr: %v, err: %v",
+					segIds[0], segIds[1], startAddr, err))
+				return ErrYIgFsInternalErr
+			}
+		}
+		err = rows.Err()
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for segment blocks, segId0: %v, segId1: %v, err: %v", segIds[0], segIds[1], err))
+			return ErrYIgFsInternalErr
+		}
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment blocks, segsNum: %v", len(segs)))
 	return
 }

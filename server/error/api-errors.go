@@ -38,9 +38,10 @@ const (
 	ErrYigFsNoSuchMachine
 	ErrYigFsNoTargetSegment
 	ErrYigFsFileAlreadyExist
-	ErrYigFsMachineNotMatchLeader
+	ErrYigFsMachineNotMatchSegLeader
 	ErrYigFsMissingSegmentLeader
 	ErrYigFsNoVaildSegments
+	ErrYigFsMachineNotMatchFileLeader
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -109,8 +110,8 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		Description:    "The file already existed.",
 		HttpStatusCode: 40011,
 	},
-	ErrYigFsMachineNotMatchLeader: {
-		AwsErrorCode:   "ErrYigFsMachineNotMatchLeader",
+	ErrYigFsMachineNotMatchSegLeader: {
+		AwsErrorCode:   "ErrYigFsMachineNotMatchSegLeader",
 		Description:    "The request machine does not match segment leader.",
 		HttpStatusCode: 40012,
 	},
@@ -123,6 +124,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsNoVaildSegments",
 		Description:    "No vaild segments to upload.",
 		HttpStatusCode: 40014,
+	},
+	ErrYigFsMachineNotMatchFileLeader: {
+		AwsErrorCode:   "ErrYigFsMachineNotMatchFileLeader",
+		Description:    "The request machine does not match file leader.",
+		HttpStatusCode: 40015,
 	},
 }
 

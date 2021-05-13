@@ -139,3 +139,13 @@ type FileInfo struct {
 	Gid uint32 `json:"gid"`
 	Blocks uint32 `json:"blocks"`
 }
+
+type DeleteFileReq struct {
+	Ctx context.Context `json:"-"`
+	Region string `json:"region"`
+	BucketName string `json:"bucket"`
+	Ino uint64 `json:"ino"`
+	Generation uint64 `json:"generation"`
+	ZoneId string `json:"zone"`
+	Machine string `json:"machine"`
+}

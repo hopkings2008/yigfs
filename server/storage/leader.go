@@ -72,14 +72,14 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 	case ErrYigFsNoSuchLeader:
 		helper.Logger.Warn(ctx, fmt.Sprintf("The file does not have leader, zone_id: %s, region: %s, bucket: %s, ino: %d, starting to create it", 
 			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino))
-		// if leader does not exist, get a up machine from zone and update leader info
+		// if leader does not exist, get a up machine from zone and update leader info.
 		getMachineResp, err := GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
 		if err != nil {
 			return resp, err
 		}
 		return getMachineResp, nil
 	case nil:
-		// if leader exist, determine where leader status is up
+		// if leader exist, determine whether the leader status is up or not.
 		leader.Machine = resp.LeaderInfo.Leader
 		var getMachineInfoResp = &types.GetMachineInfoResp{}
 		getMachineInfoResp, err = yigFs.MetaStorage.Client.GetMachineInfo(ctx, leader)
@@ -104,6 +104,50 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 	default:
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get leader, zone_id: %s, region: %s, bucket: %s, ino: %d, err: %v", 
 			leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, err))
+		return
+	}
+}
+
+func(yigFs *YigFsStorage) CheckFileLeader(ctx context.Context, file *types.DeleteFileReq) (isMatch bool, err error) {
+	leader := &types.GetLeaderReq {
+		ZoneId: file.ZoneId,
+		Region: file.Region,
+		BucketName: file.BucketName,
+		Ino: file.Ino,
+		Generation: file.Generation,
+	}
+	resp, err := yigFs.MetaStorage.Client.GetFileLeaderInfo(ctx, leader)
+	switch err {
+	case ErrYigFsNoSuchLeader:
+		helper.Logger.Warn(ctx, fmt.Sprintf("CheckFileLeader: The file does not have leader, zone_id: %s, region: %s, bucket: %s, ino: %d," + 
+			" generation: %v, starting to create it", leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation))
+		// if the file leader does not exist, get a up machine from zone and update leader info
+		resp, err = GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
+		if err != nil {
+			return
+		}
+
+		if file.ZoneId == resp.LeaderInfo.ZoneId && file.Machine == resp.LeaderInfo.Leader {
+			isMatch = true
+			return
+		}
+
+		helper.Logger.Error(ctx, fmt.Sprintf("The machine(%s/%s) is not the file leader, cannot delete the file! region: %s, bucket: %s, ino: %d," + 
+			" generation: %v", file.ZoneId, file.Machine, file.Region, file.BucketName, file.Ino, file.Generation))
+		return
+	case nil:
+		// if the file leader exist, check whether it match or not.
+		if file.ZoneId == resp.LeaderInfo.ZoneId && file.Machine == resp.LeaderInfo.Leader {
+			isMatch = true
+			return
+		}
+
+		helper.Logger.Error(ctx, fmt.Sprintf("The machine(%s/%s) is not the file leader, cannot delete the file! region: %s, bucket: %s, ino: %d," + 
+			" generation: %v", file.ZoneId, file.Machine, file.Region, file.BucketName, file.Ino, file.Generation))
+		return
+	default:
+		helper.Logger.Error(ctx, fmt.Sprintf("CheckFileLeader: Failed to get the file leader, zone_id: %s, region: %s, bucket: %s, ino: %d," + 
+			" generation: %v, err: %v", file.ZoneId, file.Region, file.BucketName, file.Ino, file.Generation, err))
 		return
 	}
 }
@@ -146,7 +190,7 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 
 		// check request machine match leader or not
 		if getFileLeaderResp.LeaderInfo.ZoneId != segment.ZoneId || getFileLeaderResp.LeaderInfo.Leader != segment.Machine {
-			err = ErrYigFsMachineNotMatchLeader
+			err = ErrYigFsMachineNotMatchSegLeader
 		}
 
 		isExisted = types.NotExisted
@@ -154,7 +198,7 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 	case nil:
 		// if segment leader exist, check request machine match leader or not
 		if getSegLeaderResp.ZoneId != segment.ZoneId || getSegLeaderResp.Leader != segment.Machine {
-			err = ErrYigFsMachineNotMatchLeader
+			err = ErrYigFsMachineNotMatchSegLeader
 		}
 		
 		isExisted = types.Existed

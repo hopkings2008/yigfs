@@ -82,5 +82,13 @@ type Client interface {
 	MergeSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (err error)
 	// check whether the block can be merge in segment_blocks table or not.
 	IsBlockCanMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isCanMerge bool, resp *types.BlockInfo, err error)
+	// get segments info for the file
+	GetFileSegmentsInfo(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}][]int64, err error)
+	// delete blocks in file_blocks table
+	DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int64) (err error)
+	// delete blocks in segment_blocks table
+	DeleteBlocksBySegsId(ctx context.Context, segs map[interface{}][]int64) (err error)
+	// delete the targe file
+	DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error)
 }
 

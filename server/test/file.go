@@ -81,13 +81,12 @@ func GetFileAttr(getFileReq *types.GetFileInfoReq) (getFileAttrResp *types.GetFi
 	}
 	defer resp.Close()
 
-	var getFileInfoResp types.GetFileInfoResp
 	fileAttrRespInfo, err := ioutil.ReadAll(resp)
 	if err != nil {
 		return getFileAttrResp, "", err
 	}
 
-	if err = json.Unmarshal(fileAttrRespInfo, &getFileInfoResp); err != nil {
+	if err = json.Unmarshal(fileAttrRespInfo, &getFileAttrResp); err != nil {
 		return getFileAttrResp, "", err
 	}
 
@@ -110,10 +109,9 @@ func GetFileLeader(getLeaderReq *types.GetLeaderReq) (getFileLeaderResp *types.G
 	}
 	defer resp.Close()
 
-	var getLeaderResp types.GetLeaderResp
 	getFileLeaderInfo, _ := ioutil.ReadAll(resp)
 
-	if err = json.Unmarshal(getFileLeaderInfo, &getLeaderResp); err != nil {
+	if err = json.Unmarshal(getFileLeaderInfo, &getFileLeaderResp); err != nil {
 		return getFileLeaderResp, "", err
 	}
 
@@ -143,4 +141,29 @@ func PutFile(createFileReq *types.CreateFileReq) (createFileResp *types.CreateFi
 	}
 
 	return createFileResp, string(createFileRespInfo), nil
+}
+
+func DeleteFile(deleteFileReq *types.DeleteFileReq) (deleteFileResp *types.NonBodyResp, result string, err error) {
+	deleteFileResp = &types.NonBodyResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/file"
+
+	reqStr, err := json.Marshal(deleteFileReq)
+	if err != nil {
+		return deleteFileResp, "", err
+	}
+
+	resp, err := SendHttpToYigFs("DELETE", newServer, sc, reqStr)
+	if err != nil {
+		return deleteFileResp, "", err
+	}
+	defer resp.Close()
+
+	deleteFileRespInfo, _ := ioutil.ReadAll(resp)
+
+	if err = json.Unmarshal(deleteFileRespInfo, &deleteFileResp); err != nil {
+		return deleteFileResp, "", err
+	}
+
+	return deleteFileResp, string(deleteFileRespInfo), nil
 }

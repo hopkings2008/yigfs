@@ -506,3 +506,52 @@ func Test_HeartBeat(t *testing.T) {
 	r.Equal(heartBeatResp.Result.ErrCode, 0)
 	t.Logf("Succeed to test heart beat, resp: %s", heartBeatInfo)
 }
+
+func Test_DeleteFile(t *testing.T) {
+	r := require.New(t)
+	// get target dir file attr
+	getFile := &types.GetDirFileInfoReq {
+		Region: Region,
+		BucketName: BucketName,
+		ParentIno: FileParentIno,
+		FileName: FileName,
+	}
+
+	getDirFileResp, getDirFileInfo, err := GetDirFileAttr(getFile)
+	r.Nil(err)
+	r.Equal(getDirFileResp.Result.ErrCode, 0)
+	t.Logf("Test_DeleteFile: Succeed to get dir file attr, resp: %s", getDirFileInfo)
+
+	// delete the target file
+	deleteFileReq := &types.DeleteFileReq {
+		Region: Region,
+		BucketName: BucketName,
+		Ino: getDirFileResp.File.Ino,
+		ZoneId: ZoneId,
+		Machine: Machine2,
+	}
+
+	deleteFileResp, deleteFileRespInfo, err := DeleteFile(deleteFileReq)
+	r.Nil(err)
+	r.Equal(deleteFileResp.Result.ErrCode, 40015)
+	t.Logf("Succeed to resp err, for the machine is not the file leader, resp: %s", deleteFileRespInfo)
+
+	deleteFileReq.Machine = Machine
+	deleteFileResp, deleteFileRespInfo, err = DeleteFile(deleteFileReq)
+	r.Nil(err)
+	r.Equal(deleteFileResp.Result.ErrCode, 0)
+
+	// get the target file attr using ino
+	getFilesReq := &types.GetFileInfoReq {
+		Region: Region,
+		BucketName: BucketName,
+		Ino: getDirFileResp.File.Ino,
+	}
+
+	getFileAttrResp, getFileAttrInfo, err := GetFileAttr(getFilesReq)
+	r.Nil(err)
+	r.Equal(getFileAttrResp.Result.ErrCode, 40002)
+	t.Logf("Succeed to get the non existed file, getFileAttrResp: %s", getFileAttrInfo)
+
+	t.Logf("Succeed to delete file, resp: %s", deleteFileRespInfo)
+}

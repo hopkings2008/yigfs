@@ -107,7 +107,14 @@ func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, blockInfo *type
 
 		blocks = append(blocks, block)
 	}
+	err = rows.Err()
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for covered existed blocks, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
 
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get covered existed blocks, offset: %v, blocksNum: %v", block.Offset, len(blocks)))
 	return blocks, nil
 }
 
@@ -547,5 +554,86 @@ func (t *TidbClient) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlow
 
 	resp.Segments = append(resp.Segments, segment)
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to GetBlocksBySegId, segId0: %v, segId1: %v", seg.SegmentId0, seg.SegmentId1))
+	return
+}
+
+func(t *TidbClient) GetFileSegmentsInfo(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}][]int64, err error) {
+	segs = make(map[interface{}][]int64)
+	sqltext := "select seg_id0, seg_id1, offset from file_blocks where region=? and bucket_name=? and ino=? and generation=? and is_deleted=?;"
+	rows, err := t.Client.Query(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, types.NotDeleted)
+	if err == sql.ErrNoRows {
+		err = ErrYigFsNoVaildSegments
+		return
+	} else if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segs for the file, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	defer rows.Close()
+	
+	var segId0, segId1 uint64
+	var offset int64
+
+	for rows.Next() {
+		err = rows.Scan(
+			&segId0,
+			&segId1,
+			&offset,
+		)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query file segs, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
+				file.Region, file.BucketName, file.Ino, file.Generation, err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		segmentId := [2]uint64{segId0, segId1}
+		segs[segmentId] = append(segs[segmentId], offset)
+	}
+	err = rows.Err()
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for file segs, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get file segs info, region: %v, bucket: %v, ino: %v, generation: %v, segsNum: %v", 
+		file.Region, file.BucketName, file.Ino, file.Generation, len(segs)))
+	return
+}
+
+func(t *TidbClient) DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int64) (err error) {
+	var stmt *sql.Stmt
+	sqltext := DeleteBlockSql()
+	stmt, err = t.Client.Prepare(sqltext)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare delete file block, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close delete file block stmt, err: %v", err))
+			err = ErrYIgFsInternalErr
+		}
+	}()
+
+	for _, blocks := range segs {
+		for _, offset := range blocks {
+			_, err = stmt.Exec(types.Deleted, file.Region, file.BucketName, file.Ino, file.Generation, offset)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the file block, region: %v, bucket: %v, ino: %v," + 
+					" generation: %v, offset: %v, err: %v", file.Region, file.BucketName, file.Ino, file.Generation, offset, err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+		}
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete file blocks, region: %v, bucket: %v, ino: %v, generation: %v, segsNum: %v", 
+		file.Region, file.BucketName, file.Ino, file.Generation, len(segs)))
 	return
 }
