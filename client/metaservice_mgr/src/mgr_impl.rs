@@ -14,7 +14,9 @@ use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
 use common::runtime::Executor;
-use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment};
+use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, 
+    ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, 
+    RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment, ReqDeleteFile, RespDeleteFile};
 
 use self::message::{MsgSegmentOffset, ReqHeartbeat, ReqUpdateSegments, RespUpdateSegments};
 pub struct MetaServiceMgrImpl{
@@ -684,6 +686,64 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
 
         Ok(result)
+    }
+
+    fn delete_file(&self, ino: u64) -> Errno {
+        let req_delete_file = ReqDeleteFile {
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            ino: ino,
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
+        };
+
+        let req_body: String;
+        let ret = json::encode_to_str::<ReqDeleteFile>(&req_delete_file);
+        match ret {
+            Ok(ret) => {
+                req_body = ret;
+            }
+            Err(ret) => {
+                println!("delete_file: failed to encode the delete file req: {:?}, err: {}", req_delete_file, ret);
+                return Errno::Eintr;
+            }
+        }
+
+        let resp_body: String;
+        let url = format!("{}/v1/file", self.meta_server_url);
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body.as_bytes(), &HttpMethod::Delete, false));
+        match ret {
+            Ok(text) => {
+                if text.status >= 300 {
+                    println!("delete_file: failed to delete the file: {}, err status: {}, resp: {}", req_body, text.status, text.body);
+                    return Errno::Eintr;
+                }
+                resp_body = text.body;
+            }
+            Err(error) => {
+                println!("delete_file: failed to send req to {} with body: {}, err: {}", url, req_body, error);
+                return Errno::Eintr;
+            }
+        }
+        
+        let resp: RespDeleteFile;
+        let ret = json::decode_from_str::<RespDeleteFile>(&resp_body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                println!("delete_file: failed to decode from: {}, err: {}", resp_body, err);
+                return Errno::Eintr;
+            }
+        }
+
+        if resp.result.err_code != 0 {
+            println!("delete_file: failed to delete the file: {}, err: {}", req_body, resp.result.err_msg);
+            return Errno::Eintr;
+        }
+
+        return Errno::Esucc;
     }
 }
 

@@ -330,3 +330,17 @@ pub struct RespHeartbeat {
     pub upload_segments: Vec<MsgUploadSegment>,
     pub remove_segments: Vec<MsgRemoveSegment>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqDeleteFile {
+    pub region: String,
+    pub bucket: String,
+    pub ino: u64,
+    pub zone: String,
+    pub machine: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespDeleteFile {
+    pub result: RespResult,
+}
