@@ -20,3 +20,5 @@ hyper-tls = "0.5.0"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 http = "0.2"
+log = "0.4.8"
+log4rs = "0.11.0"

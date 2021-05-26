@@ -16,6 +16,8 @@ use io_engine::backend_storage::BackendStore;
 use io_engine::cache_store::{CacheStore, CacheStoreConfig};
 use io_engine::disk_cache_store::DiskCacheStoreFactory;
 use yig_backend::backend::YigBackendFactory;
+use log4rs;
+use log::{info};
 
 fn main() {
     let opts = options::parse();
@@ -31,6 +33,18 @@ fn main() {
             println!("failed to parse with err: {:}", error);
             return;
         }
+    }
+
+    // config log
+    let config_log_resp = log4rs::init_file(&cfg.log_path_config.log_path, Default::default());
+    match config_log_resp {
+        Ok(_) => {
+            info!("Succeed to config log!");
+        }
+        Err(error) => {
+            println!("Failed to config log!, err: {}", error);
+            return;
+        } 
     }
 
     let exec = Executor::create();

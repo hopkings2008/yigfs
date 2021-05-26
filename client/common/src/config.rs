@@ -11,6 +11,7 @@ pub struct Config{
     pub disk_cache_config: DiskCacheConfig,
     pub backend_store_config: BackendStoreConfig,
     pub heartbeat_config: HeartbeatConfig,
+    pub log_path_config: LogPathConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -58,4 +59,9 @@ pub struct BackendStoreConfig {
 #[derive(Deserialize, Debug, Clone)]
 pub struct HeartbeatConfig{
     pub timeout: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LogPathConfig{
+    pub log_path: String,
 }
