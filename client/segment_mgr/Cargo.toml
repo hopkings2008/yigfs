@@ -14,3 +14,5 @@ yig_backend = { path = "../yig_backend" }
 tokio = { version = "1", features = ["full"] }
 hash_ring = "0.2.0"
 crossbeam-channel = "0.4"
+log = "0.4.8"
+log4rs = "0.11.0"

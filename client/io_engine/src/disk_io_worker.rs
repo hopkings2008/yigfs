@@ -376,27 +376,53 @@ impl DiskIoWorker {
         }
     }
 
-    fn do_stat(&self, msg: &MsgFileStatOp){
-        let id = NumberOp::to_u128(msg.id0, msg.id1);
-        if let Some(f) = self.handles.get(&id) {
-            let result = MsgFileStatResult{
-                id0: msg.id0,
-                id1: msg.id1,
-                size: f.size,
-                err: Errno::Esucc,
-            };
-            msg.response(result);
-            return;
-        }
-
-        let result = MsgFileStatResult{
+    fn do_stat(&mut self, msg: &MsgFileStatOp){
+        let mut result = MsgFileStatResult{
             id0: msg.id0,
             id1: msg.id1,
             size: 0,
             err: Errno::Eintr,
         };
-        println!("do_stat: got unopened seg id0: {}, id1: {}", msg.id0, msg.id1);
-        msg.response(result);
+        let id = NumberOp::to_u128(msg.id0, msg.id1);
+        if let Some(f) = self.handles.get(&id) {
+            result.size = f.size;
+            result.err = Errno::Esucc;
+            msg.response(result);
+            return;
+        }
+
+        // open the seg and stat it.
+        let name = self.to_file_name(msg.id0, msg.id1, &msg.dir);
+        let ret = OpenOptions::new().create(true).read(true).append(true).open(&name);
+        match ret {
+            Ok(f) => {
+                let file_size: u64;
+                let ret = f.metadata();
+                match ret{
+                    Ok(ret) => {
+                        file_size = ret.len();
+                    }
+                    Err(err) => {
+                        println!("do_stat: failed to get file size for {}, err: {}", name, err);
+                        result.err = Errno::Eintr;
+                        msg.response(result);
+                        return;
+                    }
+                }
+                self.handles.insert(id, FileHandleRef::new(f, file_size));
+                result.size = file_size;
+                result.err = Errno::Esucc;
+                msg.response(result);
+                return;
+            }
+            Err(err) => {
+                println!("do_stat: failed open seg id0: {}, id1: {}, dir: {}, err: {}",
+                msg.id0, msg.id1, msg.dir, err);
+                result.err = Errno::Eintr;
+                msg.response(result);
+                return;
+            }
+        }
     }
 
     fn exits(&mut self) {

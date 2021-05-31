@@ -120,6 +120,7 @@ impl MsgFileReadOp {
 pub struct MsgFileStatOp{
     pub id0: u64,
     pub id1: u64,
+    pub dir: String,
     pub result_tx: Sender<MsgFileStatResult>,
 }
 

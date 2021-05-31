@@ -3,6 +3,7 @@ use common::runtime::Executor;
 use common::error::Errno;
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
+use log::{error};
 use crate::{leader::Leader, segment_sync::SegSyncer};
 use crate::file_handle::FileHandleMgr;
 use crate::types::{FileHandle, Block, BlockIo, Segment};
@@ -51,7 +52,7 @@ impl Leader for LeaderLocal {
             if ret.is_success(){
                 // try to perform sync from backend store.
                 // check whether need to perform download from backend store.
-                let ret = self.cache_store.stat(seg.seg_id0, seg.seg_id1);
+                let ret = self.cache_store.stat(seg.seg_id0, seg.seg_id1, &seg_dir);
                 match ret {
                     Ok(ret) => {
                         if ret.size < seg.size {
@@ -196,10 +197,41 @@ impl Leader for LeaderLocal {
         let mut id0 = last_segment[0];
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
+        let mut seg_size = last_segment[3];
+        
         //println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
         loop {
             //println!("write: seg(id0: {}, id1: {}, max_size: {})", id0, id1, seg_max_size);
             let seg_dir = self.segment_mgr.get_segment_dir(id0, id1);
+            // must check whether cache size is smaller than segment size or not. if so, write the backend directly.
+            // or if O_DIRECT, write to backend directly too.
+            let cache_size: u64;
+            let ret = self.cache_store.stat(id0, id1, &seg_dir);
+            match ret {
+                Ok(ret) => {
+                    cache_size = ret.size;
+                }
+                Err(err) => {
+                    error!("write: failed to perform cache stat for seg: id0: {}, id1: {}, dir: {}, err: {:?}",
+                    id0, id1, seg_dir, err);
+                    cache_size = 0;
+                }
+            }
+            if cache_size < seg_size {
+                // write to backend store directly.
+                let ret = self.backend_store.write(id0, id1, seg_size, data);
+                if ret.err.is_success() {
+                    return Ok(BlockIo{
+                        id0: id0,
+                        id1: id1,
+                        offset: ret.offset,
+                        size: ret.nwrite,
+                    });
+                }
+                error!("write: backend_store write failed for seg: id0: {}, id1: {}, offset: {}, err: {:?}",
+                id0, id1, seg_size, ret.err);
+                return Err(ret.err);
+            }
             let ret = self.cache_store.write(id0, id1, &seg_dir, offset, seg_max_size, data);
             match ret {
                 Ok(r) => {

@@ -214,12 +214,13 @@ impl CacheStore for DiskCache {
         return Errno::Esucc;
     }
 
-    fn stat(&self, id0: u64, id1: u64) -> Result<CacheStatResult, Errno>{
+    fn stat(&self, id0: u64, id1: u64, dir: &String) -> Result<CacheStatResult, Errno>{
         let worker = self.disk_pool.get_thread(id0, id1);
         let (tx, rx) = bounded::<MsgFileStatResult>(1);
         let msg = MsgFileStatOp{
             id0: id0,
             id1: id1,
+            dir: dir.clone(),
             result_tx: tx,
         };
         let ret = worker.do_io(MsgFileOp::OpStat(msg));

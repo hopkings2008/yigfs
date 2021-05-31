@@ -326,6 +326,7 @@ impl HandleMgr {
         let mut id0: u64 = 0;
         let mut id1: u64 = 0;
         let mut max_size: u64 = 0;
+        let mut size: u64 = 0;
         let tx = msg.tx.clone();
         defer! {
             drop(tx);
@@ -337,12 +338,14 @@ impl HandleMgr {
                 id0 = l.seg_id0;
                 id1 = l.seg_id1;
                 max_size = l.capacity;
+                size = l.size;
             }
         }
         if found {
             v.push(id0);
             v.push(id1);
             v.push(max_size);
+            v.push(size);
         }
         let ret = msg.tx.send(v);
         match ret {
