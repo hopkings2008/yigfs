@@ -9,6 +9,7 @@ members = [
     "common",
     "s3",
     "yig_backend",
+    "interval_tree",
 ]
 
 
