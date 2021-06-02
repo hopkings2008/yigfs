@@ -31,8 +31,8 @@ impl<T> TNode<T>{
     pub fn set_lchild(&mut self, l: &Option<Rc<RefCell<TNode<T>>>>) {
         match l {
             Some(n) => {
-                if self.intr_end < n.as_ref().borrow().intr_end {
-                    self.intr_end = n.as_ref().borrow().intr_end;
+                if self.intr_end < n.borrow().intr_end {
+                    self.intr_end = n.borrow().intr_end;
                 }
                 self.l = Some(n.clone());
             }
@@ -45,8 +45,8 @@ impl<T> TNode<T>{
     pub fn set_rchild(&mut self, r: &Option<Rc<RefCell<TNode<T>>>>) {
         match r{
             Some(n) => {
-                if self.intr_end < n.as_ref().borrow().intr_end {
-                    self.intr_end = n.as_ref().borrow().intr_end;
+                if self.intr_end < n.borrow().intr_end {
+                    self.intr_end = n.borrow().intr_end;
                 }
                 self.r = Some(n.clone());
             }

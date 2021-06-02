@@ -1,4 +1,3 @@
-use std::cell::RefMut;
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::tnode::TNode;
@@ -12,6 +11,38 @@ impl<T> IntervalTree<T>{
         IntervalTree{
             root: None,
         }
+    }
+
+    fn insert(&mut self, z: &Rc<RefCell<TNode<T>>>){
+        let mut y: Option<Rc<RefCell<TNode<T>>>> = None;
+        let mut x = self.root.clone();
+        while x.is_some(){
+            let tmp = x.clone();
+            let n:&Rc<RefCell<TNode<T>>> = tmp.as_ref().unwrap();
+            y = x.clone();
+            if z.borrow().get_key() < n.borrow().get_key() {
+                x = n.borrow().get_lchild().clone();
+                continue;
+            }
+            x = n.borrow().get_rchild().clone();
+        }
+        // z.p = y
+        z.borrow_mut().set_parent(&y);
+        // if y == nil, root = z
+        if y.is_none() {
+            self.root = Some(z.clone());
+        } else {
+            let n = y.as_ref().unwrap();
+            if z.borrow().get_key() < n.borrow().get_key() {
+                n.borrow_mut().set_lchild(&Some(z.clone()));
+            } else {
+                n.borrow_mut().set_rchild(&Some(z.clone()));
+            }
+        }
+        z.borrow_mut().set_lchild(&None);
+        z.borrow_mut().set_rchild(&None);
+        z.borrow_mut().set_color(1);
+        self.insert_fixup(z);
     }
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){
@@ -123,7 +154,7 @@ impl<T> IntervalTree<T>{
     }
 
     fn left_rotate(&mut self, x: &Rc<RefCell<TNode<T>>>) {
-        let t = x.borrow();
+        let t = RefCell::borrow(x);
         let y = t.get_rchild();
         match y {
             Some(y) => {
@@ -159,7 +190,7 @@ impl<T> IntervalTree<T>{
     }
 
     fn right_rotate(&mut self, x: &Rc<RefCell<TNode<T>>>) {
-        let t = x.borrow();
+        let t = RefCell::borrow(x);
         let y = t.get_lchild();
         match y {
             Some(y) => {
