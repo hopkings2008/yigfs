@@ -1,6 +1,7 @@
 use common::runtime::Executor;
 use s3::s3_client::S3Client;
 use common::error::Errno;
+use log::info;
 
 #[test]
 fn test_append_object_by_path()->Result<(), String> {
@@ -18,7 +19,7 @@ fn test_append_object_by_path()->Result<(), String> {
     let resp = exec.get_runtime().block_on(s3_client.append_object_by_path(&target_bucket, &target_object, &append_position, &object_path));
     match resp.err {
         Errno::Esucc => {
-            println!("test_append_object_by_path resp is {:?}", resp);
+            info!("test_append_object_by_path resp is {:?}", resp);
             return Ok(());
         }
         _ => {
@@ -43,7 +44,7 @@ fn test_append_object()->Result<(), String> {
     let resp = exec.get_runtime().block_on(s3_client.append_object(&target_bucket, &target_object, &append_position, &data));
     match resp.err {
         Errno::Esucc => {
-            println!("test_append_object resp is {:?}", resp);
+            info!("test_append_object resp is {:?}", resp);
             return Ok(());
         }
         _ => {

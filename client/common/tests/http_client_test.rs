@@ -1,5 +1,7 @@
 use common::http_client;
 use common::runtime::Executor;
+use log::info;
+
 #[test]
 fn test_http_client_get()->Result<(), String> {
     let url = String::from("http://www.baidu.com");
@@ -13,7 +15,7 @@ fn test_http_client_get()->Result<(), String> {
     if resp.body.is_empty() {
         return Err(format!("got empty body"));
     }
-    println!("{}", resp.body);
+    info!("{}", resp.body);
     return Ok(());
 }
 
@@ -30,6 +32,6 @@ fn test_https_client_get()->Result<(), String> {
     if resp.body.is_empty() {
         return Err(format!("got empty body"));
     }
-    println!("{}", resp.body);
+    info!("{}", resp.body);
     return Ok(());
 }

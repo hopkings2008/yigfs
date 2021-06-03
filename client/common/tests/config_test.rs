@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use log::{info, error};
 
 #[test]
 fn test_parse_config()->Result<(), String>{
@@ -20,11 +21,11 @@ fn test_parse_config()->Result<(), String>{
     let parse_result = common::parse_config(test_config_file);
     match parse_result {
         Ok(cfg) => {
-            println!("got cfg: {:?}", cfg);
+            info!("got cfg: {:?}", cfg);
             Ok(())
         }
         Err(error) => {
-            println!("failed to parse with err: {}", error);
+            error!("failed to parse with err: {}", error);
             Err(format!{"failed to parse with err: {}", error})
         }
     }

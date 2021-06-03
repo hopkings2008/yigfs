@@ -11,6 +11,7 @@ use hyper::{Client, Request, Body};
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use http::header::{HeaderName, HeaderValue};
+use log::error;
 
 
 pub enum HttpMethod{
@@ -112,7 +113,7 @@ impl HttpClient{
                     resp = result;
                 }
                 Err(error) => {
-                    println!("failed to send request to url: {}, err: {} in {} time", url.clone(), error, count+1); 
+                    error!("failed to send request to url: {}, err: {} in {} time", url.clone(), error, count+1); 
                     continue;
                 }
             }
@@ -180,7 +181,7 @@ impl HttpClient{
                             headers.insert(String::from(h.as_str()), String::from(v));
                         }
                         Err(error) =>{
-                            println!("got invalid header {} with error: {}", h.as_str(), error);
+                            error!("got invalid header {} with error: {}", h.as_str(), error);
                         }
                     }
                     

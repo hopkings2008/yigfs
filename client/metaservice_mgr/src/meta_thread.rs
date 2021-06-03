@@ -6,7 +6,7 @@ use crossbeam_channel::Sender;
 use crate::meta_op::{MetaOp, MetaOpResp, MetaOpUploadSeg};
 use crate::mgr::MetaServiceMgr;
 use crate::meta_worker::MetaWorker;
-
+use log::error;
 
 
 pub struct MetaThread{
@@ -38,7 +38,7 @@ impl MetaThread {
                 self.thr.join();
             }
             Err(err) => {
-                println!("MetaThread::stop: failed to send the stop signal, err: {}", err);
+                error!("MetaThread::stop: failed to send the stop signal, err: {}", err);
             }
         }
     }
@@ -56,7 +56,7 @@ impl MetaThread {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("upload_segment: failed to send op for id0: {}, id1: {}, offset: {}, err: {}",
+                error!("upload_segment: failed to send op for id0: {}, id1: {}, offset: {}, err: {}",
                 id0, id1, offset, err);
                 return Errno::Eintr;
             }

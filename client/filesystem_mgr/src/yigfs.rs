@@ -12,6 +12,7 @@ use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetF
 use segment_mgr::leader_mgr::LeaderMgr;
 use common::uuid;
 use crate::handle::{FileHandleInfo, FileHandleInfoMgr};
+use log::{info, warn, error};
 
 const TTL: Timespec = Timespec { sec: 1, nsec: 0 };                     // 1 second
 
@@ -26,20 +27,20 @@ pub struct Yigfs{
 
 impl Filesystem for Yigfs {
     fn init(&mut self, req: &Request) -> Result<(), c_int> {
-        println!("init: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
+        info!("init: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
         let ret = self.meta_service_mgr.mount(req.uid(), req.gid());
         match ret {
             Ok(_) => {
                 return Ok(());
             }
             Err(error) => {
-                println!("failed to mount with err: {:?}", error);
+                error!("failed to mount with err: {:?}", error);
                 return Err(ENOENT);
             }
         }
     }
     fn destroy(&mut self, req: &Request) {
-        println!("destroy: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
+        warn!("destroy: uid: {}, gid: {}, fsid: {}", req.uid(), req.gid(), self.fsid);
         self.leader_mgr.stop();
         self.handle_cacher.stop();
     }
@@ -51,20 +52,20 @@ impl Filesystem for Yigfs {
                 name_str = String::from(ret);
             }
             None => {
-                println!("got invalid parent: {}, name: {:?}", parent, name);
+                error!("got invalid parent: {}, name: {:?}", parent, name);
                 return;
             }
         }
-        println!("lookup: parent: {}, name: {}", parent, name_str);
+        info!("lookup: parent: {}, name: {}", parent, name_str);
         let ret = self.meta_service_mgr.read_dir_file_attr(parent, &name_str);
         match ret {
             Ok(ret) => {
                 let file_attr = self.to_usefs_attr(&ret);
-                println!("lookup: parent: {}, name: {}, attr: {:?}", parent, name_str, file_attr);
+                info!("lookup: parent: {}, name: {}, attr: {:?}", parent, name_str, file_attr);
                 reply.entry(&TTL, &file_attr, ret.generation);
             }
             Err(error) => {
-                println!("failed to lookup for parent: {}, name: {}, err: {:?}", parent, name_str, error);
+                error!("failed to lookup for parent: {}, name: {}, err: {:?}", parent, name_str, error);
                 reply.error(ENOENT);
             }
         }
@@ -75,11 +76,11 @@ impl Filesystem for Yigfs {
         match ret {
             Ok(ret) => {
                 let attr = self.to_usefs_attr(&ret);
-                println!("getattr: ino: {}, attr: {:?}", ino, attr);
+                info!("getattr: ino: {}, attr: {:?}", ino, attr);
                 reply.attr(&TTL, &attr);
             }
             Err(error) => {
-                println!("failed to getattr for ino: {}, err: {:?}", ino, error);
+                error!("failed to getattr for ino: {}, err: {:?}", ino, error);
                 reply.error(ENOENT);
             }
         }
@@ -123,16 +124,16 @@ impl Filesystem for Yigfs {
         }
         set_attr.size = size;
 
-        println!("setattr: uid: {}, gid: {}, pid: {}, attr: {:?}", req.uid(), req.gid(), req.pid(), set_attr);
+        info!("setattr: uid: {}, gid: {}, pid: {}, attr: {:?}", req.uid(), req.gid(), req.pid(), set_attr);
         let file_attr : metaservice_mgr::types::FileAttr;
         let ret = self.meta_service_mgr.set_file_attr(&set_attr);
         match ret {
             Ok(ret) => {
                 file_attr = ret;
-                println!("set_attr: got result: {:?} for attr: {:?}", file_attr, set_attr);
+                info!("set_attr: got result: {:?} for attr: {:?}", file_attr, set_attr);
             }
             Err(err) => {
-                println!("failed to set_file_attr for {:?}, err: {:?}", set_attr, err);
+                error!("failed to set_file_attr for {:?}, err: {:?}", set_attr, err);
                 reply.error(libc::EIO);
                 return;
             }
@@ -148,7 +149,7 @@ impl Filesystem for Yigfs {
                 leader = ret.leader;
             }
             Err(err) => {
-                println!("read: file ino: {} is not opened yet, err: {:?}.", ino, err);
+                error!("read: file ino: {} is not opened yet, err: {:?}.", ino, err);
                 reply.error(libc::EBADF);
                 return;
             }
@@ -162,7 +163,7 @@ impl Filesystem for Yigfs {
                 return;
             }
             Err(err) => {
-                println!("read: failed to read ino: {}, offset: {}, err: {:?}", ino, offset, err);
+                error!("read: failed to read ino: {}, offset: {}, err: {:?}", ino, offset, err);
                 reply.error(libc::EIO);
                 return;
             }
@@ -171,7 +172,7 @@ impl Filesystem for Yigfs {
 
     fn readdir(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, mut reply: ReplyDirectory) {
         // must authorize the request here by checking _req.
-        println!("readdir: ino: {}, offset: {}", ino, offset);
+        info!("readdir: ino: {}, offset: {}", ino, offset);
         let entrys : Vec<metaservice_mgr::types::DirEntry>;
         let ret = self.meta_service_mgr.read_dir(ino, offset);
         match ret {
@@ -179,7 +180,7 @@ impl Filesystem for Yigfs {
                 entrys = ret;
             }
             Err(error) => {
-                println!("failed to readdir for ino: {}, offset: {}, err: {:?}", ino, offset, error);
+                error!("failed to readdir for ino: {}, offset: {}, err: {:?}", ino, offset, error);
                 reply.error(ENOENT);
                 return;
             }
@@ -204,7 +205,7 @@ impl Filesystem for Yigfs {
                 string = String::from(str);
             }
             None => {
-                println!("create: got invalid name: {:?}", name);
+                error!("create: got invalid name: {:?}", name);
                 reply.error(libc::EBADMSG);
                 return;
             }
@@ -212,7 +213,7 @@ impl Filesystem for Yigfs {
 
         let name = string;
 
-        println!("create: uid: {}, gid: {}, parent: {}, name: {}, mod: {}, flags: {}",
+        info!("create: uid: {}, gid: {}, parent: {}, name: {}, mod: {}, flags: {}",
         req.uid(), req.gid(), parent, name, mode, flags);
         let file_info: NewFileInfo;
         let ret = self.meta_service_mgr.new_ino_leader(parent, &name, req.uid(), req.gid(), mode);
@@ -222,12 +223,12 @@ impl Filesystem for Yigfs {
             }
             Err(err) => {
                 if !err.is_exists() {
-                    println!("failed to new_ino_leader: parent: {}, name: {}, err: {:?}",
+                    error!("failed to new_ino_leader: parent: {}, name: {}, err: {:?}",
                     parent, name, err);
                     reply.error(libc::EIO);
                     return;
                 }
-                println!("new_ino_leader: parent: {}, name: {} already exists", parent, name);
+                warn!("new_ino_leader: parent: {}, name: {} already exists", parent, name);
                 reply.error(libc::EEXIST);
                 return;
             }
@@ -237,14 +238,14 @@ impl Filesystem for Yigfs {
             leader: file_info.leader_info.leader.clone(),
         });
         if !ret.is_success(){
-            println!("create: failed to add handle cache for name: {}, ino: {}", name, file_info.attr.ino);
+            error!("create: failed to add handle cache for name: {}, ino: {}", name, file_info.attr.ino);
             reply.error(libc::EIO);
             return;
         }
         let leader_io = self.leader_mgr.get_leader(&file_info.leader_info.leader);
         let ret = leader_io.open(file_info.attr.ino);
         if !ret.is_success(){
-            println!("create: failed to open name: {}, ino: {}", name, file_info.attr.ino);
+            error!("create: failed to open name: {}, ino: {}", name, file_info.attr.ino);
             reply.error(libc::EIO);
             return;
         }
@@ -255,16 +256,16 @@ impl Filesystem for Yigfs {
 
     fn open(&mut self, req: &Request, ino: u64, flags: u32, reply: ReplyOpen){
         let file_leader_info : FileLeader;
-        println!("open: uid: {}, gid: {}, ino: {}, flags: {}",
+        info!("open: uid: {}, gid: {}, ino: {}, flags: {}",
         req.uid(), req.gid(), ino, flags);
         let ret = self.meta_service_mgr.get_file_leader(ino);
         match ret {
             Ok(ret) => {
                 file_leader_info = ret;
-                println!("got file leader {:?} for ino: {}", file_leader_info.leader, ino);
+                info!("got file leader {:?} for ino: {}", file_leader_info.leader, ino);
             }
             Err(err) => {
-                println!("failed to get_file_leader for ino: {}, err: {:?}", ino, err);
+                error!("failed to get_file_leader for ino: {}, err: {:?}", ino, err);
                 reply.error(libc::EBADF);
                 return;
             }
@@ -275,7 +276,7 @@ impl Filesystem for Yigfs {
             leader: file_leader_info.leader.clone(),
         });
         if !ret.is_success() {
-            println!("open: failed to add handle cache for ino: {}, leader: {}", ino, file_leader_info.leader);
+            error!("open: failed to add handle cache for ino: {}, leader: {}", ino, file_leader_info.leader);
             reply.error(libc::EBADF);
             return;
         }
@@ -284,7 +285,7 @@ impl Filesystem for Yigfs {
             reply.opened(ino, flags);
             return;
         }
-        println!("open: failed to open ino: {}, err: {:?}", ino, ret);
+        error!("open: failed to open ino: {}, err: {:?}", ino, ret);
         reply.error(libc::EIO);
         return;        
     }
@@ -300,7 +301,7 @@ impl Filesystem for Yigfs {
                 leader = ret.leader;
             }
             Err(err) => {
-                println!("write: file ino: {} is not opened yet, err: {:?}.", ino, err);
+                error!("write: file ino: {} is not opened yet, err: {:?}.", ino, err);
                 reply.error(libc::EBADF);
                 return;
             }
@@ -314,7 +315,7 @@ impl Filesystem for Yigfs {
                 return;
             }
             Err(err) => {
-                println!("write: failed to write ino: {}, offset: {}, err: {:?}",
+                error!("write: failed to write ino: {}, offset: {}, err: {:?}",
                 ino, offset, err);
                 reply.error(libc::EIO);
                 return;
@@ -323,7 +324,7 @@ impl Filesystem for Yigfs {
     }
 
     fn release(&mut self, req: &Request, ino: u64, fh: u64, flags: u32, lock_owner: u64, flush: bool, reply: ReplyEmpty) {
-        println!("release: uid: {}, gid: {}, ino: {}, fh: {}, flags: {}, lock_owner: {}, flush: {}", 
+        info!("release: uid: {}, gid: {}, ino: {}, fh: {}, flags: {}, lock_owner: {}, flush: {}", 
         req.uid(), req.gid(), ino, fh, flags, lock_owner, flush);
         let ret = self.handle_cacher.get_handle_info(ino);
         match ret {
@@ -331,16 +332,16 @@ impl Filesystem for Yigfs {
                 let leader = self.leader_mgr.get_leader(&ret.leader);
                 let err = leader.close(ino);
                 if !err.is_success(){
-                    println!("release: failed to close ino: {}, err: {:?}", ino, err);
+                    error!("release: failed to close ino: {}, err: {:?}", ino, err);
                 }
             }
             Err(err) => {
-                println!("release: failed to get handle for ino: {}, err: {:?}", ino, err);
+                error!("release: failed to get handle for ino: {}, err: {:?}", ino, err);
             }
         }
         let err = self.handle_cacher.del_handle_info(ino);
         if !err.is_success() {
-            println!("release: failed to del handle for ino: {}, err: {:?}", ino, err);
+            error!("release: failed to del handle for ino: {}, err: {:?}", ino, err);
         }
         reply.ok();
     }

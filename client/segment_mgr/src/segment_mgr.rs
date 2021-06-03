@@ -8,6 +8,7 @@ use common::config::Config;
 use metaservice_mgr::mgr::MetaServiceMgr;
 use metaservice_mgr::types::Segment as MetaSegment;
 use hash_ring::HashRing;
+use log::error;
 
 pub struct SegmentMgr {
     meta_service_mgr: Arc<dyn MetaServiceMgr>,
@@ -29,7 +30,7 @@ impl SegmentMgr {
                 segs = ret;
             }
             Err(err) => {
-                println!("failed to get_file_segments for ino {}, err: {:?}", ino, err);
+                error!("failed to get_file_segments for ino {}, err: {:?}", ino, err);
                 return Err(err);
             }
         }
@@ -122,7 +123,7 @@ impl SegmentMgr {
         }
         let ret = self.meta_service_mgr.update_file_segments(ino, &ms);
         if !ret.is_success() {
-            println!("update_segments: failed to update segments for ino: {}, err: {:?}", ino, ret);
+            error!("update_segments: failed to update segments for ino: {}, err: {:?}", ino, ret);
             return ret;
         }
         return ret;

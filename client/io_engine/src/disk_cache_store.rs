@@ -7,6 +7,7 @@ use common::runtime::Executor;
 use common::error::Errno;
 use crossbeam_channel::{bounded, Sender};
 use std::sync::Arc;
+use log::error;
 
 // must be implemented as thread safe.
 pub struct DiskCache {
@@ -26,7 +27,7 @@ impl CacheStore for DiskCache {
         };
         let ret = worker.do_io(MsgFileOp::OpOpen(msg));
         if !ret.is_success() {
-            println!("open(id0: {}, id1: {}, dir: {}): failed to send open msg, err: {:?}",
+            error!("open(id0: {}, id1: {}, dir: {}): failed to send open msg, err: {:?}",
             id0, id1, dir, ret);
             return ret;
         }
@@ -36,20 +37,20 @@ impl CacheStore for DiskCache {
                 match ret {
                     MsgFileOpResp::OpRespOpen(e) => {
                         if !e.err.is_success() {
-                            println!("open(id0: {}, id1: {}, dir: {}) failed with errno: {:?}", id0, id1, dir, e.err);
+                            error!("open(id0: {}, id1: {}, dir: {}) failed with errno: {:?}", id0, id1, dir, e.err);
                             return e.err;
                         }
                         return Errno::Esucc;
                     }
                     _ => {
-                        println!("open(id0: {}, id1: {}, dir: {}), got invalid resp", id0, id1, dir);
+                        error!("open(id0: {}, id1: {}, dir: {}), got invalid resp", id0, id1, dir);
                         return Errno::Eintr;
                     }
                 }
                 
             }
             Err(err) => {
-                println!("open: failed to get response for (id0: {}, id1: {}, dir: {}), err: {}", 
+                error!("open: failed to get response for (id0: {}, id1: {}, dir: {}), err: {}", 
                 id0, id1, dir, err);
                 return Errno::Eintr;
             }
@@ -66,7 +67,7 @@ impl CacheStore for DiskCache {
         };
         let ret = worker.do_io(MsgFileOp::OpOpen(msg));
         if !ret.is_success() {
-            println!("open(id0: {}, id1: {}, dir: {}): failed to send open msg, err: {:?}",
+            error!("open(id0: {}, id1: {}, dir: {}): failed to send open msg, err: {:?}",
             id0, id1, dir, ret);
             return ret;
         }
@@ -89,7 +90,7 @@ impl CacheStore for DiskCache {
         };
         let ret = worker.do_io(MsgFileOp::OpWrite(msg));
         if !ret.is_success() {
-            println!("write: failed to send_disk_io for seg(id0: {}, id1: {}, dir: {}), err: {:?}",
+            error!("write: failed to send_disk_io for seg(id0: {}, id1: {}, dir: {}), err: {:?}",
             id0, id1, dir, ret);
             return Err(Errno::Eintr);
         }
@@ -107,7 +108,7 @@ impl CacheStore for DiskCache {
                         return Err(ret.err);
                     }
                     _ => {
-                        println!("write: failed to get resp for seg(id0: {}, id1: {}, dir: {})",
+                        error!("write: failed to get resp for seg(id0: {}, id1: {}, dir: {})",
                         id0, id1, dir);
                         return Err(Errno::Eintr);
                     }
@@ -115,7 +116,7 @@ impl CacheStore for DiskCache {
                 
             }
             Err(err) => {
-                println!("disk_cache_store: write: failed to recv write result for seg(id0: {}, id1: {}, dir: {}), err: {}",
+                error!("disk_cache_store: write: failed to recv write result for seg(id0: {}, id1: {}, dir: {}), err: {}",
             id0, id1, dir, err);
             return Err(Errno::Eintr);
             }
@@ -135,7 +136,7 @@ impl CacheStore for DiskCache {
         };
         let ret = worker.do_io(MsgFileOp::OpWrite(msg));
         if !ret.is_success() {
-            println!("write: failed to send_disk_io for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}",
+            error!("write: failed to send_disk_io for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}",
             id0, id1, dir, offset, ret);
             return ret;
         }
@@ -156,7 +157,7 @@ impl CacheStore for DiskCache {
 
         let ret = worker.do_io(MsgFileOp::OpRead(msg));
         if !ret.is_success(){
-            println!("disk_cache_store: read: failed to send read op for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+            error!("disk_cache_store: read: failed to send read op for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
             id0, id1, dir, offset, ret);
             return Err(ret);
         }
@@ -168,24 +169,24 @@ impl CacheStore for DiskCache {
                         if ret.err.is_success() {
                             return Ok(ret.data);
                         } else if ret.err.is_eof() {
-                            println!("disk_cache_store: read: read eof for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+                            error!("disk_cache_store: read: read eof for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
                     id0, id1, dir, offset, ret.err);
                             return Err(Errno::Eeof);
                         } else {
-                            println!("disk_cache_store: read: failed to read data for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+                            error!("disk_cache_store: read: failed to read data for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
                     id0, id1, dir, offset, ret.err);
                             return Err(ret.err);
                         }
                     }
                     _ => {
-                        println!("disk_cache_store: read: failed to get invalid resp for seg(id0: {}, id1: {}, dir: {}",
+                        error!("disk_cache_store: read: failed to get invalid resp for seg(id0: {}, id1: {}, dir: {}",
                     id0, id1, dir);
                         return Err(Errno::Eintr);
                     }
                 }
             }
             Err(err) => {
-                println!("disk_cache_store: read: failed to recv read resp for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+                error!("disk_cache_store: read: failed to recv read resp for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
             id0, id1, dir, offset, err);
                 return Err(Errno::Eintr);
             }
@@ -207,7 +208,7 @@ impl CacheStore for DiskCache {
 
         let ret = worker.do_io(MsgFileOp::OpRead(msg));
         if !ret.is_success(){
-            println!("disk_cache_store: read: failed to send read op for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
+            error!("disk_cache_store: read: failed to send read op for seg(id0: {}, id1: {}, dir: {}), offset: {}, err: {:?}", 
             id0, id1, dir, offset, ret);
             return ret;
         }
@@ -225,7 +226,7 @@ impl CacheStore for DiskCache {
         };
         let ret = worker.do_io(MsgFileOp::OpStat(msg));
         if !ret.is_success(){
-            println!("disk_cache_store::stat: failed to perform stat for seg: id0: {}, id1: {}, err: {:?}",
+            error!("disk_cache_store::stat: failed to perform stat for seg: id0: {}, id1: {}, err: {:?}",
             id0, id1, ret);
             return Err(ret);
         }
@@ -240,7 +241,7 @@ impl CacheStore for DiskCache {
                 });
             }
             Err(err) => {
-                println!("disk_cache_store::stat failed to receive stat result for seg: id0: {}, id1: {}, err: {}",
+                error!("disk_cache_store::stat failed to receive stat result for seg: id0: {}, id1: {}, err: {}",
                 id0, id1, err);
                 return Err(Errno::Eintr);
             }
@@ -255,7 +256,7 @@ impl CacheStore for DiskCache {
         };
         let ret = worker.do_io(MsgFileOp::OpClose(msg));
         if !ret.is_success(){
-            println!("disk_cache_store: close: failed to close seg: id0: {}, id1: {}, err: {:?}", 
+            error!("disk_cache_store: close: failed to close seg: id0: {}, id1: {}, err: {:?}", 
                 id0, id1, ret);
             return ret;
         }

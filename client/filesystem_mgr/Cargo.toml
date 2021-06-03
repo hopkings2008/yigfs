@@ -14,3 +14,4 @@ crossbeam-channel = "0.4"
 metaservice_mgr = {path = "../metaservice_mgr"}
 segment_mgr = {path = "../segment_mgr"}
 common = {path = "../common" }
+log = "0.4.8"

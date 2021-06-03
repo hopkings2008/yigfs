@@ -7,6 +7,7 @@ use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
 use crate::types::{Block, FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle, Segment};
+use log::{warn, error};
 
 pub struct FileHandleMgr {
     //for update file handle.
@@ -40,7 +41,7 @@ impl FileHandleMgr {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to stop file handle mgr, err: {}", err);
+                error!("failed to stop file handle mgr, err: {}", err);
             }
         }
         // join the HandleMgr thread.
@@ -48,10 +49,10 @@ impl FileHandleMgr {
             let ret = h.join();
             match ret {
                 Ok(_) => {
-                    println!("FileHandleMgr has stopped.");
+                    warn!("FileHandleMgr has stopped.");
                 }
                 Err(_) => {
-                    println!("FileHandleMgr failes to stop, join failed");
+                    error!("FileHandleMgr failes to stop, join failed");
                 }
             }
         }
@@ -67,7 +68,7 @@ impl FileHandleMgr {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("failed to add handle for ino: {}, err: {}", handle.ino, err);
+                error!("failed to add handle for ino: {}, err: {}", handle.ino, err);
                 return Errno::Eintr;
             }
         }
@@ -85,7 +86,7 @@ impl FileHandleMgr {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("failed to add segment(id0: {}, id1: {}) for ino: {}, err: {}",
+                error!("failed to add segment(id0: {}, id1: {}) for ino: {}, err: {}",
                 seg.seg_id0, seg.seg_id1, ino, err);
                 return Errno::Eintr;
             }
@@ -106,7 +107,7 @@ impl FileHandleMgr {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("failed to add_block for ino: {}, seg_id0: {}, seg_id1: {}, err: {}",
+                error!("failed to add_block for ino: {}, seg_id0: {}, seg_id1: {}, err: {}",
                 ino, id0, id1, err);
                 return Errno::Eintr;
             }
@@ -121,7 +122,7 @@ impl FileHandleMgr {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("failed to del handle for ino: {}, err: {}", ino, err);
+                error!("failed to del handle for ino: {}, err: {}", ino, err);
                 return Errno::Eintr;
             }
         }
@@ -142,7 +143,7 @@ impl FileHandleMgr {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("get_last_segment: failed to get last segment for ino: {}, err: {}", ino, err);
+                error!("get_last_segment: failed to get last segment for ino: {}, err: {}", ino, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -152,7 +153,7 @@ impl FileHandleMgr {
                 return Ok(ret);
             }
             Err(err) => {
-                println!("get_last_segment: failed to recv response for get last segment for ino: {}, err: {}",
+                error!("get_last_segment: failed to recv response for get last segment for ino: {}, err: {}",
                 ino, err);
                 return Err(Errno::Eintr);
             }
@@ -199,13 +200,13 @@ impl FileHandleMgr {
                         }
                     }
                     Err(err) => {
-                        println!("get: failed to get handle for ino: {}, recv failed with err: {}", ino, err);
+                        error!("get: failed to get handle for ino: {}, recv failed with err: {}", ino, err);
                         return Err(Errno::Eintr);
                     }
                 }
             }
             Err(err) => {
-                println!("get: failed to get handle for ino: {}, failed to send query with err: {}", ino, err);
+                error!("get: failed to get handle for ino: {}, failed to send query with err: {}", ino, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -221,7 +222,7 @@ impl FileHandleMgr {
                 return false;
             }
             Err(err) => {
-                println!("failed to get file handle for ino: {}, err: {:?}", ino, err);
+                error!("failed to get file handle for ino: {}, err: {:?}", ino, err);
                 return false;
             }
         }
@@ -246,7 +247,7 @@ impl HandleMgr {
                             op = msg;
                         }
                         Err(err) => {
-                            println!("handle_op: failed to got handle_op msg, err: {}", err);
+                            error!("handle_op: failed to got handle_op msg, err: {}", err);
                             continue;
                         }
                     }
@@ -278,11 +279,11 @@ impl HandleMgr {
                     drop(rx);
                     match msg {
                         Ok(_) => {
-                            println!("got stop signal, stop the loop...");
+                            warn!("got stop signal, stop the loop...");
                             break;
                         }
                         Err(err) => {
-                            println!("recv invalid stop signal with err: {} and stop the loop...", err);
+                            error!("recv invalid stop signal with err: {} and stop the loop...", err);
                             break;
                         }
                     }
@@ -353,7 +354,7 @@ impl HandleMgr {
                 return;
             }
             Err(err) => {
-                println!("get_last_segment: failed to send segment id0: {}, id1: {} for ino: {}, err: {}",
+                error!("get_last_segment: failed to send segment id0: {}, id1: {} for ino: {}, err: {}",
                 id0, id1, msg.ino, err);
                 return;
             }
@@ -373,7 +374,7 @@ impl HandleMgr {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to send handle for ino: {}, err: {}", msg.ino, err);
+                error!("failed to send handle for ino: {}, err: {}", msg.ino, err);
             }
         }
     }

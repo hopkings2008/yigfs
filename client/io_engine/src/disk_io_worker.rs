@@ -12,6 +12,7 @@ use crossbeam_channel::{Receiver, select};
 use crate::types::{MsgFileCloseOp, MsgFileOp, MsgFileOpenOp, 
     MsgFileReadData, MsgFileReadOp, MsgFileWriteOp, MsgFileWriteResp};
 use crate::file_handle_ref::FileHandleRef;
+use log::{warn, error};
 
 struct DiskIoWorker {
     //id0&id1 -> File
@@ -30,7 +31,7 @@ impl IoWorker for DiskIoWorker{
                             self.do_work(&msg);
                         }
                         Err(err) => {
-                            println!("DiskIoWorker: failed to recv op_tx, err: {}", err);
+                            error!("DiskIoWorker: failed to recv op_tx, err: {}", err);
                             break;
                         }
                     }
@@ -38,10 +39,10 @@ impl IoWorker for DiskIoWorker{
                 recv(self.stop_rx) -> msg => {
                     match msg {
                         Ok(msg) => {
-                            println!("DiskIoWorker: got stop signal {}, stopping...", msg);
+                            warn!("DiskIoWorker: got stop signal {}, stopping...", msg);
                         }
                         Err(err) => {
-                            println!("DiskIoWorker: stop_rx recved err: {}, stopping...", err);
+                            error!("DiskIoWorker: stop_rx recved err: {}, stopping...", err);
                         }
                     }
                     self.exits();
@@ -97,7 +98,7 @@ impl DiskIoWorker {
                 f = ret;
             }
             Err(err) => {
-                println!("failed to open({}), err: {}", name, err);
+                error!("failed to open({}), err: {}", name, err);
                 msg.response(Errno::Eintr);
                 return;
             }
@@ -109,7 +110,7 @@ impl DiskIoWorker {
                 file_size = ret.len();
             }
             Err(err) => {
-                println!("faild to get file size for {}, err: {}", name, err);
+                error!("faild to get file size for {}, err: {}", name, err);
                 msg.response(Errno::Eintr);
                 return;
             }
@@ -141,7 +142,7 @@ impl DiskIoWorker {
                             file_size = ret.len();
                         }
                         Err(err) => {
-                            println!("do_write: failed to get file size for {}, err: {}", name, err);
+                            error!("do_write: failed to get file size for {}, err: {}", name, err);
                             resp_msg.err = Errno::Eintr;
                             msg.response(resp_msg);
                             return;
@@ -150,7 +151,7 @@ impl DiskIoWorker {
                     self.handles.insert(d, FileHandleRef::new(f, file_size));
                 }
                 Err(err) => {
-                    println!("do_write: failed to open({}), err: {}", name, err);
+                    error!("do_write: failed to open({}), err: {}", name, err);
                     resp_msg.err = Errno::Eintr;
                     msg.response(resp_msg);
                     return;
@@ -166,7 +167,7 @@ impl DiskIoWorker {
                     resp_msg.offset = ret;
                 }
                 Err(err) => {
-                    println!("do_write: failed to seek to end for msg({:?}, err: {}", msg, err);
+                    error!("do_write: failed to seek to end for msg({:?}, err: {}", msg, err);
                     resp_msg.err = Errno::Eseek;
                     msg.response(resp_msg);
                     return;
@@ -176,14 +177,14 @@ impl DiskIoWorker {
             if msg.max_size > resp_msg.offset {
                 let left_space = msg.max_size - resp_msg.offset;
                 if left_space < msg.data.len() as u64 {
-                    println!("do_write: there is no space left of the segment: id0: {}, id1: {}, id: {}, current offset: {}, left: {}",
+                    error!("do_write: there is no space left of the segment: id0: {}, id1: {}, id: {}, current offset: {}, left: {}",
                     msg.id0, msg.id1, d, resp_msg.offset, left_space);
                     resp_msg.err = Errno::Enospc;
                     msg.response(resp_msg);
                     return;
                 }
             } else {
-                println!("do_write: there is no space left of the segment: id0: {}, id1: {}, id: {}, current offset: {}, seg_max_size:{}",
+                error!("do_write: there is no space left of the segment: id0: {}, id1: {}, id: {}, current offset: {}, seg_max_size:{}",
                     msg.id0, msg.id1, d, resp_msg.offset, msg.max_size);
                 resp_msg.err = Errno::Enospc;
                 msg.response(resp_msg);
@@ -199,7 +200,7 @@ impl DiskIoWorker {
                     return;
                 }
                 Err(err) => {
-                    println!("failed to write(id0: {}, id1: {}) with offset: {}, err: {}", msg.id0, msg.id1, msg.offset, err);
+                    error!("failed to write(id0: {}, id1: {}) with offset: {}, err: {}", msg.id0, msg.id1, msg.offset, err);
                     resp_msg.err = Errno::Eintr;
                     msg.response(resp_msg);
                     return;
@@ -208,7 +209,7 @@ impl DiskIoWorker {
         }
        
         // below line cannot be executed since if file is failed to open, we will return before.
-        println!("no file handle for id0: {}, id1: {}", msg.id0, msg.id1);
+        error!("no file handle for id0: {}, id1: {}", msg.id0, msg.id1);
         resp_msg.err = Errno::Enotf;
         msg.response(resp_msg);
     }
@@ -228,7 +229,7 @@ impl DiskIoWorker {
                             file_size = ret.len();
                         }
                         Err(err) => {
-                            println!("do_read: failed to get file size for {}, err: {}", name, err);
+                            error!("do_read: failed to get file size for {}, err: {}", name, err);
                             let resp_msg = MsgFileReadData{
                                 id0: msg.id0,
                                 id1: msg.id1,
@@ -242,7 +243,7 @@ impl DiskIoWorker {
                     self.handles.insert(d, FileHandleRef::new(f, file_size));
                 }
                 Err(err) => {
-                    println!("do_read: failed to open({}), err: {}", name, err);
+                    error!("do_read: failed to open({}), err: {}", name, err);
                     let mut resp_msg = MsgFileReadData{
                         id0: msg.id0,
                         id1: msg.id1,
@@ -274,7 +275,7 @@ impl DiskIoWorker {
                     //println!("do_read: succeed to seek to {} for {:?}", ret, msg);
                 }
                 Err(err) => {
-                    println!("do_read: fail to seek to {} for {:?}, err: {}", msg.offset, msg, err);
+                    error!("do_read: fail to seek to {} for {:?}, err: {}", msg.offset, msg, err);
                     let resp_msg = MsgFileReadData{
                         id0: msg.id0,
                         id1: msg.id1,
@@ -310,7 +311,7 @@ impl DiskIoWorker {
                         }
                     }
                     Err(err) => {
-                        println!("do_read: failed to read{:?} with err: {}", msg, err);
+                        error!("do_read: failed to read{:?} with err: {}", msg, err);
                         errno = Errno::Eintr;
                         break;
                     }
@@ -349,7 +350,7 @@ impl DiskIoWorker {
             return;
         } // if
         // file handle not found.
-        println!("do_read: cannot find file handle for id0: {}, id1: {}", msg.id0, msg.id1);
+        error!("do_read: cannot find file handle for id0: {}, id1: {}", msg.id0, msg.id1);
         let resp_msg = MsgFileReadData{
             id0: msg.id0,
             id1: msg.id1,
@@ -370,7 +371,7 @@ impl DiskIoWorker {
                     }
                 }
                 Err(err) => {
-                    println!("failed to flush File(id0: {}, id1: {}), err: {}", msg.id0, msg.id1, err);
+                    error!("failed to flush File(id0: {}, id1: {}), err: {}", msg.id0, msg.id1, err);
                 }
             }
         }
@@ -403,7 +404,7 @@ impl DiskIoWorker {
                         file_size = ret.len();
                     }
                     Err(err) => {
-                        println!("do_stat: failed to get file size for {}, err: {}", name, err);
+                        error!("do_stat: failed to get file size for {}, err: {}", name, err);
                         result.err = Errno::Eintr;
                         msg.response(result);
                         return;
@@ -416,7 +417,7 @@ impl DiskIoWorker {
                 return;
             }
             Err(err) => {
-                println!("do_stat: failed open seg id0: {}, id1: {}, dir: {}, err: {}",
+                error!("do_stat: failed open seg id0: {}, id1: {}, dir: {}, err: {}",
                 msg.id0, msg.id1, msg.dir, err);
                 result.err = Errno::Eintr;
                 msg.response(result);
@@ -432,7 +433,7 @@ impl DiskIoWorker {
                 Ok(_) =>{}
                 Err(err) => {
                     let ids = NumberOp::from_u128(*k);
-                    println!("failed to flush file(id0: {}, id1: {}), err: {}", ids[0], ids[1], err);
+                    error!("failed to flush file(id0: {}, id1: {}), err: {}", ids[0], ids[1], err);
                 }
             }
         }

@@ -19,6 +19,9 @@ use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, Re
     RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment, ReqDeleteFile, RespDeleteFile};
 
 use self::message::{MsgSegmentOffset, ReqHeartbeat, ReqUpdateSegments, RespUpdateSegments};
+use log::{info, error};
+
+
 pub struct MetaServiceMgrImpl{
     http_client: Arc<http_client::HttpClient>,
     meta_server_url: String,
@@ -47,7 +50,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 req_json = ret;
             }
             Err(error) => {
-                println!("failed to encode {:?}, err: {}", req, error);
+                error!("failed to encode {:?}, err: {}", req, error);
                 return Err(Errno::Eintr);
             }
         }
@@ -60,13 +63,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(error) => {
-                println!("failed to mount region: {}, bucket: {}, err: {}",
+                error!("failed to mount region: {}, bucket: {}, err: {}",
                 self.region, self.bucket, error);
                 return Err(Errno::Eintr);
             }
         }
         if resp.status >= 300 {
-            println!("failed to mount region: {}, bucket: {}, got status: {}, body: {}",
+            error!("failed to mount region: {}, bucket: {}, got status: {}, body: {}",
             self.region, self.bucket, resp.status, resp.body);
             return Err(Errno::Eintr);
         }
@@ -79,10 +82,10 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             Ok(dirs) => {
                 if dirs.result.err_code != 0 {
                     if dirs.result.err_code == 40003 {
-                        println!("no files found in bucket {} with ino: {}, offset: {}", self.bucket, ino, offset);
+                        error!("no files found in bucket {} with ino: {}, offset: {}", self.bucket, ino, offset);
                         return Err(Errno::Enoent);
                     }
-                    println!("got error when read_dir_files for ino: {}, offset: {}, err: {}",
+                    error!("got error when read_dir_files for ino: {}, offset: {}, err: {}",
                     ino, offset, dirs.result.err_msg);
                     return Err(Errno::Eintr);
                 }
@@ -97,7 +100,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 return Ok(entrys);
             }
             Err(error) => {
-                println!("failed to read meta for ino: {}, offset: {}, err: {}",
+                error!("failed to read meta for ino: {}, offset: {}, err: {}",
                 ino, offset, error);
                 return Err(Errno::Eintr);
             }
@@ -112,7 +115,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 attr = ret;
             }
             Err(error) => {
-                println!("failed to read_file_attr for ino: {}, err: {}", ino, error);
+                error!("failed to read_file_attr for ino: {}, err: {}", ino, error);
                 return Err(Errno::Eintr);
             }
         }
@@ -143,7 +146,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 req_str = ret;
             }
             Err(err) => {
-                println!("failed to encode_to_str for attr: {:?}, err: {}", req, err);
+                error!("failed to encode_to_str for attr: {:?}, err: {}", req, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -156,13 +159,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_text = ret;
             }
             Err(err) => {
-                println!("failed to set_file_attr: {}, err: {}", req_str, err);
+                error!("failed to set_file_attr: {}, err: {}", req_str, err);
                 return Err(Errno::Eintr);
             }
         }
 
         if resp_text.status >= 300 {
-            println!("failed to set_file_attr: {}, got status: {}, resp body: {}", 
+            error!("failed to set_file_attr: {}, got status: {}, resp body: {}", 
             req_str, resp_text.status, resp_text.body);
             return Err(Errno::Eintr);
         }
@@ -174,13 +177,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("got invalid resp {} for set_file_attr: {}, err: {}", resp_text.body, req_str, err);
+                error!("got invalid resp {} for set_file_attr: {}, err: {}", resp_text.body, req_str, err);
                 return Err(Errno::Eintr);
             }
         }
 
         if resp.result.err_code != 0 {
-            println!("failed to set_file_attr for {}, err_code: {}, err_msg: {}",
+            error!("failed to set_file_attr for {}, err_code: {}, err_msg: {}",
             req_str, resp.result.err_code, resp.result.err_msg);
             return Err(Errno::Eintr);
         }
@@ -196,7 +199,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 return Ok(file_attr);
             }
             Err(error) => {
-                println!("failed to read_dir_file_attr for ino: {}, name: {}, err: {}", ino, name, error);
+                error!("failed to read_dir_file_attr for ino: {}, name: {}, err: {}", ino, name, error);
                 return Err(Errno::Eintr);
             }
         }
@@ -217,7 +220,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 body = ret;
             }
             Err(error) => {
-                println!("failed to encode req_file_leader: {:?}, err: {}", req_file_leader, error);
+                error!("failed to encode req_file_leader: {:?}, err: {}", req_file_leader, error);
                 return Err(Errno::Eintr);
             }
         }
@@ -229,12 +232,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(error) => {
-                println!("failed to get file_leader, req: {}, err: {}", body, error);
+                error!("failed to get file_leader, req: {}, err: {}", body, error);
                 return Err(Errno::Eintr);
             }
         }
         if resp.status >= 300 {
-            println!("got status {} for file_leader, req: {}, resp: {}", resp.status, body, resp.body);
+            info!("got status {} for file_leader, req: {}, resp: {}", resp.status, body, resp.body);
             return Err(Errno::Eintr);
         }
         let resp_leader : RespFileLeader;
@@ -244,12 +247,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_leader = ret;
             }
             Err(error) => {
-                println!("failed to decode file_leader from {}, err: {}", resp.body, error);
+                error!("failed to decode file_leader from {}, err: {}", resp.body, error);
                 return Err(Errno::Eintr);
             }
         }
         if resp_leader.result.err_code != 0 {
-            println!("failed to get file_leader for {}, err_code: {}, err_msg: {}", 
+            error!("failed to get file_leader for {}, err_code: {}, err_msg: {}", 
             body, resp_leader.result.err_code, resp_leader.result.err_msg);
             return Err(Errno::Eintr);
         }
@@ -279,7 +282,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 body = ret;
             }
             Err(error) => {
-                println!("failed to encode req_file_create: {:?}, err: {}", req_file_create, error);
+                error!("failed to encode req_file_create: {:?}, err: {}", req_file_create, error);
                 return Err(Errno::Eintr);
             }
         }
@@ -291,12 +294,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(error) => {
-                println!("failed to new_ino_leader for {}, err: {}", body, error);
+                error!("failed to new_ino_leader for {}, err: {}", body, error);
                 return Err(Errno::Eintr);
             }
         }
         if resp.status >= 300 {
-            println!("got status {} for new_ino_leader {}, resp: {}", resp.status, body, resp.body);
+            info!("got status {} for new_ino_leader {}, resp: {}", resp.status, body, resp.body);
             return Err(Errno::Eintr);
         }
         let resp_file_created: RespFileCreate;
@@ -306,12 +309,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_file_created = ret;
             }
             Err(error) => {
-                println!("failed to decode {} for new_ino_leader: {}, err: {}", resp.body, body, error);
+                error!("failed to decode {} for new_ino_leader: {}, err: {}", resp.body, body, error);
                 return Err(Errno::Eintr);
             }
         }
         if resp_file_created.result.err_code != 0 {
-            println!("failed to new_io_leader for {}, err_code: {}, err_msg: {}", 
+            error!("failed to new_io_leader for {}, err_code: {}, err_msg: {}", 
             body, resp_file_created.result.err_code, resp_file_created.result.err_msg);
             return Err(Errno::Eintr);
         }
@@ -344,7 +347,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 body = ret;
             }
             Err(err) => {
-                println!("failed to encode {:?}, err: {}", req_get_segments, err);
+                error!("failed to encode {:?}, err: {}", req_get_segments, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -356,12 +359,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_text = ret;
             }
             Err(err) => {
-                println!("failed to send {} to get_file_segments, err: {}", body, err);
+                error!("failed to send {} to get_file_segments, err: {}", body, err);
                 return Err(Errno::Eintr);
             }
         }
         if resp_text.status >= 300 {
-            println!("get_file_segments failed with status_code: {}, resp: {}", resp_text.status, resp_text.body);
+            info!("get_file_segments failed with status_code: {}, resp: {}", resp_text.status, resp_text.body);
             return Err(Errno::Eintr);
         }
         let resp : RespGetSegments;
@@ -371,12 +374,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("got invalid response: {} for get_file_segments, err: {}", resp_text.body, err);
+                info!("got invalid response: {} for get_file_segments, err: {}", resp_text.body, err);
                 return Err(Errno::Eintr);
             }
         }
         if resp.result.err_code != 0 {
-            println!("failed to get_file_segments for {}, err_code: {}, err_msg: {}",
+            error!("failed to get_file_segments for {}, err_code: {}, err_msg: {}",
             body, resp.result.err_code, resp.result.err_msg);
             return Err(Errno::Eintr);
         }
@@ -444,7 +447,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 body = ret;
             }
             Err(err) => {
-                println!("add_file_block: failed to encode req: {:?}, err: {}", req, err);
+                error!("add_file_block: failed to encode req: {:?}, err: {}", req, err);
                 return Errno::Eintr;
             }
         }
@@ -457,14 +460,14 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_text = ret;
             }
             Err(err) => {
-                println!("add_file_block: failed to send req to {} with body: {}, err: {}",
+                error!("add_file_block: failed to send req to {} with body: {}, err: {}",
                 url, body, err);
                 return Errno::Eintr;
             }
         }
 
         if resp_text.status >=300 {
-            println!("add_file_block: failed to add block for {}, got status: {}",
+            error!("add_file_block: failed to add block for {}, got status: {}",
             body, resp_text.status);
             return Errno::Eintr;
         }
@@ -476,13 +479,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("add_file_block: failed to decode body: {}, err: {}", resp_text.body, err);
+                error!("add_file_block: failed to decode body: {}, err: {}", resp_text.body, err);
                 return Errno::Eintr;
             }
         }
 
         if resp.result.err_code != 0 {
-            println!("add_file_block: failed to add file block for {}, err: {}", body, resp.result.err_msg);
+            error!("add_file_block: failed to add file block for {}, err: {}", body, resp.result.err_msg);
             return Errno::Eintr;
         }
         return Errno::Esucc;
@@ -510,7 +513,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 body = ret;
             }
             Err(err) => {
-                println!("update_file_segments: failed to encode req: {:?}, err: {}", req_update_seg, err);
+                error!("update_file_segments: failed to encode req: {:?}, err: {}", req_update_seg, err);
                 return Errno::Eintr;
             }
         }
@@ -523,14 +526,14 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_text = ret;
             }
             Err(err) => {
-                println!("update_file_segments: failed to send req to {} with body: {}, err: {}",
+                error!("update_file_segments: failed to send req to {} with body: {}, err: {}",
                 url, body, err);
                 return Errno::Eintr;
             }
         }
 
         if resp_text.status >=300 {
-            println!("update_file_segments: failed to add block for {}, got status: {}",
+            error!("update_file_segments: failed to add block for {}, got status: {}",
             body, resp_text.status);
             return Errno::Eintr;
         }
@@ -542,13 +545,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("update_file_segments: failed to decode body: {}, err: {}", resp_text.body, err);
+                error!("update_file_segments: failed to decode body: {}, err: {}", resp_text.body, err);
                 return Errno::Eintr;
             }
         }
 
         if resp.result.err_code != 0 {
-            println!("update_file_segments: failed to add file block for {}, err: {}", body, resp.result.err_msg);
+            error!("update_file_segments: failed to add file block for {}, err: {}", body, resp.result.err_msg);
             return Errno::Eintr;
         }
 
@@ -574,7 +577,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 req_body = ret;
             }
             Err(ret) => {
-                println!("upload_segment: failed to encode to json for id0: {}, id1: {}, next_offset: {}, err: {}",
+                error!("upload_segment: failed to encode to json for id0: {}, id1: {}, next_offset: {}, err: {}",
             id0, id1, next_offset, ret);
                 return Errno::Eintr;
             }
@@ -589,12 +592,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_body = ret;
             }
             Err(err) => {
-                println!("upload_segment: failed to send req: {}, err: {}", req_body, err);
+                error!("upload_segment: failed to send req: {}, err: {}", req_body, err);
                 return Errno::Eintr;
             }
         }
         if resp_body.status >= 300 {
-            println!("upload_segment: got resp status: {}, resp_body: {} for req: {}",
+            info!("upload_segment: got resp status: {}, resp_body: {} for req: {}",
             resp_body.status, resp_body.body, req_body);
             return Errno::Eintr;
         }
@@ -606,14 +609,14 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("upload_segment: failed to decode resp: {} for req: {}, err: {}", 
+                error!("upload_segment: failed to decode resp: {} for req: {}, err: {}", 
                 resp_body.body, req_body, err);
                 return Errno::Eintr;
             }
         }
 
         if resp.result.err_code != 0 {
-            println!("upload_segment: failed to upload: {}, err: {}", req_body, resp.result.err_msg);
+            error!("upload_segment: failed to upload: {}, err: {}", req_body, resp.result.err_msg);
             return Errno::Eintr;
         }
 
@@ -635,7 +638,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 req_str = ret;
             }
             Err(err) => {
-                println!("heartbeat: failed to encode heart req: {:?}, err: {}", req, err);
+                error!("heartbeat: failed to encode heart req: {:?}, err: {}", req, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -650,13 +653,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp_text = ret;
             }
             Err(err) => {
-                println!("heartbeat: failed to send heart: {} to server, err: {}", req_str, err);
+                error!("heartbeat: failed to send heart: {} to server, err: {}", req_str, err);
                 return Err(Errno::Eintr);
             }
         }
 
         if resp_text.status >= 300 {
-            println!("heartbeat: got status error: {} for heartbeat, resp: {}", resp_text.status, resp_text.body);
+            info!("heartbeat: got status error: {} for heartbeat, resp: {}", resp_text.status, resp_text.body);
             return Err(Errno::Eintr);
         }
 
@@ -672,7 +675,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("heartbeat: got error for heartbeat: {}, resp: {}, err: {}", req_str, resp_text.body, err);
+                error!("heartbeat: got error for heartbeat: {}, resp: {}, err: {}", req_str, resp_text.body, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -704,7 +707,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 req_body = ret;
             }
             Err(ret) => {
-                println!("delete_file: failed to encode the delete file req: {:?}, err: {}", req_delete_file, ret);
+                error!("delete_file: failed to encode the delete file req: {:?}, err: {}", req_delete_file, ret);
                 return Errno::Eintr;
             }
         }
@@ -715,13 +718,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         match ret {
             Ok(text) => {
                 if text.status >= 300 {
-                    println!("delete_file: failed to delete the file: {}, err status: {}, resp: {}", req_body, text.status, text.body);
+                    error!("delete_file: failed to delete the file: {}, err status: {}, resp: {}", req_body, text.status, text.body);
                     return Errno::Eintr;
                 }
                 resp_body = text.body;
             }
             Err(error) => {
-                println!("delete_file: failed to send req to {} with body: {}, err: {}", url, req_body, error);
+                error!("delete_file: failed to send req to {} with body: {}, err: {}", url, req_body, error);
                 return Errno::Eintr;
             }
         }
@@ -733,13 +736,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                println!("delete_file: failed to decode from: {}, err: {}", resp_body, err);
+                error!("delete_file: failed to decode from: {}, err: {}", resp_body, err);
                 return Errno::Eintr;
             }
         }
 
         if resp.result.err_code != 0 {
-            println!("delete_file: failed to delete the file: {}, err: {}", req_body, resp.result.err_msg);
+            error!("delete_file: failed to delete the file: {}, err: {}", req_body, resp.result.err_msg);
             return Errno::Eintr;
         }
 

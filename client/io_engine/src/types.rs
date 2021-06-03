@@ -2,6 +2,7 @@ extern crate crossbeam_channel;
 
 use common::error::Errno;
 use crossbeam_channel::Sender;
+use log::error;
 
 #[derive(Debug)]
 pub struct MsgFileOpenOp {
@@ -21,7 +22,7 @@ impl MsgFileOpenOp{
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to send response for open(id0: {}, id1: {}), err: {}",
+                error!("failed to send response for open(id0: {}, id1: {}), err: {}",
                 self.id0, self.id1, err);
             }
         }
@@ -78,7 +79,7 @@ impl MsgFileWriteOp {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to send response for write(id0: {}, id1: {}, offset: {}), err: {}", 
+                error!("failed to send response for write(id0: {}, id1: {}, offset: {}), err: {}", 
                     self.id0, self.id1, self.offset, err);
             }
         }
@@ -109,7 +110,7 @@ impl MsgFileReadOp {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to send response for read(id0: {}, id1: {}, offset: {}, size: {}), err: {}", 
+                error!("failed to send response for read(id0: {}, id1: {}, offset: {}, size: {}), err: {}", 
                     self.id0, self.id1, self.offset, self.size, err);
             }
         }
@@ -130,7 +131,7 @@ impl MsgFileStatOp{
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to send response for stat(id0: {}, id1: {}), err: {}",
+                error!("failed to send response for stat(id0: {}, id1: {}), err: {}",
                 self.id0, self.id1, err);
             }
         }

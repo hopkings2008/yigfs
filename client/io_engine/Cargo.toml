@@ -11,3 +11,4 @@ common = {path = "../common" }
 s3 = {path = "../s3"}
 tokio = { version = "1", features = ["full"] }
 crossbeam-channel = "0.4"
+log = "0.4.8"

@@ -5,7 +5,7 @@ use crate::io_worker::IoWorkerFactory;
 use common::{error::Errno, thread::Thread};
 use common::runtime::Executor;
 use crossbeam_channel::{unbounded, bounded, Sender};
-
+use log::error;
 
 pub struct IoThread{
     thr: Thread,
@@ -39,7 +39,7 @@ impl IoThread {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("failed to stop thr {}, err: {}", self.thr.name(), err);
+                error!("failed to stop thr {}, err: {}", self.thr.name(), err);
                 return Errno::Eintr;
             }
         }
@@ -52,7 +52,7 @@ impl IoThread {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("do_io: failed to send io, err: {}", err);
+                error!("do_io: failed to send io, err: {}", err);
                 return Errno::Eintr;
             }
         }

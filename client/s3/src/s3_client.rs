@@ -11,6 +11,7 @@ use crate::types::AppendS3ObjectResp;
 use common::http_client::HttpClient;
 use common::http_client::HttpMethod;
 use common::error::Errno;
+use log::error;
 
 pub struct S3Client {
     // region
@@ -41,7 +42,7 @@ impl S3Client {
                 return append_resp
             }
             None => {
-                println!("Err next append object position is None.");
+                error!("Err next append object position is None.");
                 append_resp.err = Errno::Eintr;
                 return append_resp
             }
@@ -73,7 +74,7 @@ impl S3Client {
                 } else if resp.status == 404 {
                     return Err(Errno::Enotf)
                 } else if resp.status >= 300 {
-                    println!("Failed to head object, resp status is: {}, body is: {}", resp.status, resp.body);
+                    error!("Failed to head object, resp status is: {}, body is: {}", resp.status, resp.body);
                     return Err(Errno::Eintr)
                 }
 
@@ -88,7 +89,7 @@ impl S3Client {
                         return Ok(rtext);
                     }
                     None => {
-                        println!("Err object length is none.");
+                        error!("Err object length is none.");
                         return Err(Errno::Eintr)
                     }
                 }
@@ -142,11 +143,11 @@ impl S3Client {
                     rtext.err = Errno::Eaccess;
                     return rtext
                 } else if resp.status == 409 {
-                    println!("The value of position does not match the length of the current Object.");
+                    error!("The value of position does not match the length of the current Object.");
                     rtext.err = Errno::Eoffset;
                     return self.get_next_position(resp.headers, rtext)
                 } else if resp.status >= 300 {
-                    println!("Failed to append object by path, resp status is: {}, body is: {}", resp.status, resp.body);
+                    error!("Failed to append object by path, resp status is: {}, body is: {}", resp.status, resp.body);
                     rtext.err = Errno::Eintr;
                     return rtext
                 }
@@ -197,11 +198,11 @@ impl S3Client {
                     rtext.err = Errno::Eaccess;
                     return rtext
                 } else if resp.status == 409 {
-                    println!("The value of position does not match the length of the current Object.");
+                    error!("The value of position does not match the length of the current Object.");
                     rtext.err = Errno::Eoffset;
                     return self.get_next_position(resp.headers, rtext)
                 } else if resp.status >= 300 {
-                    println!("Failed to append object, resp status is: {}, body is: {}", resp.status, resp.body);
+                    error!("Failed to append object, resp status is: {}, body is: {}", resp.status, resp.body);
                     rtext.err = Errno::Eintr;
                     return rtext
                 }
@@ -247,7 +248,7 @@ impl S3Client {
                 } else if resp.status == 416 {
                     return Err(Errno::Erange)
                 } else if resp.status >= 300 {
-                    println!("Failed to get object, resp status is: {}, body is: {}", resp.status, resp.body);
+                    error!("Failed to get object, resp status is: {}, body is: {}", resp.status, resp.body);
                     return Err(Errno::Eintr)
                 }
 

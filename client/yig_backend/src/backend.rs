@@ -10,6 +10,8 @@ use std::collections::HashMap;
 use crossbeam_channel::bounded;
 use crossbeam_channel::Sender;
 use std::sync::Arc;
+use log::error;
+
 
 // make sure that YigBackend is thread safe.
 pub struct YigBackend{
@@ -29,7 +31,7 @@ impl BackendStore for YigBackend{
         };
         let ret = thr.do_io(MsgFileOp::OpOpen(msg));
         if !ret.is_success() {
-            println!("YigBackend::open: failed to send io open req for id0: {}, id1: {}, err: {:?}",
+            error!("YigBackend::open: failed to send io open req for id0: {}, id1: {}, err: {:?}",
             id0, id1, ret);
             return ret;
         }
@@ -39,20 +41,20 @@ impl BackendStore for YigBackend{
                 match ret {
                     MsgFileOpResp::OpRespOpen(ret) => {
                         if !ret.err.is_success(){
-                            println!("YigBackend::open: failed to open id0: {}, id1: {}, err: {:?}",
+                            error!("YigBackend::open: failed to open id0: {}, id1: {}, err: {:?}",
                             id0, id1, ret.err);
                         }
                         return ret.err;
                     }
                     _ => {
-                        println!("YigBackend::open: got invalid open resp for id0: {}, id1: {}",
+                        error!("YigBackend::open: got invalid open resp for id0: {}, id1: {}",
                         id0, id1);
                         return Errno::Eintr;
                     }
                 }
             }
             Err(err) => {
-                println!("YigBackend::open: failed to got result for open id0: {}, id1: {}, err: {}",
+                error!("YigBackend::open: failed to got result for open id0: {}, id1: {}, err: {}",
                 id0, id1, err);
                 return Errno::Eintr;
             }
@@ -79,7 +81,7 @@ impl BackendStore for YigBackend{
         };
         let ret = thr.do_io(MsgFileOp::OpWrite(msg));
         if !ret.is_success(){
-            println!("YigBackend::write: failed to send OpWrite for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            error!("YigBackend::write: failed to send OpWrite for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
             self.bucket, id0, id1, offset, data.len(), ret);
             result.err = ret;
             return result;
@@ -97,7 +99,7 @@ impl BackendStore for YigBackend{
                         result.err = ret.err;
                     }
                     _ => {
-                        println!("YigBackend::write: got invalid write resp for {}/id0: {}, id1: {}, offset: {}, size: {}",
+                        error!("YigBackend::write: got invalid write resp for {}/id0: {}, id1: {}, offset: {}, size: {}",
                         self.bucket, id0, id1, offset, data.len());
                         result.err = Errno::Eintr;
                         return result;
@@ -105,7 +107,7 @@ impl BackendStore for YigBackend{
                 }
             }
             Err(err) => {
-                println!("YigBackend::write: failed to recv write result for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+                error!("YigBackend::write: failed to recv write result for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
             self.bucket, id0, id1, offset, data.len(), err);
                 result.err = Errno::Eintr;
             }
@@ -126,7 +128,7 @@ impl BackendStore for YigBackend{
         };
         let ret = thr.do_io(MsgFileOp::OpWrite(msg));
         if !ret.is_success(){
-            println!("YigBackend::write_async: failed to send OpWrite for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            error!("YigBackend::write_async: failed to send OpWrite for {}/id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
             self.bucket, id0, id1, offset, data.len(), ret);
             return ret;
         }
@@ -146,7 +148,7 @@ impl BackendStore for YigBackend{
         };
         let ret = thr.do_io(MsgFileOp::OpRead(msg_read));
         if !ret.is_success(){
-            println!("YigBackend::read: failed to send OpRead for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            error!("YigBackend::read: failed to send OpRead for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
             self.bucket, id0, id1, offset, size, ret);
             return Err(ret);
         }
@@ -158,19 +160,19 @@ impl BackendStore for YigBackend{
                         if ret.err.is_success() {
                             return Ok(ret.data);
                         }
-                        println!("YigBackend::read: failed to read bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+                        error!("YigBackend::read: failed to read bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
                     self.bucket, id0, id1, offset, size, ret.err);
                         return Err(ret.err);
                     }
                     _ => {
-                        println!("YigBackend::read: got invalid read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}",
+                        error!("YigBackend::read: got invalid read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}",
                         self.bucket, id0, id1, offset, size);
                         return Err(Errno::Eintr);
                     }
                 }
             }
             Err(err) => {
-                println!("YigBackend::read: failed to recv read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {}",
+                error!("YigBackend::read: failed to recv read resp for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {}",
             self.bucket, id0, id1, offset, size, err);
                 return Err(Errno::Eintr);
             }
@@ -189,7 +191,7 @@ impl BackendStore for YigBackend{
         };
         let ret = thr.do_io(MsgFileOp::OpRead(msg_read));
         if !ret.is_success(){
-            println!("YigBackend::read_async: failed to send OpRead for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
+            error!("YigBackend::read_async: failed to send OpRead for bucket: {}, id0: {}, id1: {}, offset: {}, size: {}, err: {:?}",
             self.bucket, id0, id1, offset, size, ret);
             return ret;
         }
@@ -235,42 +237,42 @@ impl BackendStoreFactory for YigBackendFactory{
         if let Some(r) = cfg.get("region"){
             region = r.clone();
         } else {
-            println!("new_backend_store: missing region setting");
+            error!("new_backend_store: missing region setting");
             return Err(Errno::Eintr);
         }
 
         if let Some(e) = cfg.get("endpoint"){
             endpoint = e.clone();
         } else {
-            println!("new_backend_store: missing endpoint setting");
+            error!("new_backend_store: missing endpoint setting");
             return Err(Errno::Eintr);
         }
 
         if let Some(a) = cfg.get("ak") {
             ak = a.clone();
         } else {
-            println!("new_backend_store: missing ak");
+            error!("new_backend_store: missing ak");
             return Err(Errno::Eintr);
         }
 
         if let Some(s) = cfg.get("sk") {
             sk = s.clone();
         } else {
-            println!("new_backend_store: missing sk");
+            error!("new_backend_store: missing sk");
             return Err(Errno::Eintr);
         }
 
         if let Some(n) = cfg.get("thread_num") {
             thread_num = n.parse::<u32>().unwrap();
         } else {
-            println!("new_backend_store: missing thread_num");
+            error!("new_backend_store: missing thread_num");
             return Err(Errno::Eintr);
         }
 
         if let Some(b) = cfg.get("bucket") {
             bucket = b.clone();
         } else {
-            println!("new_backend_store: missing bucket");
+            error!("new_backend_store: missing bucket");
             return Err(Errno::Eintr);
         }
 
