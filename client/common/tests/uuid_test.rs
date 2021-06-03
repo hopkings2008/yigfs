@@ -1,5 +1,6 @@
 use common::uuid;
 use common::numbers::NumberOp;
+use log::info;
 
 #[test]
 fn test_uuid_string()->Result<(), String> {
@@ -7,7 +8,7 @@ fn test_uuid_string()->Result<(), String> {
     if id.is_empty(){
         return Err(format!("got empty string"));
     }
-    println!("uuid string: {}", id);
+    info!("uuid string: {}", id);
     Ok(())
 }
 
@@ -17,7 +18,7 @@ fn test_uuid_u64()->Result<(), String>{
     if ids.is_empty(){
         return Err(format!("got empty vec"));
     }
-    println!("uuid: {:?}", ids);
+    info!("uuid: {:?}", ids);
     Ok(())
 }
 
@@ -27,7 +28,7 @@ fn test_numberop_uuid() -> Result<(), String>{
     let id = NumberOp::to_u128(ids[0], ids[1]);
     let vids = NumberOp::from_u128(id);
     if ids[0] != vids[0] || ids[1] != vids[1] {
-        println!("original ids: {:?}, converted ids: {:?}", ids, vids);
+        info!("original ids: {:?}, converted ids: {:?}", ids, vids);
         return Err(format!("original ids: {:?}, converted ids: {:?}", ids, vids));
     }
     Ok(())

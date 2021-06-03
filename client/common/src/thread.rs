@@ -1,5 +1,6 @@
 use std::thread;
 use std::thread::{JoinHandle, Builder};
+use log::error;
 
 pub struct Thread {
     builder: Option<Builder>,
@@ -31,7 +32,7 @@ impl Thread {
                     self.handle = Some(ret);
                 }
                 Err(err) => {
-                    println!("failed to spawn thread {} with err: {}", self.name, err);
+                    error!("failed to spawn thread {} with err: {}", self.name, err);
                 }
             }
         }
@@ -44,7 +45,7 @@ impl Thread {
             match ret {
                 Ok(_)=> {}
                 Err(err) => {
-                    println!("failed to join thread: {}, err: {:?}", self.name, err);
+                    error!("failed to join thread: {}, err: {:?}", self.name, err);
                 }
             }
         }

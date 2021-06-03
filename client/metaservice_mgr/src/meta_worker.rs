@@ -4,7 +4,7 @@ use crossbeam_channel::{Receiver, select};
 
 use crate::{meta_op::{MetaOpUploadSeg, MetaOpUploadSegResp, MetaOpResp}, mgr::MetaServiceMgr};
 use crate::meta_op::MetaOp;
-
+use log::{warn, error};
 
 
 pub struct MetaWorker{
@@ -31,18 +31,18 @@ impl MetaWorker {
                             self.do_work(msg);
                         }
                         Err(err) => {
-                            println!("MetaWorker::start: failed to recv op_rx, err: {}", err);
+                            error!("MetaWorker::start: failed to recv op_rx, err: {}", err);
                         }
                     }
                 }
                 recv(self.stop_rx) -> msg => {
                     match msg{
                         Ok(msg) => {
-                            println!("MetaWorker::start: got stop signal: {}, stopping...", msg);
+                            warn!("MetaWorker::start: got stop signal: {}, stopping...", msg);
                             return;
                         }
                         Err(err) => {
-                            println!("MetaWorker::start: failed to recv stop_rx, err: {}", err);
+                            error!("MetaWorker::start: failed to recv stop_rx, err: {}", err);
                             return;
                         }
                     }
@@ -62,7 +62,7 @@ impl MetaWorker {
     fn do_upload_seg(&self, op: MetaOpUploadSeg){
         let ret = self.meta_mgr.upload_segment(op.id0, op.id1, op.offset);
         if !ret.is_success(){
-            println!("do_upload_seg: failed to upload segment for id0: {}, id1: {}, offset: {}, err: {:?}",
+            error!("do_upload_seg: failed to upload segment for id0: {}, id1: {}, offset: {}, err: {:?}",
             op.id0, op.id1, op.offset, ret);
         }
         let resp = MetaOpUploadSegResp{
@@ -72,7 +72,7 @@ impl MetaWorker {
         };
         let ret = op.response(MetaOpResp::RespUploadSeg(resp));
         if !ret.is_success(){
-            println!("do_upload_seg: failed to send resp for id0: {}, id1: {}, offset: {}, err: {:?}",
+            error!("do_upload_seg: failed to send resp for id0: {}, id1: {}, offset: {}, err: {:?}",
             op.id0, op.id1, op.offset, ret);
         }
     }

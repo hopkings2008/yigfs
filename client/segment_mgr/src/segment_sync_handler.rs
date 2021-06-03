@@ -10,7 +10,7 @@ use metaservice_mgr::{meta_op::{MetaOpResp, MetaOpUploadSegResp}, meta_store::Me
 use std::sync::Arc;
 use std::collections::HashMap;
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
-
+use log::{info, warn, error};
 
 pub struct SegSyncHandler{
     cache_store: Arc<dyn CacheStore>,
@@ -61,7 +61,7 @@ impl SegSyncHandler{
                             self.do_op(msg);
                         }
                         Err(err) => {
-                            println!("SegSyncHandler::start: failed to recv op, err: {}", err);
+                            error!("SegSyncHandler::start: failed to recv op, err: {}", err);
                         }
                     }
                 }
@@ -71,7 +71,7 @@ impl SegSyncHandler{
                             self.handle_cache_op(msg);
                         }
                         Err(err) => {
-                            println!("SegSyncHandler::start: failed to recv cache_store message, err: {}", err);
+                            error!("SegSyncHandler::start: failed to recv cache_store message, err: {}", err);
                         }
                     }
                 }
@@ -81,7 +81,7 @@ impl SegSyncHandler{
                             self.handle_backend_store_op(msg);
                         }
                         Err(err) => {
-                            println!("SegSyncHandler::start: failed to recv backend_store message, err: {}", err);
+                            error!("SegSyncHandler::start: failed to recv backend_store message, err: {}", err);
                         }
                     }
                 }
@@ -91,18 +91,18 @@ impl SegSyncHandler{
                             self.handle_meta_store_op(msg);
                         }
                         Err(err) => {
-                            println!("SegSyncHandler::start: failed to recv meta_store message, err: {}", err);
+                            error!("SegSyncHandler::start: failed to recv meta_store message, err: {}", err);
                         }
                     }
                 }
                 recv(self.stop_rx) -> ret => {
                     match ret {
                         Ok(msg) => {
-                            println!("SegSyncHandler::start: got stop signal: {}, stopping...", msg);
+                            info!("SegSyncHandler::start: got stop signal: {}, stopping...", msg);
                             return;
                         }
                         Err(err) => {
-                            println!("SegSyncHandler::start: failed to recv stop signal, err: {}", err);
+                            error!("SegSyncHandler::start: failed to recv stop signal, err: {}", err);
                             return;
                         }
                     }
@@ -133,7 +133,7 @@ impl SegSyncHandler{
                 // perform the cache open.
                 let ret = self.cache_store.open_async(op.id0, op.id1, &op.dir, self.cache_op_tx.clone());
                 if !ret.is_success(){
-                    println!("SegSyncHandler::OpUpload: failed to open segment id0:{}, id1: {}, dir: {}, err: {:?}",
+                    error!("SegSyncHandler::OpUpload: failed to open segment id0:{}, id1: {}, dir: {}, err: {:?}",
                     op.id0, op.id1, op.dir, ret);
                 }
             }
@@ -155,7 +155,7 @@ impl SegSyncHandler{
                 // perform cache open.
                 let ret = self.cache_store.open_async(op.id0, op.id1, &op.dir, self.cache_op_tx.clone());
                 if !ret.is_success(){
-                    println!("SegSyncHandler::OpDownload: failed to open segment id0: {}, id1: {}, dir: {}, err: {:?}",
+                    error!("SegSyncHandler::OpDownload: failed to open segment id0: {}, id1: {}, dir: {}, err: {:?}",
                     op.id0, op.id1, op.dir, ret);
                 }
             }
@@ -175,7 +175,7 @@ impl SegSyncHandler{
                 self.handle_cache_write(write_op);
             }
             MsgFileOpResp::OpRespStat(stat_op) => {
-                println!("handle_cache_op: got unsupported stat op for seg: id0: {}, id1: {}",
+                error!("handle_cache_op: got unsupported stat op for seg: id0: {}, id1: {}",
                 stat_op.id0, stat_op.id1);
             }
         }
@@ -187,7 +187,7 @@ impl SegSyncHandler{
         if let Some(s) = self.seg_state_machines.get_mut(&seg_id) {
             // we need check current state firstly.
             if !s.is_state_match(&SegState::CacheOpen) {
-                println!("SegSyncHandler::handle_cache_open: the state machine of id0: {}, id1: {} is not cache_open, it is: {:?}",
+                error!("SegSyncHandler::handle_cache_open: the state machine of id0: {}, id1: {} is not cache_open, it is: {:?}",
                 op.id0, op.id1, s.get_current_state());
                 // close the segment and remove the seg state machine.
                 self.cache_store.close(op.id0, op.id1);
@@ -196,7 +196,7 @@ impl SegSyncHandler{
             }
             // check whether open failed or not.
             if !op.err.is_success(){
-                println!("handle_cache_open: failed to open id0: {}, id1: {}, dir: {}, err: {:?}",
+                error!("handle_cache_open: failed to open id0: {}, id1: {}, dir: {}, err: {:?}",
                 op.id0, op.id1, s.get_dir(), op.err);
                 self.cache_store.close(op.id0, op.id1);
                 self.seg_state_machines.remove(&seg_id);
@@ -209,7 +209,7 @@ impl SegSyncHandler{
                     s.set_state(SegState::CacheRead);
                     let ret = self.cache_store.read_async(op.id0, op.id1, s.get_dir(), s.get_offset(), s.get_op_size(), self.cache_op_tx.clone());
                     if !ret.is_success(){
-                        println!("SegSyncHandler::handle_cache_open: failed to perform cache read for seg id0: {}, id1: {}
+                        error!("SegSyncHandler::handle_cache_open: failed to perform cache read for seg id0: {}, id1: {}
                         dir: {}, offset: {}, err: {:?}", op.id0, op.id1, s.get_dir(), s.get_offset(), ret);
                         // close the segment and remove the seg state machine.
                         self.cache_store.close(op.id0, op.id1);
@@ -221,14 +221,14 @@ impl SegSyncHandler{
                     let ret = self.backend_store.read_async(op.id0, op.id1, s.get_offset(), 
                     s.get_op_size(), self.backend_op_tx.clone());
                     if !ret.is_success(){
-                        println!("SegSyncHandler::handle_cache_open: failed to perform backend read for seg id0: {}, 
+                        error!("SegSyncHandler::handle_cache_open: failed to perform backend read for seg id0: {}, 
                         id1: {}, dir: {}, offset: {}, err: {:?}", op.id0, op.id1, s.get_dir(), s.get_offset(), ret);
                         self.cache_store.close(op.id0, op.id1);
                         self.seg_state_machines.remove(&seg_id);
                     }
                 }
                 _ => {
-                    println!("SegSyncHandler::handle_cache_open: next_state{:?} is not supported.",
+                    error!("SegSyncHandler::handle_cache_open: next_state{:?} is not supported.",
                     next_state);
                     // close the segment and remove the seg state machine.
                     self.cache_store.close(op.id0, op.id1);
@@ -238,7 +238,7 @@ impl SegSyncHandler{
             return;
         }
         // seg doesn't exists before...
-        println!("SegSyncHandler::handle_cache_open: got unopend seg: id0: {}, id1: {}",
+        error!("SegSyncHandler::handle_cache_open: got unopend seg: id0: {}, id1: {}",
         op.id0, op.id1);
         // close the seg.
         self.cache_store.close(op.id0, op.id1);
@@ -250,7 +250,7 @@ impl SegSyncHandler{
         if let Some(s) = self.seg_state_machines.get_mut(&seg_id) {
             // check state match.
             if !s.is_state_match(&SegState::CacheRead) {
-                println!("SegSyncHandler::handle_cache_read: got unmatched state for seg: id0: {}, id1: {},
+                error!("SegSyncHandler::handle_cache_read: got unmatched state for seg: id0: {}, id1: {},
                  current state: {:?}, expected state: CacheRead", op.id0, op.id1, s.get_current_state());
                 return;
             }
@@ -260,11 +260,11 @@ impl SegSyncHandler{
                 SegState::BackendWrite => {
                     if !op.err.is_success() {
                         if op.err.is_eof(){
-                            println!("SegSyncHandler::handle_cache_read: got eof for seg: id0: {}, id1: {}, 
+                            error!("SegSyncHandler::handle_cache_read: got eof for seg: id0: {}, id1: {}, 
                             offset: {}.", op.id0, op.id1, s.get_offset());
                             s.set_state(SegState::CacheClose);                            
                         } else {
-                            println!("SegSyncHandler::handle_cache_read: failed to read seg: id0: {}, id1: {},
+                            error!("SegSyncHandler::handle_cache_read: failed to read seg: id0: {}, id1: {},
                             offset: {}, err: {:?}", op.id0, op.id1, s.get_offset(), op.err);
                         }
                         // close & remove the seg state machine.
@@ -277,7 +277,7 @@ impl SegSyncHandler{
                         let ret = self.backend_store.write_async(op.id0, 
                         op.id1, s.get_offset(), data.as_slice(), self.backend_op_tx.clone());
                         if !ret.is_success() {
-                            println!("SegSyncHandler::handle_cache_read: failed to perform write for seg id0: {}, id1: {},
+                            error!("SegSyncHandler::handle_cache_read: failed to perform write for seg id0: {}, id1: {},
                             offset: {}, err: {:?}", op.id0, op.id1, s.get_offset(), ret);
                             // close & remove the state machine.
                             self.cache_store.close(op.id0, op.id1);
@@ -288,7 +288,7 @@ impl SegSyncHandler{
                     // no more data read... this will return early in eof.
                 }
                 _ => {
-                    println!("SegSyncHandler::handle_cache_read: got invalid state: {:?} for seg id0: {}, id1: {}",
+                    error!("SegSyncHandler::handle_cache_read: got invalid state: {:?} for seg id0: {}, id1: {}",
                     next_state, op.id0, op.id1);
                     self.cache_store.close(op.id0, op.id1);
                     self.seg_state_machines.remove(&seg_id);
@@ -296,7 +296,7 @@ impl SegSyncHandler{
                 }
             }
         }
-        println!("SegSyncHandler::handle_cache_read: got invalid op state for seg id0: {}, id1: {}", op.id0, op.id1);
+        error!("SegSyncHandler::handle_cache_read: got invalid op state for seg id0: {}, id1: {}", op.id0, op.id1);
         // close the seg.
         self.cache_store.close(op.id0, op.id1);
     }
@@ -306,14 +306,14 @@ impl SegSyncHandler{
         if let Some(s) = self.seg_state_machines.get_mut(&seg_id){
             // check whether former cache write is successful or not.
             if !op.err.is_success(){
-                println!("handle_cache_write: seg id0: {}, id1: {}, failed to write offset: {}, err: {:?}",
+                error!("handle_cache_write: seg id0: {}, id1: {}, failed to write offset: {}, err: {:?}",
                 op.id0, op.id1, s.get_offset(), op.err);
                 self.cache_store.close(op.id0, op.id1);
                 self.seg_state_machines.remove(&seg_id);
                 return;
             }
             if !s.is_state_match(&SegState::CacheWrite){
-                println!("handle_cache_write: seg id0: {}, id1: {}, got invalid state: {:?}, expected: CacheWrite",
+                error!("handle_cache_write: seg id0: {}, id1: {}, got invalid state: {:?}, expected: CacheWrite",
                 op.id0, op.id1, s.get_current_state());
                 self.cache_store.close(op.id0, op.id1);
                 self.seg_state_machines.remove(&seg_id);
@@ -327,7 +327,7 @@ impl SegSyncHandler{
                     let ret = self.backend_store.read_async(op.id0, op.id1, s.get_offset(), 
                     s.get_op_size(), self.backend_op_tx.clone());
                     if !ret.is_success(){
-                        println!("handle_cache_write: failed to perform backend read for seg id0: {}, id1: {}, offset: {}, err: {:?}",
+                        error!("handle_cache_write: failed to perform backend read for seg id0: {}, id1: {}, offset: {}, err: {:?}",
                     op.id0, op.id1, s.get_offset(), ret);
                         self.cache_store.close(op.id0, op.id1);
                         self.seg_state_machines.remove(&seg_id);
@@ -335,7 +335,7 @@ impl SegSyncHandler{
                     }
                 }
                 _ => {
-                    println!("handle_cache_write: got invalid next_state: {:?} for seg id0: {}, id1: {}",
+                    error!("handle_cache_write: got invalid next_state: {:?} for seg id0: {}, id1: {}",
                     next_state, op.id0, op.id1);
                     self.cache_store.close(op.id1, op.id1);
                     self.seg_state_machines.remove(&seg_id);
@@ -345,7 +345,7 @@ impl SegSyncHandler{
             return;
         }
 
-        println!("handle_cache_write: got unmanaged seg id0: {}, id1: {}", op.id0, op.id1);
+        error!("handle_cache_write: got unmanaged seg id0: {}, id1: {}", op.id0, op.id1);
         self.cache_store.close(op.id0, op.id1);
     }
 
@@ -353,7 +353,7 @@ impl SegSyncHandler{
     fn handle_backend_store_op(&mut self, op: MsgFileOpResp){
         match op{
             MsgFileOpResp::OpRespOpen(open_op) => {
-                println!("handle_backend_store_op: skip open_op: seg: id0: {}, id1: {}",
+                warn!("handle_backend_store_op: skip open_op: seg: id0: {}, id1: {}",
                 open_op.id0, open_op.id1);
             }
             MsgFileOpResp::OpRespRead(read_op) => {
@@ -363,7 +363,7 @@ impl SegSyncHandler{
                 self.handle_backend_store_write(write_op);
             }
             MsgFileOpResp::OpRespStat(stat_op) => {
-                println!("handle_backend_store_op: got unsupported stat op for seg: id0: {}, id1: {}",
+                error!("handle_backend_store_op: got unsupported stat op for seg: id0: {}, id1: {}",
                 stat_op.id0, stat_op.id1);
             }
         }
@@ -374,9 +374,9 @@ impl SegSyncHandler{
         // check the whether read op is successful or not.
         if !op.err.is_success(){
             if op.err.is_eof() || op.err.is_invalid_range() {
-                println!("handle_backend_store_read: got eof for seg: id0: {}, id1: {}", op.id0, op.id1);
+                error!("handle_backend_store_read: got eof for seg: id0: {}, id1: {}", op.id0, op.id1);
             } else {
-                println!("handle_backend_store_read: read failed for seg: id0: {}, id1: {}, err: {:?}",
+                error!("handle_backend_store_read: read failed for seg: id0: {}, id1: {}, err: {:?}",
                 op.id0, op.id1, op.err);
             }
             self.cache_store.close(op.id0, op.id1);
@@ -385,7 +385,7 @@ impl SegSyncHandler{
         }
         if let Some(s) = self.seg_state_machines.get_mut(&seg_id){
             if !s.is_state_match(&SegState::BackendRead){
-                println!("handle_backend_store_read: got invalid seg state, expected BackendRead, got: {:?}
+                error!("handle_backend_store_read: got invalid seg state, expected BackendRead, got: {:?}
                 for seg id0: {}, id1: {}", s.get_current_state(), op.id0, op.id1);
                 self.cache_store.close(op.id0, op.id1);
                 self.seg_state_machines.remove(&seg_id);
@@ -399,20 +399,20 @@ impl SegSyncHandler{
                         let ret = self.cache_store.write_async(op.id0, op.id1, 
                             s.get_dir(), s.get_offset(), s.get_capacity(), data.as_slice(), self.cache_op_tx.clone());
                         if !ret.is_success(){
-                            println!("handle_backend_store_read: failed to perform cache store write for seg: 
+                            error!("handle_backend_store_read: failed to perform cache store write for seg: 
                             id0: {}, id1: {}, offset: {}, err: {:?}", op.id0, op.id1, s.get_offset(), ret);
                             self.cache_store.close(op.id0, op.id1);
                             self.seg_state_machines.remove(&seg_id);
                         }
                         return;
                     }
-                    println!("handle_backend_store_read: no more data read for seg: id0: {}, id1: {}, offset: {}",
+                    error!("handle_backend_store_read: no more data read for seg: id0: {}, id1: {}, offset: {}",
                     op.id0, op.id1, s.get_offset());
                     self.cache_store.close(op.id0, op.id1);
                     self.seg_state_machines.remove(&seg_id);
                 }
                 _ => {
-                    println!("handle_backend_store_read: got invalid next state for seg: id0: {}, id1: {}, offset: {},
+                    error!("handle_backend_store_read: got invalid next state for seg: id0: {}, id1: {}, offset: {},
                     current state: {:?}, next state: {:?}", op.id0, op.id1, s.get_offset(), s.get_current_state(), next_state);
                     self.cache_store.close(op.id1, op.id1);
                     self.seg_state_machines.remove(&seg_id);
@@ -420,7 +420,7 @@ impl SegSyncHandler{
             }
             return;
         }
-        println!("handle_backend_store_read: got unmanaged seg id0: {}, id: {}", op.id0, op.id1);
+        error!("handle_backend_store_read: got unmanaged seg id0: {}, id: {}", op.id0, op.id1);
         self.cache_store.close(op.id0, op.id1);        
     }
 
@@ -429,7 +429,7 @@ impl SegSyncHandler{
 
         if let Some(s) = self.seg_state_machines.get_mut(&seg_id) {
             if !s.is_state_match(&SegState::BackendWrite){
-                println!("handle_backend_store_write: got invalid seg state, expected BackendWrite, got: {:?}
+                error!("handle_backend_store_write: got invalid seg state, expected BackendWrite, got: {:?}
                  for seg id0: {}, id1: {}", s.get_current_state(), op.id0, op.id1);
                  // close the cache & remove the state machines.
                  self.cache_store.close(op.id0, op.id1);
@@ -440,11 +440,11 @@ impl SegSyncHandler{
             match op.err {
                 Errno::Esucc => {}
                 Errno::Eoffset => {
-                    println!("handle_backend_store_write: invalid offset: {} of write for id0: {}, id1: {}, need from offset: {}",
+                    error!("handle_backend_store_write: invalid offset: {} of write for id0: {}, id1: {}, need from offset: {}",
                     s.get_offset(), op.id0, op.id1, op.offset);
                 }
                 _ => {
-                    println!("handle_backend_store_write: write failed for id0: {}, id1: {} with offset: {}, err: {:?}",
+                    error!("handle_backend_store_write: write failed for id0: {}, id1: {} with offset: {}, err: {:?}",
                     op.id0, op.id1, s.get_offset(), op.err);
                     self.cache_store.close(op.id0, op.id1);
                     self.seg_state_machines.remove(&seg_id);
@@ -461,7 +461,7 @@ impl SegSyncHandler{
                     s.set_offset(offset);
                     let ret = self.meta_store.upload_segment_async(op.id0, op.id1, offset, self.meta_op_tx.clone());
                     if !ret.is_success() {
-                        println!("handle_backend_store_write: failed to send update segment for id0: {}, id1: {}, offset: {}, err: {:?}",
+                        error!("handle_backend_store_write: failed to send update segment for id0: {}, id1: {}, offset: {}, err: {:?}",
                         op.id0, op.id1, offset, ret);
                         self.cache_store.close(op.id0, op.id1);
                         self.seg_state_machines.remove(&seg_id);
@@ -469,7 +469,7 @@ impl SegSyncHandler{
                     return;
                 }
                 _ => {
-                    println!("handle_backend_store_write: got invalid state: {:?}, expected MetaUpload for id0: {}, id1: {}",
+                    error!("handle_backend_store_write: got invalid state: {:?}, expected MetaUpload for id0: {}, id1: {}",
                     next_state, op.id0, op.id1);
                     self.cache_store.close(op.id0, op.id1);
                     self.seg_state_machines.remove(&seg_id);
@@ -477,7 +477,7 @@ impl SegSyncHandler{
                 }
             }
         }
-        println!("handle_backend_store_write: got unmanged seg id0: {}, id1: {}", op.id0, op.id1);
+        error!("handle_backend_store_write: got unmanged seg id0: {}, id1: {}", op.id0, op.id1);
         self.cache_store.close(op.id0, op.id1);
     }
 
@@ -495,7 +495,7 @@ impl SegSyncHandler{
 
         if let Some(s) = self.seg_state_machines.get_mut(&seg_id) {
             if !s.is_state_match(&SegState::MetaUpload){
-                println!("handle_meta_store_upload_seg: got invalid seg state, expected MetaUpload, got: {:?}
+                error!("handle_meta_store_upload_seg: got invalid seg state, expected MetaUpload, got: {:?}
                  for seg id0: {}, id1: {}", s.get_current_state(), op.id0, op.id1);
                  // close the cache & remove the state machines.
                  self.cache_store.close(op.id0, op.id1);
@@ -504,7 +504,7 @@ impl SegSyncHandler{
             }
             // check whether former op is successful or not.
             if !op.err.is_success(){
-                println!("handle_meta_store_upload_seg: failed to upload meta offset: {} for id0: {}, id1: {}, err: {:?}",
+                error!("handle_meta_store_upload_seg: failed to upload meta offset: {} for id0: {}, id1: {}, err: {:?}",
                 s.get_offset(), op.id0, op.id1, op.err);
                 self.cache_store.close(op.id0, op.id1);
                 self.seg_state_machines.remove(&seg_id);
@@ -518,7 +518,7 @@ impl SegSyncHandler{
                     let ret = self.cache_store.read_async(op.id0, op.id1, s.get_dir(), 
                     s.get_offset(), s.get_op_size(), self.cache_op_tx.clone());
                     if !ret.is_success(){
-                        println!("handle_meta_store_upload_seg: failed to preform cache read for id0: {}, id1: {},
+                        error!("handle_meta_store_upload_seg: failed to preform cache read for id0: {}, id1: {},
                         offset: {}, err: {:?}", op.id0, op.id1, s.get_offset(), ret);
                         self.cache_store.close(op.id0, op.id1);
                         self.seg_state_machines.remove(&seg_id);
@@ -526,7 +526,7 @@ impl SegSyncHandler{
                     return;
                 }
                 _ => {
-                    println!("handle_meta_store_upload_seg: got invalid seg next state {:?} for id0: {}, id1: {},
+                    error!("handle_meta_store_upload_seg: got invalid seg next state {:?} for id0: {}, id1: {},
                         expected CacheRead", next_state, op.id0, op.id1);
                     self.cache_store.close(op.id0, op.id1);
                     self.seg_state_machines.remove(&seg_id);

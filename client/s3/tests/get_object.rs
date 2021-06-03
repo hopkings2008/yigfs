@@ -1,5 +1,6 @@
 use common::runtime::Executor;
 use s3::s3_client::S3Client;
+use log::info;
 
 #[test]
 fn test_get_object()->Result<(), String> {
@@ -24,7 +25,7 @@ fn test_get_object()->Result<(), String> {
             let obj = String::from_utf8(result);
             match obj {
                 Ok(bstr) => {
-                    println!("get object resp is: {}", bstr);
+                    info!("get object resp is: {}", bstr);
                     return Ok(());
                 }
                 Err(error) => {

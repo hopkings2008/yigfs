@@ -5,6 +5,7 @@ use metaservice_mgr::mgr::MetaServiceMgr;
 use std::sync::Arc;
 use crate::{segment_mgr::SegmentMgr, segment_sync::SegSyncer};
 use metaservice_mgr::types::HeartbeatResult;
+use log::{warn, error};
 
 
 pub struct HeartbeatMgr{
@@ -40,7 +41,7 @@ impl Drop for HeartbeatMgr{
                 self.thr.join();
             }
             Err(err) => {
-                println!("HeartbeatMgr: failed to perform stop, err: {}", err);
+                error!("HeartbeatMgr: failed to perform stop, err: {}", err);
             }
         }
     }
@@ -75,10 +76,10 @@ impl HeartbeatImpl {
                 recv(self.stop_rx)->msg => {
                     match msg{
                         Ok(msg) => {
-                            println!("HeartbeatImpl: got stop signal: {}, stopping...", msg);
+                            warn!("HeartbeatImpl: got stop signal: {}, stopping...", msg);
                         }
                         Err(err) => {
-                            println!("HeartbeatImpl: receive error from stop_rx, err: {}", err);
+                            error!("HeartbeatImpl: receive error from stop_rx, err: {}", err);
                         }
                     }
                     return;
@@ -92,7 +93,7 @@ impl HeartbeatImpl {
                             result = ret;
                         }
                         Err(err) => {
-                            println!("HeartbeatImpl: failed to perform heartbeat, err: {:?}", err);
+                            error!("HeartbeatImpl: failed to perform heartbeat, err: {:?}", err);
                             continue;
                         }
                     }
@@ -101,7 +102,7 @@ impl HeartbeatImpl {
                         let seg_dir = self.segment_mgr.get_segment_dir(u.id0, u.id1);
                         let err = self.segment_syncer.upload_segment(&seg_dir, u.id0, u.id1, u.offset);
                         if !err.is_success() {
-                            println!("HeartbeatImpl: failed to upload segment: id0: {}, id1: {}, dir: {}, err: {:?}",
+                            error!("HeartbeatImpl: failed to upload segment: id0: {}, id1: {}, dir: {}, err: {:?}",
                             u.id0, u.id1, seg_dir, err);
                             continue;
                         }

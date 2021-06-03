@@ -4,6 +4,7 @@ use io_engine::types::{MsgFileOp, MsgFileOpenResp, MsgFileReadData, MsgFileWrite
 use io_engine::io_worker::{IoWorker, IoWorkerFactory};
 use s3::s3_client::S3Client;
 use crossbeam_channel::{Receiver, select};
+use log::{info, warn, error};
 
 
 #[derive(Debug, Default)]
@@ -32,7 +33,7 @@ impl IoWorker for YigIoWorker {
                             self.do_work(&msg);
                         }
                         Err(err) => {
-                            println!("YigIoWorker: failed to recv op message, err: {}", err);
+                            error!("YigIoWorker: failed to recv op message, err: {}", err);
                             break;
                         }
                     }
@@ -40,11 +41,11 @@ impl IoWorker for YigIoWorker {
                 recv(self.stop_rx) -> msg => {
                     match msg {
                         Ok(msg) => {
-                            println!("YigIoWorker: got stop message: {:?}, stopping...", msg);
+                            warn!("YigIoWorker: got stop message: {:?}, stopping...", msg);
                             break;
                         }
                         Err(err) => {
-                            println!("YigIoWorker: failed to recv stop message: err: {}", err);
+                            error!("YigIoWorker: failed to recv stop message: err: {}", err);
                             break;
                         }
                     }
@@ -77,10 +78,10 @@ impl YigIoWorker{
                 let ret = self.open(&msg_open.dir, &obj);
                 match ret {
                     Ok(ret) => {
-                        println!("open yig object: {}/{}, size: {}", msg_open.dir, obj, ret);
+                        info!("open yig object: {}/{}, size: {}", msg_open.dir, obj, ret);
                     }
                     Err(err) => {
-                        println!("failed to open yig object: {}/{}, err: {:?}", msg_open.dir, obj, err);
+                        error!("failed to open yig object: {}/{}, err: {:?}", msg_open.dir, obj, err);
                         result = err;
                     }
                 }
@@ -93,7 +94,7 @@ impl YigIoWorker{
                     Ok(_) => {
                     }
                     Err(err) => {
-                        println!("open yig object: failed to send open result, err: {}", err);
+                        error!("open yig object: failed to send open result, err: {}", err);
                     }
                 }
             }
@@ -116,7 +117,7 @@ impl YigIoWorker{
                         resp.err = Errno::Esucc;
                     }
                     Err(err) => {
-                        println!("YigIoWorker: OpRead: failed to read: {}/{}, offset: {}, size: {}, err: {:?}",
+                        error!("YigIoWorker: OpRead: failed to read: {}/{}, offset: {}, size: {}, err: {:?}",
                     msg_read.dir, obj, msg_read.offset, msg_read.size, err);
                         resp.err = err;
                     }
@@ -147,7 +148,7 @@ impl YigIoWorker{
                         resp.err = Errno::Eoffset;
                     }
                     _ => {
-                        println!("failed to write to yig for {}/{}, offset: {}, data len: {}, err: {:?}",
+                        error!("failed to write to yig for {}/{}, offset: {}, data len: {}, err: {:?}",
                         msg_write.dir, obj, msg_write.offset, msg_write.data.len(), ret.err);
                         resp.err = ret.err;
                     }
@@ -156,16 +157,16 @@ impl YigIoWorker{
                 match ret{
                     Ok(_) => {}
                     Err(err) => {
-                        println!("failed to write to yig: failed send write resp for {}/{}, offset: {}, data_len: {}, err: {:?}",
+                        error!("failed to write to yig: failed send write resp for {}/{}, offset: {}, data_len: {}, err: {:?}",
                     msg_write.dir, obj, msg_write.offset, msg_write.data.len(), err);
                     }
                 }
             }
             MsgFileOp::OpClose(msg_close) => {
-                println!("close: id0: {}, id1: {}", msg_close.id0, msg_close.id1);
+                info!("close: id0: {}, id1: {}", msg_close.id0, msg_close.id1);
             }
             MsgFileOp::OpStat(msg_stat) => {
-                println!("stat: id0: {}, id1: {}", msg_stat.id0, msg_stat.id1);
+                info!("stat: id0: {}, id1: {}", msg_stat.id0, msg_stat.id1);
             }
         }
     }
@@ -179,10 +180,10 @@ impl YigIoWorker{
             }
             Err(err) => {
                 if err.is_enotf() {
-                    println!("{}/{} doesn't exist", bucket, object);
+                    error!("{}/{} doesn't exist", bucket, object);
                     return Ok(0);
                 }
-                println!("failed to head {}/{}, err: {:?}", bucket, object, err);
+                error!("failed to head {}/{}, err: {:?}", bucket, object, err);
                 return Err(err);
             }
         }
@@ -204,12 +205,12 @@ impl YigIoWorker{
             Errno::Eoffset => {
                 result.err = Errno::Eoffset;
                 result.offset = ret.next_append_position;
-                println!("YigIoWorker: miss matched offset: {}, should be from offset: {} for object: {}",
+                error!("YigIoWorker: miss matched offset: {}, should be from offset: {} for object: {}",
                 offset, result.offset, object);
                 result
             }
             _ => {
-                println!("failed to append({}/{}, offset: {}, size: {}, err: {:?}",
+                error!("failed to append({}/{}, offset: {}, size: {}, err: {:?}",
                 bucket, object, offset, data.len(), ret.err);
                 result.err = ret.err;
                 result.offset = 0;
@@ -227,7 +228,7 @@ impl YigIoWorker{
                 return Ok(ret);
             }
             Err(err) => {
-                println!("failed to get({}/{}, offset: {}, size: {}, err: {:?}",
+                error!("failed to get({}/{}, offset: {}, size: {}, err: {:?}",
                 bucket, object, offset, size, err);
                 return Err(err);
             }

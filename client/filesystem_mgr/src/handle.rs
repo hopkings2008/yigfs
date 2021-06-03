@@ -7,6 +7,7 @@ use std::thread::JoinHandle;
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
+use log::{info, error};
 
 pub struct MsgGetHandleInfo{
     pub ino: u64,
@@ -50,7 +51,7 @@ impl FileHandleInfoMgr {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("failed to stop file handle info mgr, err: {}", err);
+                error!("failed to stop file handle info mgr, err: {}", err);
             }
         }
         // join the HandleMgr thread.
@@ -58,10 +59,10 @@ impl FileHandleInfoMgr {
             let ret = h.join();
             match ret {
                 Ok(_) => {
-                    println!("FileHandleInfoMgr has stopped.");
+                    info!("FileHandleInfoMgr has stopped.");
                 }
                 Err(_) => {
-                    println!("FileHandleInfoMgr failes to stop, join failed");
+                    error!("FileHandleInfoMgr failes to stop, join failed");
                 }
             }
         }
@@ -78,7 +79,7 @@ impl FileHandleInfoMgr {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("add_handle_info: failed to send handle(ino: {}, leader: {}), err: {}", ino, leader, err);
+                error!("add_handle_info: failed to send handle(ino: {}, leader: {}), err: {}", ino, leader, err);
                 return Errno::Eintr;
             }
         }
@@ -98,7 +99,7 @@ impl FileHandleInfoMgr {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("get_handle_info: failed to send ino: {}, err: {}", ino, err);
+                error!("get_handle_info: failed to send ino: {}, err: {}", ino, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -111,7 +112,7 @@ impl FileHandleInfoMgr {
                 return Err(Errno::Enoent);
             }
             Err(err) => {
-                println!("get_handle_info: failed to get handle for ino: {}, err: {}", ino, err);
+                error!("get_handle_info: failed to get handle for ino: {}, err: {}", ino, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -124,7 +125,7 @@ impl FileHandleInfoMgr {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("del_handle_info: failed to send ino: {}, err: {}", ino, err);
+                error!("del_handle_info: failed to send ino: {}, err: {}", ino, err);
                 return Errno::Eintr;
             }
         }
@@ -156,7 +157,7 @@ impl HandleCacher {
                             op = msg;
                         }
                         Err(err) => {
-                            println!("start: failed to got handle_op msg, err: {}", err);
+                            error!("start: failed to got handle_op msg, err: {}", err);
                             continue;
                         }
                     }
@@ -179,11 +180,11 @@ impl HandleCacher {
                     drop(rx);
                     match msg {
                         Ok(_) => {
-                            println!("got stop signal, stop the loop...");
+                            info!("got stop signal, stop the loop...");
                             break;
                         }
                         Err(err) => {
-                            println!("recv invalid stop signal with err: {} and stop the loop...", err);
+                            error!("recv invalid stop signal with err: {} and stop the loop...", err);
                             break;
                         }
                     }
@@ -212,7 +213,7 @@ impl HandleCacher {
         match ret {
             Ok(_) => {}
             Err(err) => {
-                println!("get_handle_info: failed to send handle, err: {}", err);
+                error!("get_handle_info: failed to send handle, err: {}", err);
             }
         }
     }

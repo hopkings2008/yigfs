@@ -4,6 +4,7 @@ use crossbeam_channel::Sender;
 use common::error::Errno;
 use crate::{meta_op::MetaOpResp, meta_thread_pool::MetaThreadPool, mgr::MetaServiceMgr};
 use std::sync::Arc;
+use log::{error};
 
 pub struct MetaStore{
     meta_pool: MetaThreadPool,
@@ -23,7 +24,7 @@ impl MetaStore{
         let thr = self.meta_pool.get_meta_thread_for_seg(id0, id1);
         let ret = thr.upload_segment(id0, id1, offset, resp_tx);
         if !ret.is_success() {
-            println!("upload_segment_async: failed to upload segment for id0: {}, id1: {}, offset: {}, err: {:?}",
+            error!("upload_segment_async: failed to upload segment for id0: {}, id1: {}, offset: {}, err: {:?}",
             id0, id1, offset, ret);
         }
         return ret;

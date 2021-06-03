@@ -8,6 +8,8 @@ use io_engine::backend_storage::BackendStore;
 use metaservice_mgr::meta_store::MetaStore;
 
 use crate::{segment_sync_handler::SegSyncHandler, types::{SegDownload, SegSyncOp, SegUpload}};
+use log::error;
+
 pub struct SegSyncer{
     op_tx: Sender<SegSyncOp>,
     stop_tx: Sender<u8>,
@@ -47,7 +49,7 @@ impl SegSyncer {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("sync_segment: failed to send upload op for id0: {}, id1: {}, offset: {}, err: {}",
+                error!("sync_segment: failed to send upload op for id0: {}, id1: {}, offset: {}, err: {}",
                 id0, id1, offset, err);
                 return Errno::Eintr;
             }
@@ -68,7 +70,7 @@ impl SegSyncer {
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("sync_segment: failed to perform download segment for id0: {}, id1: {}, offset: {}, err: {}",
+                error!("sync_segment: failed to perform download segment for id0: {}, id1: {}, offset: {}, err: {}",
             id0, id1, offset, err);
                 return Errno::Eintr;
             }
@@ -84,7 +86,7 @@ impl Drop for SegSyncer{
                 self.thr.join();
             }
             Err(err) => {
-                println!("SegSyncer: failed to perform stop, err: {}", err);
+                error!("SegSyncer: failed to perform stop, err: {}", err);
             }
         }
     }

@@ -3,7 +3,7 @@ use common::runtime::Executor;
 use common::error::Errno;
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
-use log::{error};
+use log::{info, warn, error};
 use crate::{leader::Leader, segment_sync::SegSyncer};
 use crate::file_handle::FileHandleMgr;
 use crate::types::{FileHandle, Block, BlockIo, Segment};
@@ -25,12 +25,12 @@ impl Leader for LeaderLocal {
         let ret = self.handle_mgr.get(ino);
         match ret {
             Ok(ret) => {
-                println!("open: got handle for ino: {}, leader: {}", ino, ret.leader);
+                info!("open: got handle for ino: {}, leader: {}", ino, ret.leader);
                 return Errno::Esucc;
             }
             Err(err) => {
                 if !err.is_enoent() {
-                    println!("open: failed to get file handle for ino: {}, err: {:?}", ino, err);
+                    error!("open: failed to get file handle for ino: {}, err: {:?}", ino, err);
                     return err;
                 }
             }
@@ -41,7 +41,7 @@ impl Leader for LeaderLocal {
                 segments = ret;
             }
             Err(err) => {
-                println!("open: failed to get_file_segments for ino: {}", ino);
+                error!("open: failed to get_file_segments for ino: {}", ino);
                 return err;
             }
         }
@@ -57,26 +57,26 @@ impl Leader for LeaderLocal {
                     Ok(ret) => {
                         if ret.size < seg.size {
                             // perform the download from backend store.
-                            println!("open: seg: id0: {}, id1: {}, cache size: {}, real size: {}",
+                            info!("open: seg: id0: {}, id1: {}, cache size: {}, real size: {}",
                             seg.seg_id0, seg.seg_id1, ret.size, seg.size);
                             let sync_offset = ret.size;
                             let ret = self.sync_mgr.download_segment(&seg_dir, seg.seg_id0, seg.seg_id1, sync_offset, seg.capacity);
                             if ret.is_success(){
-                                println!("open: start performing downloading seg id0: {}, id1: {}, offset: {} in dir: {}",
+                                info!("open: start performing downloading seg id0: {}, id1: {}, offset: {} in dir: {}",
                                 seg.seg_id0, seg.seg_id1, sync_offset, seg_dir);
                             } else {
-                                println!("open: failed to perform segment sync for id0: {}, id1: {}, offset: {}, dir: {}, err: {:?}",
+                                error!("open: failed to perform segment sync for id0: {}, id1: {}, offset: {}, dir: {}, err: {:?}",
                                 seg.seg_id0, seg.seg_id1, sync_offset, seg_dir, ret);
                             }
                         }
                     }
                     Err(err) => {
-                        println!("open: failed to stat seg id0: {}, id1: {}, err: {:?}", seg.seg_id0, seg.seg_id1, err);
+                        error!("open: failed to stat seg id0: {}, id1: {}, err: {:?}", seg.seg_id0, seg.seg_id1, err);
                     }
                 }
                 continue;
             }
-            println!("LeaderLocal open: seg(id0: {}, id1: {}) for ino: {} failed, err: {:?}",
+            error!("LeaderLocal open: seg(id0: {}, id1: {}) for ino: {} failed, err: {:?}",
             seg.seg_id0, seg.seg_id1, ino, ret);
             return ret;
         }
@@ -100,7 +100,7 @@ impl Leader for LeaderLocal {
                 file_handle = ret;
             }
             Err(err) => {
-                println!("read: failed to get file_handle for ino: {}, offset: {}, size: {}, err: {:?}", 
+                error!("read: failed to get file_handle for ino: {}, offset: {}, size: {}, err: {:?}", 
                 ino, offset, size, err);
                 return Err(err);
             }
@@ -132,14 +132,14 @@ impl Leader for LeaderLocal {
                         }
                         Err(err) => {
                             if err.is_eof() {
-                                println!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, start: {}, size: {}",
+                                info!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, start: {}, size: {}",
                                 ino, s.seg_id0, s.seg_id1, offset, start, to_read);
                                 continue;
                             }
                             if err.is_bad_offset(){
                                 need_read_backend_store = true;
                             } else {
-                                println!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
+                                error!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
                                 ino, offset, start, to_read, err);
                                 return Err(err);
                             }
@@ -160,7 +160,7 @@ impl Leader for LeaderLocal {
                             }
                             Err(err) => {
                                 if err.is_invalid_range() {
-                                    println!("LeadLocal: backend_read: ino: {}, offset: {}, start: {}, size: {} 
+                                    error!("LeadLocal: backend_read: ino: {}, offset: {}, start: {}, size: {} 
                                     exceeds the backend store's range", ino, offset, start, to_read);
                                     continue;
                                 }
@@ -168,7 +168,7 @@ impl Leader for LeaderLocal {
                         }
                     }
                     if total_read == 0 {
-                        println!("LeadLocal: read: finished for ino: {}, offset: {}, start: {}, size: {}", 
+                        warn!("LeadLocal: read: finished for ino: {}, offset: {}, start: {}, size: {}", 
                         ino, offset, start, size);
                         return Ok(data);
                     }
@@ -186,12 +186,12 @@ impl Leader for LeaderLocal {
                 last_segment = ret;
             }
             Err(err) => {
-                println!("write: failed to get_last_segment for ino: {}, err: {:?}", ino, err);
+                error!("write: failed to get_last_segment for ino: {}, err: {:?}", ino, err);
                 return Err(err);
             }
         }
         if last_segment.is_empty() {
-            println!("write: failed to get_last_segment for ino: {}, no segments found.", ino);
+            error!("write: failed to get_last_segment for ino: {}, no segments found.", ino);
             return Err(Errno::Enoent);
         }
         let mut id0 = last_segment[0];
@@ -246,7 +246,7 @@ impl Leader for LeaderLocal {
                     };
                     let ret = self.handle_mgr.add_block(ino, id0, id1, &b);
                     if !ret.is_success() {
-                        println!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
+                        error!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
                         return Err(ret);
                     }
                     
@@ -267,23 +267,23 @@ impl Leader for LeaderLocal {
                             size: r.nwrite,
                         });
                     }
-                    println!("write: failed to upload block{:?} for ino: {}, err: {:?}", b, ino, ret);
+                    error!("write: failed to upload block{:?} for ino: {}, err: {:?}", b, ino, ret);
                     return Err(ret);*/
                 }
                 Err(err) => {
                     if err.is_enospc() {
-                        println!("LeadLocal: write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {} with offset: {}",
+                        error!("LeadLocal: write: segment(id0: {}, id1: {}, dir: {}) has no space left for ino: {} with offset: {}",
                             id0, id1, seg_dir, ino, offset);
                         let seg = self.segment_mgr.new_segment(&String::from(""));
                         self.handle_mgr.add_segment(ino, &seg);
                         id0 = seg.seg_id0;
                         id1 = seg.seg_id1;
                         seg_max_size = seg.capacity;
-                        println!("LeadLocal: write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
+                        info!("LeadLocal: write: add new segment(id0: {}, id1: {}) for ino: {} with offset: {}",
                     id0, id1, ino, offset);
                         continue;
                     }
-                    println!("LeadLocal: write: failed to get response for seg(id0: {}, id1: {}) of ino: {} with offset: {}, err: {:?}", 
+                    error!("LeadLocal: write: failed to get response for seg(id0: {}, id1: {}) of ino: {} with offset: {}, err: {:?}", 
                         id0, id1, ino, offset, err);
                     return Err(err);
                 }
@@ -302,7 +302,7 @@ impl Leader for LeaderLocal {
                 handle = ret;
             }
             Err(err) => {
-                println!("LeadLocal close: failed to get file handle for ino: {}, err: {:?}", ino, err);
+                error!("LeadLocal close: failed to get file handle for ino: {}, err: {:?}", ino, err);
                 return err;
             }
         }
@@ -310,14 +310,14 @@ impl Leader for LeaderLocal {
         if handle.is_dirty() && !handle.segments.is_empty() {
             let ret = self.segment_mgr.update_segments(ino, &handle.segments);
             if !ret.is_success(){
-                println!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);
+                error!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);
                 return ret;
             }
         }
         // close the segments file handles.
         for s in &handle.segments {
             for b in &s.blocks {
-                println!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
+                info!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
                 ino, s.seg_id0, s.seg_id1, b.offset, b.size);
             }
             //close the segment.
@@ -325,7 +325,7 @@ impl Leader for LeaderLocal {
             if ret.is_success(){
                 continue;
             }
-            println!("LeadLocal: close: failed to close seg: (id0: {}, id1: {}), err: {:?}",
+            error!("LeadLocal: close: failed to close seg: (id0: {}, id1: {}), err: {:?}",
             s.seg_id0, s.seg_id1, ret);
         }
 

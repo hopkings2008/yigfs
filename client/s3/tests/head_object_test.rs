@@ -1,5 +1,6 @@
 use common::runtime::Executor;
 use s3::s3_client::S3Client;
+use log::info;
 
 #[test]
 fn test_head_object()->Result<(), String> {
@@ -15,7 +16,7 @@ fn test_head_object()->Result<(), String> {
     let resp = exec.get_runtime().block_on(s3_client.head_object(&target_bucket, &target_object));
     match resp {
         Ok(result) => {
-            println!("test_head_object resp is {:?}", result);
+            info!("test_head_object resp is {:?}", result);
             return Ok(());
         }
         Err(error) => {

@@ -17,7 +17,7 @@ use io_engine::cache_store::{CacheStore, CacheStoreConfig};
 use io_engine::disk_cache_store::DiskCacheStoreFactory;
 use yig_backend::backend::YigBackendFactory;
 use log4rs;
-use log::{info};
+use log::{info, error};
 
 fn main() {
     let opts = options::parse();
@@ -30,7 +30,7 @@ fn main() {
             cfg = ret;
         }
         Err(error)=>{
-            println!("failed to parse with err: {:}", error);
+            error!("failed to parse with err: {:}", error);
             return;
         }
     }
@@ -42,7 +42,7 @@ fn main() {
             info!("Succeed to config log!");
         }
         Err(error) => {
-            println!("Failed to config log!, err: {}", error);
+            error!("Failed to config log!, err: {}", error);
             return;
         } 
     }
@@ -65,7 +65,7 @@ fn main() {
             backend_store = ret;
         }
         Err(err) => {
-            println!("failed to create backend store, err: {:?}", err);
+            error!("failed to create backend store, err: {:?}", err);
             return;
         }
     }
@@ -82,7 +82,7 @@ fn main() {
             cache_store = ret;
         }
         Err(err) => {
-            println!("failed to create cache store, err: {:?}", err);
+            error!("failed to create cache store, err: {:?}", err);
             return;
         }
     }

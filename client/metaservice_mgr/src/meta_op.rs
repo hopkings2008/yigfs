@@ -1,6 +1,7 @@
 
 use common::error::Errno;
 use crossbeam_channel::Sender;
+use log::error;
 
 pub struct MetaOpUploadSegResp{
     pub id0: u64,
@@ -32,7 +33,7 @@ impl MetaOpUploadSeg{
                 return Errno::Esucc;
             }
             Err(err) => {
-                println!("MetaOpUploadSeg::response: failed to send response for id0: {}, id1: {}, offset: {},
+                error!("MetaOpUploadSeg::response: failed to send response for id0: {}, id1: {}, offset: {},
                 err: {}", self.id0, self.id1, self.offset, err);
                 return Errno::Eintr;
             }

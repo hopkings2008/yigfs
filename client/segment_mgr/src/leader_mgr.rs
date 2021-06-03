@@ -8,6 +8,7 @@ use io_engine::cache_store::CacheStore;
 use crate::{leader::Leader, segment_mgr::SegmentMgr, segment_sync::SegSyncer};
 use crate::leader_local::LeaderLocal;
 use crate::leader_not_support::LeaderNotSupport;
+use log::error;
 
 #[derive(Debug)]
 enum LeaderType {
@@ -36,7 +37,7 @@ impl LeaderMgr {
     pub fn stop(&mut self){
         for (k, l) in &mut self.leaders {
             l.release();
-            println!("leader of {:?} is stopped.", k);
+            error!("leader of {:?} is stopped.", k);
         }
         self.leaders.clear();
     }
