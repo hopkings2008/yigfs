@@ -13,7 +13,7 @@ impl<T> IntervalTree<T>{
         }
     }
 
-    fn insert(&mut self, z: &Rc<RefCell<TNode<T>>>){
+    pub fn insert(&mut self, z: &Rc<RefCell<TNode<T>>>){
         let mut y: Option<Rc<RefCell<TNode<T>>>> = None;
         let mut x = self.root.clone();
         while x.is_some(){
@@ -43,6 +43,49 @@ impl<T> IntervalTree<T>{
         z.borrow_mut().set_rchild(&None);
         z.borrow_mut().set_color(1);
         self.insert_fixup(z);
+    }
+    
+    pub fn delete(&mut self, z: &Rc<RefCell<TNode<T>>>){
+        let mut y = z.clone();
+        let mut origin_color = y.borrow().get_color();
+        let mut x: Option<Rc<RefCell<TNode<T>>>> = None;
+        if z.borrow().get_lchild().is_none() {
+            x = z.borrow().get_rchild().clone();
+            self.transplant(z, z.borrow().get_rchild());
+        } else if z.borrow().get_rchild().is_none() {
+            x = z.borrow().get_lchild().clone();
+            self.transplant(z, z.borrow().get_lchild());
+        } else {
+            let min = self.tree_node_minum(z.borrow().get_rchild());
+            if min.is_some(){
+                y = min.unwrap().clone();
+                origin_color = y.borrow().get_color();
+                x = y.borrow().get_rchild().clone();
+                if y.borrow().get_parent().as_ref().is_some() && y.borrow().get_parent().as_ref().unwrap().as_ptr() == z.as_ptr() {
+                    if x.is_some() {
+                        x.as_ref().unwrap().borrow_mut().set_parent(&Some(y.clone()));
+                    }
+                } else {
+                    self.transplant(&y, y.borrow().get_rchild());
+                    y.borrow_mut().set_rchild(z.borrow().get_rchild());
+                    let yb = y.borrow();
+                    let yr = yb.get_rchild();
+                    if yr.is_some() {
+                        yr.as_ref().unwrap().borrow_mut().set_parent(&Some(y.clone()));
+                    }
+                }
+                self.transplant(z, &Some(y.clone()));
+                y.borrow_mut().set_lchild(z.borrow().get_lchild());
+                if y.borrow().get_lchild().is_some() {
+                    y.borrow().get_lchild().as_ref().unwrap().borrow_mut().set_parent(&Some(y.clone()));
+                }
+                y.borrow_mut().set_color(z.borrow().get_color());
+            }
+        }
+
+        if origin_color == 0 {
+            self.delete_fixup(&x);
+        }
     }
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){
@@ -225,23 +268,25 @@ impl<T> IntervalTree<T>{
         }
     }
 
-    fn transplant(&mut self, u: &Rc<RefCell<TNode<T>>>, v: &Rc<RefCell<TNode<T>>>){
+    fn transplant(&mut self, u: &Rc<RefCell<TNode<T>>>, v: &Option<Rc<RefCell<TNode<T>>>>){
         if u.borrow().get_parent().is_none() {
-            self.root = Some(v.clone());
+            self.root = v.clone();
         } else {
             let ub = u.borrow();
             let p = ub.get_parent().as_ref().unwrap();
             if let Some(l) = p.borrow().get_lchild() {
                 if l.as_ptr() == u.as_ptr() {
-                    p.borrow_mut().set_lchild(&Some(v.clone()));
+                    p.borrow_mut().set_lchild(v);
                 } else {
-                    p.borrow_mut().set_rchild(&Some(v.clone()));
+                    p.borrow_mut().set_rchild(v);
                 }
             } else {
-                p.borrow_mut().set_rchild(&Some(v.clone()));
+                p.borrow_mut().set_rchild(v);
             };
         }
-        v.borrow_mut().set_parent(u.borrow().get_parent());
+        if v.is_some() {
+            v.as_ref().unwrap().borrow_mut().set_parent(u.borrow().get_parent());
+        }
     }
 
     fn tree_node_minum(&self, n: &Option<Rc<RefCell<TNode<T>>>>) -> Option<Rc<RefCell<TNode<T>>>>{
