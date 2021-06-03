@@ -197,7 +197,7 @@ impl Leader for LeaderLocal {
         let mut id0 = last_segment[0];
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
-        let mut seg_size = last_segment[3];
+        let seg_size = last_segment[3];
         
         //println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
         loop {

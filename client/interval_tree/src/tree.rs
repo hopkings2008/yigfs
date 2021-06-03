@@ -224,4 +224,154 @@ impl<T> IntervalTree<T>{
             }
         }
     }
+
+    fn transplant(&mut self, u: &Rc<RefCell<TNode<T>>>, v: &Rc<RefCell<TNode<T>>>){
+        if u.borrow().get_parent().is_none() {
+            self.root = Some(v.clone());
+        } else {
+            let ub = u.borrow();
+            let p = ub.get_parent().as_ref().unwrap();
+            if let Some(l) = p.borrow().get_lchild() {
+                if l.as_ptr() == u.as_ptr() {
+                    p.borrow_mut().set_lchild(&Some(v.clone()));
+                } else {
+                    p.borrow_mut().set_rchild(&Some(v.clone()));
+                }
+            } else {
+                p.borrow_mut().set_rchild(&Some(v.clone()));
+            };
+        }
+        v.borrow_mut().set_parent(u.borrow().get_parent());
+    }
+
+    fn tree_node_minum(&self, n: &Option<Rc<RefCell<TNode<T>>>>) -> Option<Rc<RefCell<TNode<T>>>>{
+        let mut x = n.clone();
+        let mut y: Option<Rc<RefCell<TNode<T>>>> = None;
+        while x.is_some() {
+            y = x.clone();
+            x = y.as_ref().unwrap().borrow().get_lchild().clone();
+        }
+        return y;
+    }
+
+    fn delete_fixup(&mut self, n: &Option<Rc<RefCell<TNode<T>>>>){
+        if self.root.is_none() {
+            return;
+        }
+        if n.is_none() {
+            return;
+        }
+
+        let mut x = n.as_ref().unwrap().clone();
+        //x != T:root and x:color == BLACK
+        while x.as_ptr() != self.root.as_ref().unwrap().as_ptr() && 
+            x.borrow().get_color() == 0 {
+            // if x == x.p.left
+            let mut is_x_p_left = false;
+            if let Some(p) = x.borrow().get_parent() {
+                if x.as_ptr() == p.borrow().get_lchild().as_ref().unwrap().as_ptr() {
+                    is_x_p_left = true;
+                }
+            }
+            if is_x_p_left {
+                let tmp_x = x.clone();
+                let tmp_x_b = tmp_x.borrow();
+                let x_p = tmp_x_b.get_parent().as_ref().unwrap();
+                // w = x.p.right
+                if let Some(mut w) = x_p.borrow().get_rchild().clone(){
+                    // w.color == red
+                    if w.borrow().get_color() == 1 {
+                        // w.color = black
+                        w.borrow_mut().set_color(0);
+                        // x.p.color = red
+                        x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(1);
+                        // LEFT-ROTATE(T, x.p)
+                        self.left_rotate(x_p);
+                        // w = x.p.right
+                        w = tmp_x_b.get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
+                    }
+                    // w.left.color == black and w.right.color == black
+                    if w.borrow().get_lchild().is_some() && w.borrow().get_rchild().is_some() {
+                        let wc = w.clone();
+                        let wb = wc.borrow();
+                        let l = wb.get_lchild().as_ref().unwrap();
+                        let r = wb.get_rchild().as_ref().unwrap();
+                        if l.borrow().get_color() == 0 && r.borrow().get_color() == 0 {
+                            // w.color = red
+                            w.borrow_mut().set_color(1);
+                            x = tmp_x.borrow().get_parent().as_ref().unwrap().clone();
+                        } else if r.borrow().get_color() == 0 {
+                            // if w.r.color == black
+                            // w.l.color = black
+                            l.borrow_mut().set_color(0);
+                            // w.color = red
+                            w.borrow_mut().set_color(1);
+                            // right rotation on x
+                            self.right_rotate(&w);
+                            // w = x.p.right
+                            w = tmp_x_b.get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
+                        }
+                    }
+                    // w.color = x.p.color
+                    w.borrow_mut().set_color(x.borrow().get_parent().as_ref().unwrap().borrow().get_color());
+                    // x.p.color = black
+                    x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(0);
+                    // w.right.color = black
+                    w.borrow().get_rchild().as_ref().unwrap().borrow_mut().set_color(0);
+                    // left rotation on x.p
+                    self.left_rotate(x.borrow().get_parent().as_ref().unwrap());
+                    x = self.root.as_ref().unwrap().clone();
+                };
+            } else {
+                let tmp_x = x.clone();
+                let tmp_x_b = tmp_x.borrow();
+                let x_p = tmp_x_b.get_parent().as_ref().unwrap();
+                // w = x.p.left
+                if let Some(mut w) = x_p.borrow().get_lchild().clone(){
+                    // w.color == red
+                    if w.borrow().get_color() == 1 {
+                        // w.color = black
+                        w.borrow_mut().set_color(0);
+                        // x.p.color = red
+                        x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(1);
+                        // RIGHT-ROTATE(T, x.p)
+                        self.right_rotate(x_p);
+                        // w = x.p.left
+                        w = tmp_x_b.get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
+                    }
+                    // w.left.color == black and w.right.color == black
+                    if w.borrow().get_lchild().is_some() && w.borrow().get_rchild().is_some() {
+                        let wc = w.clone();
+                        let wb = wc.borrow();
+                        let l = wb.get_lchild().as_ref().unwrap();
+                        let r = wb.get_rchild().as_ref().unwrap();
+                        if l.borrow().get_color() == 0 && r.borrow().get_color() == 0 {
+                            // w.color = red
+                            w.borrow_mut().set_color(1);
+                            x = tmp_x.borrow().get_parent().as_ref().unwrap().clone();
+                        } else if l.borrow().get_color() == 0 {
+                            // if w.l.color == black
+                            // w.r.color = black
+                            r.borrow_mut().set_color(0);
+                            // w.color = red
+                            w.borrow_mut().set_color(1);
+                            // left rotation on x
+                            self.left_rotate(&w);
+                            // w = x.p.left
+                            w = tmp_x_b.get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
+                        }
+                    }
+                    // w.color = x.p.color
+                    w.borrow_mut().set_color(x.borrow().get_parent().as_ref().unwrap().borrow().get_color());
+                    // x.p.color = black
+                    x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(0);
+                    // w.left.color = black
+                    w.borrow().get_lchild().as_ref().unwrap().borrow_mut().set_color(0);
+                    // right rotation on x.p
+                    self.right_rotate(x.borrow().get_parent().as_ref().unwrap());
+                    x = self.root.as_ref().unwrap().clone();
+                };
+            }
+        }
+    }
 }
