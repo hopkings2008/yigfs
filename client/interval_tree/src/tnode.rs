@@ -15,12 +15,12 @@ pub struct TNode<T>{
 
 impl<T> TNode<T>{
     //[start, end)
-    pub fn new(start: u64, end: u64, val: T, color: u8) -> Self{
+    pub fn new(start: u64, end: u64, val: T) -> Self{
         TNode{
             p: None,
             l: None,
             r: None,
-            color: color,
+            color: 1, // initial the node to red
             key: start,
             intr: Interval::new(start, end),
             intr_end: end,
