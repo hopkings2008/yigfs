@@ -88,6 +88,30 @@ impl<T> IntervalTree<T>{
             }
         }
 
+        // adjust the max interval end for the ancestors of y.
+        let mut adjust_node = y.clone();
+        loop {
+            let tmp_node = adjust_node.clone();
+            let adjust_node_b = tmp_node.borrow();
+            let p = adjust_node_b.get_parent();
+            if p.is_none() {
+                break;
+            }
+            let p_node = p.as_ref().unwrap();
+            p_node.borrow_mut().set_intr_end(p_node.borrow().get_intr().end);
+            if let Some(l) = p_node.borrow().get_lchild(){
+                if l.borrow().get_intr_end() > p_node.borrow().get_intr_end() {
+                    p_node.borrow_mut().set_intr_end(l.borrow().get_intr_end());
+                }
+            }
+            if let Some(r) = p_node.borrow().get_rchild() {
+                if r.borrow().get_intr_end() > p_node.borrow().get_intr_end(){
+                    p_node.borrow_mut().set_intr_end(r.borrow().get_intr_end());
+                }
+            }
+            adjust_node = p_node.clone();
+        }
+
         if origin_color == 0 {
             self.delete_fixup(&x);
         }
