@@ -146,14 +146,14 @@ func PutFile(createFileReq *types.CreateFileReq) (createFileResp *types.CreateFi
 func DeleteFile(deleteFileReq *types.DeleteFileReq) (deleteFileResp *types.NonBodyResp, result string, err error) {
 	deleteFileResp = &types.NonBodyResp{}
 	sc := NewClient()
-	newServer := Endpoint + "/v1/file"
+	newServer := Endpoint + "/v1/file/remove"
 
 	reqStr, err := json.Marshal(deleteFileReq)
 	if err != nil {
 		return deleteFileResp, "", err
 	}
 
-	resp, err := SendHttpToYigFs("DELETE", newServer, sc, reqStr)
+	resp, err := SendHttpToYigFs("POST", newServer, sc, reqStr)
 	if err != nil {
 		return deleteFileResp, "", err
 	}
