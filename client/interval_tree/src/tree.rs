@@ -14,6 +14,58 @@ impl<T> IntervalTree<T>{
         }
     }
 
+    pub fn get(&self, start: u64, end: u64) -> Vec<Rc<RefCell<TNode<T>>>>{
+        let mut v: Vec<Rc<RefCell<TNode<T>>>> = Vec::new();
+        let mut x = self.root.clone();
+        loop {
+            if x.is_none() {
+                break;
+            }
+
+            let tmp_x = x.clone();
+            let n = tmp_x.as_ref().unwrap();
+            let nb = n.borrow();
+            let intr = nb.get_intr();
+            if intr.start <= start && start < intr.end {
+                // got the start interval, need to track all the successors for the end.
+                v.push(n.clone());
+                if end <= intr.end {
+                    break;
+                }
+                // end > intr.end, more than two intervals are needed.
+                let mut curr = n.clone();
+                loop {
+                    let succ = self.successor(&curr);
+                    if succ.is_none() {
+                        break;
+                    }
+                    v.push(succ.as_ref().unwrap().clone());
+                    if succ.as_ref().unwrap().borrow().get_intr().end > end {
+                        break;
+                    }
+                    curr = succ.as_ref().unwrap().clone();
+                }
+                break;
+            }
+
+            // x's interval doesn't contain the [start, end)
+            // x.left.end >= end
+            let mut go_to_left = false;
+            if let Some(l) = n.borrow().get_lchild() {
+                if l.borrow().get_intr().end >= end {
+                    x = n.borrow().get_lchild().clone();
+                    go_to_left = true;
+                }
+            }
+
+            if !go_to_left {
+                x = n.borrow().get_rchild().clone();
+            }
+        }
+
+        return v;
+    }
+
     pub fn insert(&mut self, z: &Rc<RefCell<TNode<T>>>){
         let mut y: Option<Rc<RefCell<TNode<T>>>> = None;
         let mut x = self.root.clone();
@@ -475,5 +527,26 @@ impl<T> IntervalTree<T>{
         }
         // x.color = black
         x.borrow_mut().set_color(0);
+    }
+
+    fn successor(&self, n: &Rc<RefCell<TNode<T>>>) -> Option<Rc<RefCell<TNode<T>>>> {
+        if n.borrow().get_rchild().is_some() {
+            return self.tree_node_minum(n.borrow().get_rchild());
+        }
+        let mut y = n.borrow().get_parent().clone();
+        let mut x = n.clone();
+        // y != nil && x == y.right
+        while let Some(node) = &y.clone() {
+            if let Some(r) = node.borrow().get_rchild() {
+                if x.as_ptr() == r.as_ptr() {
+                    // x = y
+                    x = node.clone();
+                    // y = y.p
+                    y = node.borrow().get_parent().clone();
+                }
+            }
+        }
+
+        return y;
     }
 }
