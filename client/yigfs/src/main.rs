@@ -30,7 +30,7 @@ fn main() {
             cfg = ret;
         }
         Err(error)=>{
-            error!("failed to parse with err: {:}", error);
+            println!("failed to parse with err: {:}", error);
             return;
         }
     }
@@ -42,7 +42,7 @@ fn main() {
             info!("Succeed to config log!");
         }
         Err(error) => {
-            error!("Failed to config log!, err: {}", error);
+            println!("Failed to config log!, err: {}", error);
             return;
         } 
     }
