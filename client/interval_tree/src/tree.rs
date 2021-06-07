@@ -231,12 +231,17 @@ impl<T> IntervalTree<T>{
                 x.borrow_mut().set_parent(&Some(y.clone()));
                 // reset the intr_end
                 y.borrow_mut().set_intr_end(x.borrow().get_intr_end());
+                x.borrow_mut().set_intr_end(x.borrow().get_intr().end);
                 if let Some(r) = x.borrow().get_rchild() {
-                    x.borrow_mut().set_intr_end(r.borrow().get_intr_end());
-                } else if let Some(l) = x.borrow().get_lchild() {
+                    if r.borrow().get_intr_end() > x.borrow().get_intr_end() {
+                        x.borrow_mut().set_intr_end(r.borrow().get_intr_end());
+                    }
+                } 
+                if let Some(l) = x.borrow().get_lchild() {
+                    if l.borrow().get_intr_end() > x.borrow().get_intr_end(){
+                        x.borrow_mut().set_intr_end(l.borrow().get_intr_end());
+                    }
                     x.borrow_mut().set_intr_end(l.borrow().get_intr_end());
-                } else {
-                    x.borrow_mut().set_intr_end(x.borrow().get_intr().end);
                 }
             }
             None => {
@@ -247,7 +252,7 @@ impl<T> IntervalTree<T>{
     }
 
     fn right_rotate(&mut self, x: &Rc<RefCell<TNode<T>>>) {
-        let t = RefCell::borrow(x);
+        let t = x.borrow();
         let y = t.get_lchild();
         match y {
             Some(y) => {
@@ -276,12 +281,17 @@ impl<T> IntervalTree<T>{
                 x.borrow_mut().set_parent(&Some(y.clone()));
                 // reset the intr_end
                 y.borrow_mut().set_intr_end(x.borrow().get_intr_end());
+                x.borrow_mut().set_intr_end(x.borrow().get_intr().end);
                 if let Some(r) = x.borrow().get_rchild() {
-                    x.borrow_mut().set_intr_end(r.borrow().get_intr_end());
-                } else if let Some(l) = x.borrow().get_lchild() {
+                    if r.borrow().get_intr_end() > x.borrow().get_intr_end() {
+                        x.borrow_mut().set_intr_end(r.borrow().get_intr_end());
+                    }
+                } 
+                if let Some(l) = x.borrow().get_lchild() {
+                    if l.borrow().get_intr_end() > x.borrow().get_intr_end(){
+                        x.borrow_mut().set_intr_end(l.borrow().get_intr_end());
+                    }
                     x.borrow_mut().set_intr_end(l.borrow().get_intr_end());
-                } else {
-                    x.borrow_mut().set_intr_end(x.borrow().get_intr().end);
                 }
             }
             None => {
