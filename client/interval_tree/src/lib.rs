@@ -1,3 +1,3 @@
 pub mod tree;
-mod tnode;
-mod interval;
+pub mod tnode;
+pub mod interval;
