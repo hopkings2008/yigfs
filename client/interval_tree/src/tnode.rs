@@ -29,25 +29,11 @@ impl<T> TNode<T>{
     }
 
     pub fn set_lchild(&mut self, l: &Option<Rc<RefCell<TNode<T>>>>) {
-        match l {
-            Some(n) => {
-                self.l = Some(n.clone());
-            }
-            None => {
-                self.l = None;
-            }
-        }
+        self.l = l.clone();
     }
 
     pub fn set_rchild(&mut self, r: &Option<Rc<RefCell<TNode<T>>>>) {
-        match r{
-            Some(n) => {
-                self.r = Some(n.clone());
-            }
-            None => {
-                self.r = None;
-            }
-        }
+        self.r = r.clone();
     }
 
     pub fn get_lchild(&self) -> &Option<Rc<RefCell<TNode<T>>>> {
@@ -58,15 +44,20 @@ impl<T> TNode<T>{
         &self.r
     }
 
-    pub fn set_parent(&mut self, p: &Option<Rc<RefCell<TNode<T>>>>) {
-        match p {
-            Some(p) => {
-                self.p = Some(p.clone());
-            }
-            None => {
-                self.p = None;
-            }
+    pub fn get_num_of_children(&self) -> u32 {
+        let mut num = 0;
+        if self.l.is_some() {
+            num += 1;
         }
+        if self.r.is_some() {
+            num += 1;
+        }
+
+        num
+    }
+
+    pub fn set_parent(&mut self, p: &Option<Rc<RefCell<TNode<T>>>>) {
+        self.p = p.clone();
     }
 
     pub fn get_parent(&self) -> &Option<Rc<RefCell<TNode<T>>>> {
