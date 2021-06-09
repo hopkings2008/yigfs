@@ -193,8 +193,8 @@ fn test_interval_tree_100w_get()->Result<(), String>{
     loop {
         let begin = Instant::now();
         let nodes = tree.get(start, end);
-        let dur = begin.elapsed();
-        total_dur += dur.as_nanos();
+        let dur = begin.elapsed().as_nanos();
+        total_dur += dur;
         count += 1;
         if nodes.is_empty() {
             return Err(format!("get empty interval for start: {}, end: {}", start, end));
