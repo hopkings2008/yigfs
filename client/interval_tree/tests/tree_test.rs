@@ -164,13 +164,16 @@ fn test_interval_tree_100w_get()->Result<(), String>{
     
     let mut start = 0;
     let mut end = 10;
+    let mut count = 0;
+    
     loop{
         let intr = Interval::new(start, end);
         let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
         tree.insert(&n);
         start += 10;
         end += 10;
-        if start >= 1000000 {
+        count += 1;
+        if count >= 1000000 {
             break;
         }
     }
@@ -178,7 +181,7 @@ fn test_interval_tree_100w_get()->Result<(), String>{
     // get the intervals.
     start = 0;
     end = 10;
-    let mut count = 0;
+    count = 0;
     let mut total_dur: u128 = 0;
     let limit = 1000;
     loop {
