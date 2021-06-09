@@ -40,10 +40,12 @@ impl<T> IntervalTree<T>{
                     if succ.is_none() {
                         break;
                     }
-                    v.push(succ.as_ref().unwrap().clone());
-                    if succ.as_ref().unwrap().borrow().get_intr().end > end {
+                    if succ.as_ref().unwrap().borrow().get_intr().start >= end {
                         break;
                     }
+
+                    v.push(succ.as_ref().unwrap().clone());
+                    
                     curr = succ.as_ref().unwrap().clone();
                 }
                 break;
@@ -52,7 +54,7 @@ impl<T> IntervalTree<T>{
             // x's interval doesn't contain the [start, end)
             // x.left.end >= end
             if let Some(l) = n.borrow().get_lchild() {
-                if l.borrow().get_intr_end() >= end {
+                if l.borrow().get_intr_end() >= start {
                     x = n.borrow().get_lchild().clone();
                     continue;
                 }
@@ -533,8 +535,10 @@ impl<T> IntervalTree<T>{
                     x = node.clone();
                     // y = y.p
                     y = node.borrow().get_parent().clone();
+                    continue;
                 }
             }
+            break;
         }
 
         return y;
