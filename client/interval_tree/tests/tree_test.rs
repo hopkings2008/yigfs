@@ -164,12 +164,16 @@ fn test_interval_tree_100w_get()->Result<(), String>{
     
     let mut start = 0;
     let mut end = 10;
+    let mut total_dur: u128 = 0;
     let mut count = 0;
     
     loop{
         let intr = Interval::new(start, end);
         let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
+        let begin = Instant::now();
         tree.insert(&n);
+        let dur = begin.elapsed().as_nanos();
+        total_dur += dur;
         start += 10;
         end += 10;
         count += 1;
@@ -178,11 +182,13 @@ fn test_interval_tree_100w_get()->Result<(), String>{
         }
     }
 
+    let average_dur = (total_dur as f64)/(count as f64);
+    println!("insert average: {}, total_dur: {}", average_dur, total_dur);
     // get the intervals.
     start = 0;
     end = 10;
     count = 0;
-    let mut total_dur: u128 = 0;
+    total_dur = 0;
     let limit = 1000;
     loop {
         let begin = Instant::now();
