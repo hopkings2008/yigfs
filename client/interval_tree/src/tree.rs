@@ -105,7 +105,7 @@ impl<T> IntervalTree<T>{
         let mut y = z.clone();
         let mut origin_color = y.borrow().get_color();
         let mut x: Option<Rc<RefCell<TNode<T>>>> = None;
-        let intr = z.borrow().get_intr();
+        //let intr = z.borrow().get_intr();
         //println!("delete: intr: [{}, {})", intr.start, intr.end);
         if z.borrow().get_lchild().is_none() {
             x = z.borrow().get_rchild().clone();
