@@ -18,7 +18,7 @@ fn test_interval_tree_basic_insert()->Result<(), String>{
         tree.insert(&n);
         start += 10;
         end += 10;
-        if start >= 100 {
+        if start >= 10000 {
             break;
         }
     }
@@ -40,7 +40,7 @@ fn test_interval_tree_basic_insert()->Result<(), String>{
         }
         start += 10;
         end += 10;
-        if start >= 100 {
+        if start >= 10000 {
             break;
         }
     }
