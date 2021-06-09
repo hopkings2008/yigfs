@@ -7,7 +7,7 @@ use interval_tree::tnode::TNode;
 use interval_tree::interval::Interval;
 
 #[test]
-fn interval_tree_basic_insert(){
+fn test_interval_tree_basic_insert()->Result<(), String>{
     let mut tree = IntervalTree::new();
     
     let mut start = 0;
@@ -22,4 +22,28 @@ fn interval_tree_basic_insert(){
             break;
         }
     }
+
+    // get the intervals.
+    start = 0;
+    end = 10;
+    loop {
+        let nodes = tree.get(start, end);
+        if nodes.is_empty() {
+            return Err(format!("get empty interval for start: {}, end: {}", start, end));
+        }
+        if nodes.len() > 1 {
+            return Err(format!("got more than 1 interval for start: {}, end: {}, intervals: {:?}", start, end, nodes));
+        }
+        let intr = nodes[0].borrow().get_intr();
+        if intr.start != start || intr.end != end {
+            return Err(format!("got invalid interval: {:?} for start: {}, end: {}", intr, start, end));
+        }
+        start += 10;
+        end += 10;
+        if start >= 100 {
+            break;
+        }
+    }
+
+    Ok(())
 }

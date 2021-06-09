@@ -1,4 +1,3 @@
-
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::tnode::TNode;
@@ -17,6 +16,7 @@ impl<T> IntervalTree<T>{
     pub fn get(&self, start: u64, end: u64) -> Vec<Rc<RefCell<TNode<T>>>>{
         let mut v: Vec<Rc<RefCell<TNode<T>>>> = Vec::new();
         let mut x = self.root.clone();
+        //println!("get: start: {}, end: {}", start, end);
         loop {
             if x.is_none() {
                 break;
@@ -26,6 +26,7 @@ impl<T> IntervalTree<T>{
             let n = tmp_x.as_ref().unwrap();
             let nb = n.borrow();
             let intr = nb.get_intr();
+            //println!("node: start: {}, end: {}, max: {}", intr.start, intr.end, nb.get_intr_end());
             if intr.start <= start && start < intr.end {
                 // got the start interval, need to track all the successors for the end.
                 v.push(n.clone());
@@ -50,17 +51,14 @@ impl<T> IntervalTree<T>{
 
             // x's interval doesn't contain the [start, end)
             // x.left.end >= end
-            let mut go_to_left = false;
             if let Some(l) = n.borrow().get_lchild() {
-                if l.borrow().get_intr().end >= end {
+                if l.borrow().get_intr_end() >= end {
                     x = n.borrow().get_lchild().clone();
-                    go_to_left = true;
+                    continue;
                 }
             }
 
-            if !go_to_left {
-                x = n.borrow().get_rchild().clone();
-            }
+            x = n.borrow().get_rchild().clone();
         }
 
         return v;
@@ -97,6 +95,7 @@ impl<T> IntervalTree<T>{
         z.borrow_mut().set_rchild(&None);
         z.borrow_mut().set_color(1);
 
+        //println!("insert: start: {}, end: {}", z.borrow().get_intr().start, z.borrow().get_intr().end);
         self.insert_fixup(z);
     }
     
@@ -301,6 +300,24 @@ impl<T> IntervalTree<T>{
         }
         y.borrow_mut().set_lchild(&Some(x.clone()));
         x.borrow_mut().set_parent(&Some(y.clone()));
+        //refresh the max interval end.
+        // y.max = x.max
+        y.borrow_mut().set_intr_end(x.borrow().get_intr_end());
+        // x.max = max(x.end, x.left.max, x.right.max)
+        let end = x.borrow().get_intr().end;
+        x.borrow_mut().set_intr_end(end);
+        if x.borrow().get_lchild().is_some(){
+            let l = x.borrow().get_lchild().as_ref().unwrap().clone();
+            if l.borrow().get_intr_end() > x.borrow().get_intr_end() {
+                x.borrow_mut().set_intr_end(l.borrow().get_intr_end());
+            }
+        }
+        if x.borrow().get_rchild().is_some(){
+            let r = x.borrow().get_rchild().as_ref().unwrap().clone();
+            if r.borrow().get_intr_end() > x.borrow().get_intr_end() {
+                x.borrow_mut().set_intr_end(r.borrow().get_intr_end());
+            }
+        }
     }
 
     fn right_rotate(&mut self, x: &Rc<RefCell<TNode<T>>>) {
@@ -329,6 +346,25 @@ impl<T> IntervalTree<T>{
         }
         y.borrow_mut().set_rchild(&Some(x.clone()));
         x.borrow_mut().set_parent(&Some(y.clone()));
+
+        //refresh the max interval end.
+        // y.max = x.max
+        y.borrow_mut().set_intr_end(x.borrow().get_intr_end());
+        // x.max = max(x.end, x.left.max, x.right.max)
+        let end = x.borrow().get_intr().end;
+        x.borrow_mut().set_intr_end(end);
+        if x.borrow().get_rchild().is_some(){
+            let r = x.borrow().get_rchild().as_ref().unwrap().clone();
+            if r.borrow().get_intr_end() > x.borrow().get_intr_end() {
+                x.borrow_mut().set_intr_end(r.borrow().get_intr_end());
+            }
+        }
+        if x.borrow().get_lchild().is_some(){
+            let l = x.borrow().get_lchild().as_ref().unwrap().clone();
+            if l.borrow().get_intr_end() > x.borrow().get_intr_end() {
+                x.borrow_mut().set_intr_end(l.borrow().get_intr_end());
+            }
+        }
     }
 
     fn transplant(&mut self, u: &Rc<RefCell<TNode<T>>>, v: &Option<Rc<RefCell<TNode<T>>>>){

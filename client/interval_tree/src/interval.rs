@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Interval {
     pub start: u64,
     pub end: u64,

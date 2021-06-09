@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::interval::Interval;
 
+#[derive(Debug)]
 pub struct TNode<T>{
     p: Option<Rc<RefCell<TNode<T>>>>,
     l: Option<Rc<RefCell<TNode<T>>>>,
@@ -72,8 +73,11 @@ impl<T> TNode<T>{
         self.color = color;
     }
 
-    pub fn get_intr(&self) -> &Interval {
-        &self.intr
+    pub fn get_intr(&self) -> Interval {
+        Interval {
+            start: self.intr.start,
+            end: self.intr.end,
+        }
     }
 
     pub fn get_intr_end(&self) -> u64{
