@@ -199,13 +199,13 @@ fn test_interval_tree_100w_get()->Result<(), String>{
         }
         start += 10;
         end += 10;
-        if start >= limit {
+        if count >= limit {
             break;
         }
     }
 
-    let average_dur = (total_dur as f64)/(limit as f64);
-    println!("100w query: limit: {}, average query time: {}, total_dur: {}", limit, average_dur, total_dur);
+    let average_dur = (total_dur as f64)/(count as f64);
+    println!("100w query: limit: {}, average query time: {}, total_dur: {}", count, average_dur, total_dur);
 
     Ok(())
 }
