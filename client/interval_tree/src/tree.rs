@@ -105,6 +105,8 @@ impl<T> IntervalTree<T>{
         let mut y = z.clone();
         let mut origin_color = y.borrow().get_color();
         let mut x: Option<Rc<RefCell<TNode<T>>>> = None;
+        let intr = z.borrow().get_intr();
+        //println!("delete: intr: [{}, {})", intr.start, intr.end);
         if z.borrow().get_lchild().is_none() {
             x = z.borrow().get_rchild().clone();
             self.transplant(z, z.borrow().get_rchild());
@@ -149,13 +151,16 @@ impl<T> IntervalTree<T>{
                 break;
             }
             let p_node = p.as_ref().unwrap();
-            p_node.borrow_mut().set_intr_end(p_node.borrow().get_intr().end);
-            if let Some(l) = p_node.borrow().get_lchild(){
+            let end = p_node.borrow().get_intr().end;
+            p_node.borrow_mut().set_intr_end(end);
+            if p_node.borrow().get_lchild().is_some(){
+                let l = p_node.borrow().get_lchild().as_ref().unwrap().clone();
                 if l.borrow().get_intr_end() > p_node.borrow().get_intr_end() {
                     p_node.borrow_mut().set_intr_end(l.borrow().get_intr_end());
                 }
             }
-            if let Some(r) = p_node.borrow().get_rchild() {
+            if p_node.borrow().get_rchild().is_some() {
+                let r = p_node.borrow().get_rchild().as_ref().unwrap().clone();
                 if r.borrow().get_intr_end() > p_node.borrow().get_intr_end(){
                     p_node.borrow_mut().set_intr_end(r.borrow().get_intr_end());
                 }
@@ -375,13 +380,14 @@ impl<T> IntervalTree<T>{
         } else {
             let ub = u.borrow();
             let p = ub.get_parent().as_ref().unwrap();
-            if let Some(l) = p.borrow().get_lchild() {
+            if p.borrow().get_lchild().is_some() {
+                let l = p.borrow().get_lchild().as_ref().unwrap().clone();
                 if l.as_ptr() == u.as_ptr() {
                     p.borrow_mut().set_lchild(v);
                 } else {
                     p.borrow_mut().set_rchild(v);
                 }
-            } else {
+            } else {// if p doesn't have left child, u must be p's right child.
                 p.borrow_mut().set_rchild(v);
             };
         }
