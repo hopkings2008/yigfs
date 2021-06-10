@@ -101,13 +101,16 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
     
     let mut start = 0;
     let mut end = 10;
+    let mut count = 0;
+    let limit = 1000;
     loop{
         let intr = Interval::new(start, end);
         let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
         tree.insert(&n);
         start += 10;
         end += 10;
-        if start >= 10000 {
+        count += 1;
+        if count >= limit {
             break;
         }
     }
@@ -115,6 +118,7 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
     // remove intervals.
     start = 0;
     end = 10;
+    count = 0;
     loop {
         let nodes = tree.get(start, end);
         if nodes.is_empty() {
@@ -130,7 +134,8 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
         tree.delete(&nodes[0]);
         start += 10;
         end += 10;
-        if start >= 10000 {
+        count += 1;
+        if count >= limit {
             break;
         }
     }
@@ -138,6 +143,7 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
     // get the intervals again.
     start = 0;
     end = 10;
+    count = 0;
     loop {
         let nodes = tree.get(start, end);
         if !nodes.is_empty() {
@@ -150,7 +156,8 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
         
         start += 10;
         end += 10;
-        if start >= 10000 {
+        count += 1;
+        if count >= limit {
             break;
         }
     }
@@ -177,7 +184,7 @@ fn test_interval_tree_100w_get()->Result<(), String>{
         start += 10;
         end += 10;
         count += 1;
-        if count >= 1000000 {
+        if count >= 16 {
             break;
         }
     }
@@ -189,7 +196,7 @@ fn test_interval_tree_100w_get()->Result<(), String>{
     end = 10;
     count = 0;
     total_dur = 0;
-    let limit = 1000;
+    let limit = 2;
     loop {
         let begin = Instant::now();
         let nodes = tree.get(start, end);

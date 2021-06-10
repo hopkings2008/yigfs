@@ -17,16 +17,17 @@ impl<T> IntervalTree<T>{
         let mut v: Vec<Rc<RefCell<TNode<T>>>> = Vec::new();
         let mut x = self.root.clone();
         //println!("get: start: {}, end: {}", start, end);
+        let mut depth = 0;
         loop {
             if x.is_none() {
                 break;
             }
-
+            depth += 1;
             let tmp_x = x.clone();
             let n = tmp_x.as_ref().unwrap();
             let nb = n.borrow();
             let intr = nb.get_intr();
-            //println!("node: start: {}, end: {}, max: {}", intr.start, intr.end, nb.get_intr_end());
+            //println!("node: start: {}, end: {}, max: {}, for [{}, {})", intr.start, intr.end, nb.get_intr_end(), start, end);
             if intr.start <= start && start < intr.end {
                 // got the start interval, need to track all the successors for the end.
                 v.push(n.clone());
@@ -63,6 +64,7 @@ impl<T> IntervalTree<T>{
             x = n.borrow().get_rchild().clone();
         }
 
+        //println!("the depth of [{}, {}) is {}", start, end, depth);
         return v;
     }
 
@@ -74,7 +76,7 @@ impl<T> IntervalTree<T>{
             if y.as_ref().unwrap().borrow().get_intr_end() < z.borrow().get_intr_end() {
                 y.as_ref().unwrap().borrow_mut().set_intr_end(z.borrow().get_intr_end());
             }
-            if z.borrow().get_key() < x.as_ref().unwrap().borrow().get_key() {
+            if z.borrow().get_key() <= x.as_ref().unwrap().borrow().get_key() {
                 x = y.as_ref().unwrap().borrow().get_lchild().clone();
                 continue;
             }
@@ -87,7 +89,7 @@ impl<T> IntervalTree<T>{
         if y.is_none() {
             self.root = Some(z.clone());
         } else {
-            if z.borrow().get_key() < y.as_ref().unwrap().borrow().get_key() {
+            if z.borrow().get_key() <= y.as_ref().unwrap().borrow().get_key() {
                 y.as_ref().unwrap().borrow_mut().set_lchild(&Some(z.clone()));
             } else {
                 y.as_ref().unwrap().borrow_mut().set_rchild(&Some(z.clone()));
@@ -171,13 +173,17 @@ impl<T> IntervalTree<T>{
         if origin_color == 0 {
             self.delete_fixup(&x);
         }
+        // clear z's parent pointer and children's pointers.
+        z.borrow_mut().set_parent(&None);
+        z.borrow_mut().set_lchild(&None);
+        z.borrow_mut().set_rchild(&None);
     }
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){
         let mut z = node.clone();
-        while z.borrow().get_color() == 1 {
+        while z.borrow().get_parent().is_some() &&  z.borrow().get_parent().as_ref().unwrap().borrow().get_color() == 1 {
             // z.p is nil or z.p.p is nil
-            if z.borrow().get_parent().is_none() || z.borrow().get_parent().as_ref().unwrap().borrow().get_parent().is_none() {
+            if z.borrow().get_parent().as_ref().unwrap().borrow().get_parent().is_none() {
                 break;
             }
             // z.p != nil && z.p.p != nil
@@ -205,7 +211,7 @@ impl<T> IntervalTree<T>{
                     // y.color = black
                     let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
                     let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
-                    z_p_p.borrow_mut().set_color(0);
+                    z_p_p.borrow().get_rchild().as_ref().unwrap().borrow_mut().set_color(0);
                     // z.p.p.color = red
                     z_p_p.borrow_mut().set_color(1);
                     // z = z.p.p
@@ -223,7 +229,7 @@ impl<T> IntervalTree<T>{
                     // z.p.color = black
                     z_p.borrow_mut().set_color(0);
                     if z_p.borrow().get_parent().is_some() {
-                        let z_p_p = z.borrow().get_parent().as_ref().unwrap().clone();
+                        let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
                         // z.p.p.color = red
                         z_p_p.borrow_mut().set_color(1);
                         // right rotate on z.p.p
@@ -243,10 +249,9 @@ impl<T> IntervalTree<T>{
                     // z.p.color = black
                     z.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(0);
                     // y.color = black
-                    // use temp vars to break the readable borrow link.
                     let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
                     let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
-                    z_p_p.borrow().get_rchild().as_ref().unwrap().borrow_mut().set_color(0);
+                    z_p_p.borrow().get_lchild().as_ref().unwrap().borrow_mut().set_color(0);
                     // z.p.p.color = red
                     z_p_p.borrow_mut().set_color(1);
                     // z = z.p.p
@@ -256,11 +261,10 @@ impl<T> IntervalTree<T>{
                     // z == z.p.left
                     // z = z.p
                     z = z.clone().borrow().get_parent().as_ref().unwrap().clone();
-                    // right rotate on z
-                    self.right_rotate(&z);
+                    // left rotate on z
+                    self.left_rotate(&z);
                 }
-                // z.p.color = black
-                if z.borrow().get_parent().is_some() {
+                if z.borrow().get_parent().is_some(){
                     let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
                     // z.p.color = black
                     z_p.borrow_mut().set_color(0);
@@ -268,8 +272,8 @@ impl<T> IntervalTree<T>{
                         let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
                         // z.p.p.color = red
                         z_p_p.borrow_mut().set_color(1);
-                        // left rotate on z.p.p
-                        self.left_rotate(&z_p_p);
+                        // right rotate on z.p.p
+                        self.right_rotate(&z_p_p);
                     }
                 }
             }
