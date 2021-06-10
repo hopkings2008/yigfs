@@ -13,6 +13,10 @@ impl<T> IntervalTree<T>{
         }
     }
 
+    pub fn get_root(&self) -> &Option<Rc<RefCell<TNode<T>>>> {
+        &self.root
+    }
+
     pub fn get(&self, start: u64, end: u64) -> Vec<Rc<RefCell<TNode<T>>>>{
         let mut v: Vec<Rc<RefCell<TNode<T>>>> = Vec::new();
         let mut x = self.root.clone();
@@ -73,10 +77,10 @@ impl<T> IntervalTree<T>{
         let mut x = self.root.clone();
         while x.is_some(){
             y = x.clone();
-            if y.as_ref().unwrap().borrow().get_intr_end() < z.borrow().get_intr_end() {
-                y.as_ref().unwrap().borrow_mut().set_intr_end(z.borrow().get_intr_end());
+            if x.as_ref().unwrap().borrow().get_intr_end() < z.borrow().get_intr_end() {
+                x.as_ref().unwrap().borrow_mut().set_intr_end(z.borrow().get_intr_end());
             }
-            if z.borrow().get_key() <= x.as_ref().unwrap().borrow().get_key() {
+            if z.borrow().get_key() < x.as_ref().unwrap().borrow().get_key() {
                 x = y.as_ref().unwrap().borrow().get_lchild().clone();
                 continue;
             }
@@ -89,7 +93,7 @@ impl<T> IntervalTree<T>{
         if y.is_none() {
             self.root = Some(z.clone());
         } else {
-            if z.borrow().get_key() <= y.as_ref().unwrap().borrow().get_key() {
+            if z.borrow().get_key() < y.as_ref().unwrap().borrow().get_key() {
                 y.as_ref().unwrap().borrow_mut().set_lchild(&Some(z.clone()));
             } else {
                 y.as_ref().unwrap().borrow_mut().set_rchild(&Some(z.clone()));
@@ -184,96 +188,74 @@ impl<T> IntervalTree<T>{
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){
         let mut z = node.clone();
+        // z.p.color == red
         while z.borrow().get_parent().is_some() &&  z.borrow().get_parent().as_ref().unwrap().borrow().get_color() == 1 {
             // z.p is nil or z.p.p is nil
             if z.borrow().get_parent().as_ref().unwrap().borrow().get_parent().is_none() {
                 break;
             }
-            // z.p != nil && z.p.p != nil
-            let mut is_parent_left_child = false;
-            if let Some(grandpa) = z.borrow().get_parent().as_ref().unwrap().borrow().get_parent(){
-                if let Some(l) = grandpa.borrow().get_lchild() {
-                    // z.p == z.p.p.left
-                    if l.as_ptr() == z.borrow().get_parent().as_ref().unwrap().as_ptr() {
-                        is_parent_left_child = true;
-                    }
-                }
-            }
-            if is_parent_left_child {
-                let mut is_y_color_red = false;
-                if let Some(y) = z.borrow().
-                get_parent().as_ref().unwrap().borrow().get_parent().as_ref().unwrap().borrow().get_rchild() {
-                    if y.borrow().get_color() == 1 {
-                        is_y_color_red = true;
-                    }
-                }
+            let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
+            let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
+            //z.p == z.p.p.left
+            if z_p_p.borrow().get_lchild().is_some() && z_p.as_ptr() == z_p_p.borrow().get_lchild().as_ref().unwrap().as_ptr() {
                 // y = z.p.p.right, if y.color == red
-                if is_y_color_red {
+                if z_p_p.borrow().get_rchild().is_some() && z_p_p.borrow().get_rchild().as_ref().unwrap().borrow().get_color() == 1{
+                    let y = z_p_p.borrow().get_rchild().as_ref().unwrap().clone();
                     // z.p.color = black
-                    z.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(0);
+                    z_p.borrow_mut().set_color(0);
                     // y.color = black
-                    let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
-                    let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
-                    z_p_p.borrow().get_rchild().as_ref().unwrap().borrow_mut().set_color(0);
+                    y.borrow_mut().set_color(0);
                     // z.p.p.color = red
                     z_p_p.borrow_mut().set_color(1);
                     // z = z.p.p
                     z = z_p_p.clone();
-                } else if z.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().is_some() && 
-                    z.as_ptr() == z.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().as_ptr() {
-                    // z == z.p.right
+                } else if z_p.borrow().get_rchild().is_some() && 
+                z.as_ptr() == z_p.borrow().get_rchild().as_ref().unwrap().as_ptr() {
+                    // if z == z.p.right
                     // z = z.p
-                    z = z.clone().borrow().get_parent().as_ref().unwrap().clone();
+                    z = z_p.clone();
                     // left rotate on z
                     self.left_rotate(&z);
                 }
-                if z.borrow().get_parent().is_some(){
+                // z.p.color = black.
+                if z.borrow().get_parent().is_some() {
                     let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
-                    // z.p.color = black
                     z_p.borrow_mut().set_color(0);
+                    // z.p.p.color = red
                     if z_p.borrow().get_parent().is_some() {
                         let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
-                        // z.p.p.color = red
                         z_p_p.borrow_mut().set_color(1);
                         // right rotate on z.p.p
                         self.right_rotate(&z_p_p);
                     }
                 }
-            } else {
-                let mut is_y_color_red = false;
-                if let Some(y) = z.borrow().
-                get_parent().as_ref().unwrap().borrow().get_parent().as_ref().unwrap().borrow().get_lchild() {
-                    if y.borrow().get_color() == 1 {
-                        is_y_color_red = true;
-                    }
-                }
+            } else { // z.p == z.p.p.right
                 // y = z.p.p.left, if y.color == red
-                if is_y_color_red {
+                if z_p_p.borrow().get_lchild().is_some() && z_p_p.borrow().get_lchild().as_ref().unwrap().borrow().get_color() == 1{
+                    let y = z_p_p.borrow().get_lchild().as_ref().unwrap().clone();
                     // z.p.color = black
-                    z.borrow().get_parent().as_ref().unwrap().borrow_mut().set_color(0);
+                    z_p.borrow_mut().set_color(0);
                     // y.color = black
-                    let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
-                    let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
-                    z_p_p.borrow().get_lchild().as_ref().unwrap().borrow_mut().set_color(0);
+                    y.borrow_mut().set_color(0);
                     // z.p.p.color = red
                     z_p_p.borrow_mut().set_color(1);
                     // z = z.p.p
                     z = z_p_p.clone();
-                } else if z.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().is_some() && 
-                    z.as_ptr() == z.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().as_ptr() {
-                    // z == z.p.left
+                } else if z_p.borrow().get_lchild().is_some() && 
+                z.as_ptr() == z_p.borrow().get_lchild().as_ref().unwrap().as_ptr() {
+                    // if z == z.p.left
                     // z = z.p
-                    z = z.clone().borrow().get_parent().as_ref().unwrap().clone();
+                    z = z_p.clone();
                     // right rotate on z
                     self.right_rotate(&z);
                 }
-                if z.borrow().get_parent().is_some(){
+                // z.p.color = black.
+                if z.borrow().get_parent().is_some() {
                     let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
-                    // z.p.color = black
                     z_p.borrow_mut().set_color(0);
+                    // z.p.p.color = red
                     if z_p.borrow().get_parent().is_some() {
                         let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
-                        // z.p.p.color = red
                         z_p_p.borrow_mut().set_color(1);
                         // left rotate on z.p.p
                         self.left_rotate(&z_p_p);
@@ -312,7 +294,9 @@ impl<T> IntervalTree<T>{
         } else {
             x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_rchild(&Some(y.clone()));
         }
+        // y.left = x
         y.borrow_mut().set_lchild(&Some(x.clone()));
+        // x.parent = y
         x.borrow_mut().set_parent(&Some(y.clone()));
         //refresh the max interval end.
         // y.max = x.max
@@ -358,7 +342,9 @@ impl<T> IntervalTree<T>{
         } else {
             x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_lchild(&Some(y.clone()));
         }
+        // y.right = x
         y.borrow_mut().set_rchild(&Some(x.clone()));
+        // x.parent = y
         x.borrow_mut().set_parent(&Some(y.clone()));
 
         //refresh the max interval end.
