@@ -104,8 +104,10 @@ impl<T> IntervalTree<T>{
     }
     
     pub fn delete(&mut self, z: &Rc<RefCell<TNode<T>>>){
+        // y stands for the deleted node z or z's successor
         let mut y = z.clone();
         let mut origin_color = y.borrow().get_color();
+        // x stands for the y's successor
         let mut x: Option<Rc<RefCell<TNode<T>>>> = None;
         //let intr = z.borrow().get_intr();
         //println!("delete: intr: [{}, {})", intr.start, intr.end);
@@ -120,6 +122,7 @@ impl<T> IntervalTree<T>{
             if min.is_some(){
                 y = min.unwrap().clone();
                 origin_color = y.borrow().get_color();
+                // y's left child must be nil.
                 x = y.borrow().get_rchild().clone();
                 if y.borrow().get_parent().as_ref().is_some() && y.borrow().get_parent().as_ref().unwrap().as_ptr() == z.as_ptr() {
                     if x.is_some() {
@@ -261,8 +264,8 @@ impl<T> IntervalTree<T>{
                     // z == z.p.left
                     // z = z.p
                     z = z.clone().borrow().get_parent().as_ref().unwrap().clone();
-                    // left rotate on z
-                    self.left_rotate(&z);
+                    // right rotate on z
+                    self.right_rotate(&z);
                 }
                 if z.borrow().get_parent().is_some(){
                     let z_p = z.borrow().get_parent().as_ref().unwrap().clone();
@@ -272,8 +275,8 @@ impl<T> IntervalTree<T>{
                         let z_p_p = z_p.borrow().get_parent().as_ref().unwrap().clone();
                         // z.p.p.color = red
                         z_p_p.borrow_mut().set_color(1);
-                        // right rotate on z.p.p
-                        self.right_rotate(&z_p_p);
+                        // left rotate on z.p.p
+                        self.left_rotate(&z_p_p);
                     }
                 }
             }
@@ -462,7 +465,7 @@ impl<T> IntervalTree<T>{
                             l.borrow_mut().set_color(0);
                             // w.color = red
                             w.borrow_mut().set_color(1);
-                            // right rotation on x
+                            // right rotation on w
                             self.right_rotate(&w);
                             // w = x.p.right
                             w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
@@ -509,7 +512,7 @@ impl<T> IntervalTree<T>{
                             r.borrow_mut().set_color(0);
                             // w.color = red
                             w.borrow_mut().set_color(1);
-                            // left rotation on x
+                            // left rotation on w
                             self.left_rotate(&w);
                             // w = x.p.left
                             w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
