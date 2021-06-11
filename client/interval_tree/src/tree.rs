@@ -29,13 +29,11 @@ impl<T: Clone> IntervalTree<T>{
     pub fn get(&self, start: u64, end: u64) -> Vec<Rc<RefCell<TNode<T>>>>{
         let mut v: Vec<Rc<RefCell<TNode<T>>>> = Vec::new();
         let mut x = self.root.clone();
-        //println!("get: start: {}, end: {}", start, end);
-        let mut depth = 0;
+
         loop {
             if x.as_ref().unwrap().borrow().is_nil() {
                 break;
             }
-            depth += 1;
             let tmp_x = x.clone();
             let n = tmp_x.as_ref().unwrap();
             let nb = n.borrow();
@@ -77,7 +75,6 @@ impl<T: Clone> IntervalTree<T>{
             x = n.borrow().get_rchild().clone();
         }
 
-        //println!("the depth of [{}, {}) is {}", start, end, depth);
         return v;
     }
 
@@ -121,9 +118,8 @@ impl<T: Clone> IntervalTree<T>{
         let y = z.clone();
         let mut origin_color = y.borrow().get_color();
         // x stands for the y's successor
-        let mut x: Option<Rc<RefCell<TNode<T>>>>;
-        //let intr = z.borrow().get_intr();
-        //println!("delete: intr: [{}, {})", intr.start, intr.end);
+        let x: Option<Rc<RefCell<TNode<T>>>>;
+        
         if z.borrow().get_lchild().as_ref().unwrap().borrow().is_nil() {
             x = z.borrow().get_rchild().clone();
             self.transplant(z, &z.borrow().get_rchild());
@@ -153,38 +149,28 @@ impl<T: Clone> IntervalTree<T>{
 
         // adjust the max interval end for the ancestors of y.
         let mut adjust_node = y.clone();
-        loop {
-            let tmp_node = adjust_node.clone();
-            let adjust_node_b = tmp_node.borrow();
-            let p = adjust_node_b.get_parent();
-            if p.as_ref().unwrap().borrow().is_nil() {
-                break;
-            }
-            let p_node = p.as_ref().unwrap();
-            let end = p_node.borrow().get_intr().end;
-            p_node.borrow_mut().set_intr_end(end);
-            if p_node.borrow().get_lchild().as_ref().unwrap().borrow().is_not_nil(){
-                let l = p_node.borrow().get_lchild().as_ref().unwrap().clone();
-                if l.borrow().get_intr_end() > p_node.borrow().get_intr_end() {
-                    p_node.borrow_mut().set_intr_end(l.borrow().get_intr_end());
+        while adjust_node.borrow().is_not_nil() {
+            
+            let end = adjust_node.borrow().get_intr().end;
+            adjust_node.borrow_mut().set_intr_end(end);
+            if adjust_node.borrow().get_lchild().as_ref().unwrap().borrow().is_not_nil(){
+                let l = adjust_node.borrow().get_lchild().as_ref().unwrap().clone();
+                if l.borrow().get_intr_end() > adjust_node.borrow().get_intr_end() {
+                    adjust_node.borrow_mut().set_intr_end(l.borrow().get_intr_end());
                 }
             }
-            if p_node.borrow().get_rchild().as_ref().unwrap().borrow().is_not_nil() {
-                let r = p_node.borrow().get_rchild().as_ref().unwrap().clone();
-                if r.borrow().get_intr_end() > p_node.borrow().get_intr_end(){
-                    p_node.borrow_mut().set_intr_end(r.borrow().get_intr_end());
+            if adjust_node.borrow().get_rchild().as_ref().unwrap().borrow().is_not_nil() {
+                let r = adjust_node.borrow().get_rchild().as_ref().unwrap().clone();
+                if r.borrow().get_intr_end() > adjust_node.borrow().get_intr_end(){
+                    adjust_node.borrow_mut().set_intr_end(r.borrow().get_intr_end());
                 }
             }
-            adjust_node = p_node.clone();
+            adjust_node = adjust_node.clone().borrow().get_parent().as_ref().unwrap().clone();
         }
 
         if origin_color.is_black() {
             self.delete_fixup(&x);
         }
-        // clear z's parent pointer and children's pointers.
-        z.borrow_mut().set_parent(Some(self.nil.clone()));
-        z.borrow_mut().set_lchild(Some(self.nil.clone()));
-        z.borrow_mut().set_rchild(Some(self.nil.clone()));
     }
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){
@@ -356,7 +342,7 @@ impl<T: Clone> IntervalTree<T>{
 
     fn tree_node_minum(&self, n: &Option<Rc<RefCell<TNode<T>>>>) -> Option<Rc<RefCell<TNode<T>>>>{
         let mut x = n.clone();
-        let mut y: Option<Rc<RefCell<TNode<T>>>> = None;
+        let mut y: Option<Rc<RefCell<TNode<T>>>> = Some(self.nil.clone());
         while x.as_ref().unwrap().borrow().is_not_nil() {
             y = x.clone();
             x = y.as_ref().unwrap().borrow().get_lchild().clone();
@@ -366,14 +352,16 @@ impl<T: Clone> IntervalTree<T>{
 
     fn delete_fixup(&mut self, n: &Option<Rc<RefCell<TNode<T>>>>){
         let mut x = n.as_ref().unwrap().clone();
+        if x.borrow().is_nil() {
+            return;
+        }
         //x != T:root and x:color == BLACK
         while x.as_ptr() != self.root.as_ref().unwrap().as_ptr() && 
             x.borrow().is_black() {
             // if x == x.p.left
             if x.as_ptr() == x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().as_ptr() {
-                let tmp_x = x.clone();
                 // w = x.p.right
-                let mut w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
+                let mut w = x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
                 // w.color == red
                 if w.borrow().is_red() {
                     // w.color = black
@@ -381,9 +369,9 @@ impl<T: Clone> IntervalTree<T>{
                     // x.p.color = red
                     x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_red();
                     // LEFT-ROTATE(T, x.p)
-                    self.left_rotate(tmp_x.borrow().get_parent().as_ref().unwrap());
+                    self.left_rotate(x.borrow().get_parent().as_ref().unwrap());
                     // w = x.p.right
-                    w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
+                    w = x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
                 }
                 // w.left.color == black and w.right.color == black
                 let l = w.borrow().get_lchild().as_ref().unwrap().clone();
@@ -392,31 +380,32 @@ impl<T: Clone> IntervalTree<T>{
                     // w.color = red
                     w.borrow_mut().set_red();
                     // x = x.p
-                    x = tmp_x.borrow().get_parent().as_ref().unwrap().clone();
-                } else if r.borrow().is_black() {
-                    // if w.r.color == black
-                    // w.l.color = black
-                    l.borrow_mut().set_black();
-                    // w.color = red
-                    w.borrow_mut().set_red();
-                    // right rotation on w
-                    self.right_rotate(&w);
-                    // w = x.p.right
-                    w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
-                }
+                    x = x.clone().borrow().get_parent().as_ref().unwrap().clone();
+                } else {
+                    if r.borrow().is_black() {
+                        // if w.r.color == black
+                        // w.l.color = black
+                        l.borrow_mut().set_black();
+                        // w.color = red
+                        w.borrow_mut().set_red();
+                        // right rotation on w
+                        self.right_rotate(&w);
+                        // w = x.p.right
+                        w = x.borrow().get_parent().as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().clone();
+                    }
                 
-                // w.color = x.p.color
-                w.borrow_mut().set_color(x.borrow().get_parent().as_ref().unwrap().borrow().get_color());
-                // x.p.color = black
-                x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_black();
-                // w.right.color = black
-                w.borrow().get_rchild().as_ref().unwrap().borrow_mut().set_black();
-                // left rotation on x.p
-                self.left_rotate(x.borrow().get_parent().as_ref().unwrap());
-                // x = T.root
-                x = self.root.as_ref().unwrap().clone();
+                    // w.color = x.p.color
+                    w.borrow_mut().set_color(x.borrow().get_parent().as_ref().unwrap().borrow().get_color());
+                    // x.p.color = black
+                    x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_black();
+                    // w.right.color = black
+                    w.borrow().get_rchild().as_ref().unwrap().borrow_mut().set_black();
+                    // left rotation on x.p
+                    self.left_rotate(x.borrow().get_parent().as_ref().unwrap());
+                    // x = T.root
+                    x = self.root.as_ref().unwrap().clone();
+                }
             } else {
-                let tmp_x = x.clone();
                 // w = x.p.left
                 let mut w = x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
                 // w.color == red
@@ -426,9 +415,9 @@ impl<T: Clone> IntervalTree<T>{
                     // x.p.color = red
                     x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_red();
                     // RIGHT-ROTATE(T, x.p)
-                    self.right_rotate(tmp_x.borrow().get_parent().as_ref().unwrap());
+                    self.right_rotate(x.borrow().get_parent().as_ref().unwrap());
                     // w = x.p.left
-                    w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
+                    w = x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
                 }
                 // w.left.color == black and w.right.color == black
                 let l = w.borrow().get_lchild().as_ref().unwrap().clone();
@@ -436,29 +425,32 @@ impl<T: Clone> IntervalTree<T>{
                 if l.borrow().is_black() && r.borrow().is_black() {
                     // w.color = red
                     w.borrow_mut().set_red();
-                    x = tmp_x.borrow().get_parent().as_ref().unwrap().clone();
-                } else if l.borrow().is_black() {
-                    // if w.l.color == black
-                    // w.r.color = black
-                    r.borrow_mut().set_black();
-                    // w.color = red
-                    w.borrow_mut().set_red();
-                    // left rotation on w
-                    self.left_rotate(&w);
-                    // w = x.p.left
-                    w = tmp_x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
+                    // x = x.p
+                    x = x.clone().borrow().get_parent().as_ref().unwrap().clone();
+                } else {
+                    if l.borrow().is_black() {
+                        // if w.l.color == black
+                        // w.r.color = black
+                        r.borrow_mut().set_black();
+                        // w.color = red
+                        w.borrow_mut().set_red();
+                        // left rotation on w
+                        self.left_rotate(&w);
+                        // w = x.p.left
+                        w = x.borrow().get_parent().as_ref().unwrap().borrow().get_lchild().as_ref().unwrap().clone();
+                    }
+                
+                    // w.color = x.p.color
+                    w.borrow_mut().set_color(x.borrow().get_parent().as_ref().unwrap().borrow().get_color());
+                    // x.p.color = black
+                    x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_black();
+                    // w.left.color = black
+                    w.borrow().get_lchild().as_ref().unwrap().borrow_mut().set_black();
+                    // right rotation on x.p
+                    self.right_rotate(x.borrow().get_parent().as_ref().unwrap());
+                    
+                    x = self.root.as_ref().unwrap().clone();
                 }
-                
-                // w.color = x.p.color
-                w.borrow_mut().set_color(x.borrow().get_parent().as_ref().unwrap().borrow().get_color());
-                // x.p.color = black
-                x.borrow().get_parent().as_ref().unwrap().borrow_mut().set_black();
-                // w.left.color = black
-                w.borrow().get_lchild().as_ref().unwrap().borrow_mut().set_black();
-                // right rotation on x.p
-                self.right_rotate(x.borrow().get_parent().as_ref().unwrap());
-                
-                x = self.root.as_ref().unwrap().clone();
             }
         }
         // x.color = black

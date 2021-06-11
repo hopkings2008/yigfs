@@ -225,23 +225,4 @@ impl<T:Clone> TNode<T>{
     pub fn get_key(&self) -> u64{
         self.key
     }
-
-    // only for nil parent
-    fn set_nil_parent_to_self(&mut self, p: &Option<Rc<RefCell<TNode<T>>>>){
-        if self.is_nil() {
-            self.p = p.clone();
-        }
-    }
-
-    fn set_nil_lchild_to_self(&mut self, l: &Option<Rc<RefCell<TNode<T>>>>){
-        if self.is_nil(){
-            self.l = l.clone();
-        }
-    }
-
-    fn set_nil_rchild_to_self(&mut self, r: &Option<Rc<RefCell<TNode<T>>>>){
-        if self.is_nil(){
-            self.r = r.clone();
-        }
-    }
 }
