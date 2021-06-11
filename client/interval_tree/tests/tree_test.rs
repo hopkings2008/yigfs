@@ -1,20 +1,16 @@
-
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::time::Instant;
 use interval_tree::tree::IntervalTree;
-use interval_tree::tnode::TNode;
 use interval_tree::interval::Interval;
 
 #[test]
 fn test_interval_tree_basic_insert()->Result<(), String>{
-    let mut tree = IntervalTree::new();
+    let mut tree = IntervalTree::new(Interval::new(0,0));
     
     let mut start = 0;
     let mut end = 10;
     loop{
         let intr = Interval::new(start, end);
-        let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
+        let n = tree.new_node(start, end, intr);
         tree.insert(&n);
         start += 10;
         end += 10;
@@ -50,13 +46,13 @@ fn test_interval_tree_basic_insert()->Result<(), String>{
 
 #[test]
 fn test_interval_tree_basic_get_range()->Result<(), String>{
-    let mut tree = IntervalTree::new();
+    let mut tree = IntervalTree::new(Interval::new(0,0));
     
     let mut start = 0;
     let mut end = 10;
     loop{
         let intr = Interval::new(start, end);
-        let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
+        let n = tree.new_node(start, end, intr);
         tree.insert(&n);
         start += 10;
         end += 10;
@@ -97,7 +93,7 @@ fn test_interval_tree_basic_get_range()->Result<(), String>{
 
 #[test]
 fn test_interval_tree_basic_delete()->Result<(), String>{
-    let mut tree = IntervalTree::new();
+    let mut tree = IntervalTree::new(Interval::new(0,0));
     
     let mut start = 0;
     let mut end = 10;
@@ -105,7 +101,7 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
     let limit = 1000;
     loop{
         let intr = Interval::new(start, end);
-        let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
+        let n = tree.new_node(start, end, intr);
         tree.insert(&n);
         start += 10;
         end += 10;
@@ -167,7 +163,7 @@ fn test_interval_tree_basic_delete()->Result<(), String>{
 
 #[test]
 fn test_interval_tree_100w_get()->Result<(), String>{
-    let mut tree = IntervalTree::new();
+    let mut tree = IntervalTree::new(Interval::new(0,0));
     
     let mut start = 0;
     let mut end = 10;
@@ -176,7 +172,7 @@ fn test_interval_tree_100w_get()->Result<(), String>{
     
     loop{
         let intr = Interval::new(start, end);
-        let n = Rc::new(RefCell::new(TNode::<Interval>::new(start, end, intr)));
+        let n = tree.new_node(start, end, intr);
         let begin = Instant::now();
         tree.insert(&n);
         let dur = begin.elapsed().as_nanos();
@@ -184,19 +180,26 @@ fn test_interval_tree_100w_get()->Result<(), String>{
         start += 10;
         end += 10;
         count += 1;
-        if count >= 16 {
+        if count >= 1000000 {
             break;
         }
     }
 
     let average_dur = (total_dur as f64)/(count as f64);
     println!("insert average: {}, total_dur: {}", average_dur, total_dur);
+    let root = tree.get_root();
+    if root.is_none() {
+        return Err(format!("empty root"));
+    }
+    let root_intr = root.as_ref().unwrap().borrow().get_intr();
+    let root_intr_max = root.as_ref().unwrap().borrow().get_intr_end();
+    println!("root is: [{}, {}), max: {}", root_intr.start, root_intr.end, root_intr_max);
     // get the intervals.
     start = 0;
     end = 10;
     count = 0;
     total_dur = 0;
-    let limit = 2;
+    let limit = 1000;
     loop {
         let begin = Instant::now();
         let nodes = tree.get(start, end);
