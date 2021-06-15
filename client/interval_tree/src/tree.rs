@@ -196,10 +196,7 @@ impl<T: Clone> IntervalTree<T>{
             let mut p = n.as_ref().unwrap().borrow().get_parent().clone();
             loop {
                 if p.as_ref().unwrap().borrow().is_nil() || n.as_ref().unwrap().as_ptr() == p.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().as_ptr() {
-                    n.as_ref().unwrap().borrow_mut().set_parent(None);
-                    n.as_ref().unwrap().borrow_mut().set_lchild(None);
-                    n.as_ref().unwrap().borrow_mut().set_rchild(None);
-                    drop(n);
+                    self.free_node(&n);
                     n = p.clone();
                     if p.as_ref().unwrap().borrow().is_not_nil(){
                         p.as_ref().unwrap().borrow_mut().set_rchild(Some(self.nil.clone()));
@@ -208,10 +205,7 @@ impl<T: Clone> IntervalTree<T>{
                     }
                     break;
                 }
-                n.as_ref().unwrap().borrow_mut().set_parent(None);
-                n.as_ref().unwrap().borrow_mut().set_lchild(None);
-                n.as_ref().unwrap().borrow_mut().set_rchild(None);
-                drop(n);
+                self.free_node(&n);
                 p.as_ref().unwrap().borrow_mut().set_lchild(Some(self.nil.clone()));
                 n = p;
                 break;
@@ -524,21 +518,9 @@ impl<T: Clone> IntervalTree<T>{
         return y;
     }
 
-    fn free_node(&mut self, n: &Option<Rc<RefCell<TNode<T>>>>) {
+    fn free_node(&self, n: &Option<Rc<RefCell<TNode<T>>>>) {
         if n.as_ref().unwrap().borrow().is_nil() {
             return;
-        }
-        let p = n.as_ref().unwrap().borrow().get_parent().as_ref().unwrap().clone();
-        // n is the root.
-        if p.borrow().is_nil() {
-            drop(n);
-            self.root = Some(self.nil.clone());
-            return;
-        }
-        if p.borrow().get_lchild().as_ref().unwrap().as_ptr() == n.as_ref().unwrap().as_ptr() {
-            p.borrow_mut().set_lchild(Some(self.nil.clone()));
-        } else {
-            p.borrow_mut().set_rchild(Some(self.nil.clone()));
         }
         // clear the pointers of this node.
         n.as_ref().unwrap().borrow_mut().set_parent(None);
