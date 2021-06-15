@@ -171,6 +171,55 @@ impl<T: Clone> IntervalTree<T>{
         if origin_color.is_black() {
             self.delete_fixup(&x);
         }
+        
+        // free z.
+        z.borrow_mut().set_parent(None);
+        z.borrow_mut().set_lchild(None);
+        z.borrow_mut().set_rchild(None);
+        drop(z);
+    }
+
+    // traverse the tree in sequence and free it.
+    pub fn traverse_and_free(&mut self) -> Vec<T> {
+        let mut values: Vec<T> = Vec::new();
+        let mut n = self.tree_node_minum(&self.root);
+        // note: when access n, means that n's left children have already been accessed.
+        // try to traverse the tree in mid sequence order.
+        while n.as_ref().unwrap().borrow().is_not_nil() {
+            values.push(n.as_ref().unwrap().borrow().get_value());
+            if n.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().borrow().is_not_nil() {
+                n = self.tree_node_minum(&n.clone().as_ref().unwrap().borrow().get_rchild());
+                continue;
+            }
+            // free the node if it doesn't have children.
+            
+            let mut p = n.as_ref().unwrap().borrow().get_parent().clone();
+            loop {
+                if p.as_ref().unwrap().borrow().is_nil() || n.as_ref().unwrap().as_ptr() == p.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().as_ptr() {
+                    n.as_ref().unwrap().borrow_mut().set_parent(None);
+                    n.as_ref().unwrap().borrow_mut().set_lchild(None);
+                    n.as_ref().unwrap().borrow_mut().set_rchild(None);
+                    drop(n);
+                    n = p.clone();
+                    if p.as_ref().unwrap().borrow().is_not_nil(){
+                        p.as_ref().unwrap().borrow_mut().set_rchild(Some(self.nil.clone()));
+                        p = p.clone().as_ref().unwrap().borrow().get_parent().clone();
+                        continue;
+                    }
+                    break;
+                }
+                n.as_ref().unwrap().borrow_mut().set_parent(None);
+                n.as_ref().unwrap().borrow_mut().set_lchild(None);
+                n.as_ref().unwrap().borrow_mut().set_rchild(None);
+                drop(n);
+                p.as_ref().unwrap().borrow_mut().set_lchild(Some(self.nil.clone()));
+                n = p;
+                break;
+            }
+        }
+        // set root the nil.
+        self.root = Some(self.nil.clone());
+        return values;
     }
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){
@@ -473,5 +522,28 @@ impl<T: Clone> IntervalTree<T>{
         }
 
         return y;
+    }
+
+    fn free_node(&mut self, n: &Option<Rc<RefCell<TNode<T>>>>) {
+        if n.as_ref().unwrap().borrow().is_nil() {
+            return;
+        }
+        let p = n.as_ref().unwrap().borrow().get_parent().as_ref().unwrap().clone();
+        // n is the root.
+        if p.borrow().is_nil() {
+            drop(n);
+            self.root = Some(self.nil.clone());
+            return;
+        }
+        if p.borrow().get_lchild().as_ref().unwrap().as_ptr() == n.as_ref().unwrap().as_ptr() {
+            p.borrow_mut().set_lchild(Some(self.nil.clone()));
+        } else {
+            p.borrow_mut().set_rchild(Some(self.nil.clone()));
+        }
+        // clear the pointers of this node.
+        n.as_ref().unwrap().borrow_mut().set_parent(None);
+        n.as_ref().unwrap().borrow_mut().set_lchild(None);
+        n.as_ref().unwrap().borrow_mut().set_rchild(None);
+        drop(n);
     }
 }

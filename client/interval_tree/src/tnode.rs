@@ -142,11 +142,13 @@ impl<T:Clone> TNode<T>{
 
     pub fn get_num_of_children(&self) -> u32 {
         let mut num = 0;
-        if self.l.as_ref().unwrap().borrow().is_not_nil(){
-            num += 1;
-        }
-        if self.r.as_ref().unwrap().borrow().is_not_nil() {
-            num += 1;
+        if self.is_not_nil(){
+            if self.l.is_some() && self.l.as_ref().unwrap().borrow().is_not_nil(){
+                num += 1;
+            }
+            if self.r.is_some() && self.r.as_ref().unwrap().borrow().is_not_nil() {
+                num += 1;
+            }
         }
 
         num
@@ -224,5 +226,15 @@ impl<T:Clone> TNode<T>{
 
     pub fn get_key(&self) -> u64{
         self.key
+    }
+
+    pub fn set_value(&mut self, value: T) {
+        if self.is_not_nil() {
+            self.val = value;
+        }
+    }
+
+    pub fn get_value(&self) -> T {
+        self.val.clone()
     }
 }
