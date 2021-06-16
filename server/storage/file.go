@@ -159,35 +159,23 @@ func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFile
 		return
 	}
 
-	waitgroup.Add(1)
 	// delete seg blocks
-	go func() {
-		defer waitgroup.Done()
-		err = yigFs.MetaStorage.Client.DeleteSegBlocks(ctx, file)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
-				file.Region, file.BucketName, file.Ino, file.Generation, err))
-			return
-		}
-	}()
+	err = yigFs.MetaStorage.Client.DeleteSegBlocks(ctx, file)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		return
+	}
 
 	// delete seg info
 	err = yigFs.MetaStorage.Client.DeleteSegInfo(ctx, file, segs)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg info, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
 			file.Region, file.BucketName, file.Ino, file.Generation, err))
-		waitgroup.Wait()
 		return
 	}
 
-	waitgroup.Wait()
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted file, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
-			file.Region, file.BucketName, file.Ino, file.Generation, err))
-		return
-	}
-
-	// delete blocks in file_blocks table.
+	// delete file blocks.
 	err = yigFs.MetaStorage.Client.DeleteFileBlocks(ctx, file)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted file and seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
