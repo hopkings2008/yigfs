@@ -345,6 +345,17 @@ impl Filesystem for Yigfs {
         }
         reply.ok();
     }
+
+    fn unlink(&mut self, req: &Request, ino: u64, _name: &OsStr, reply: ReplyEmpty) {
+        info!("unlink: uid: {}, gid: {}, ino: {}", req.uid(), req.gid(), ino);
+        let ret = self.meta_service_mgr.delete_file(ino);
+        if !ret.is_success(){
+            error!("unlink: failed to remove the file, ino: {}", ino);
+            reply.error(libc::EIO);
+            return;
+        }
+        reply.ok();
+    }
 }
 
 impl Yigfs{
