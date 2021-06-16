@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/snowflake"
 	. "github.com/hopkings2008/yigfs/server/error"
@@ -26,6 +27,17 @@ func GetBlockInfoSql() (sqltext string) {
 
 func GetBlocksBySegId() (sqltext string) {
 	sqltext = "select seg_start_addr from segment_blocks where seg_id0=? and seg_id1=? and is_deleted=?;"
+	return sqltext
+}
+
+func CheckSegHasBlocksSql() (sqltext string) {
+	sqltext = "select 1 from segment_blocks where seg_id0=? and seg_id1=? and is_deleted=?;"
+	return sqltext
+}
+
+func DeleteSegBlocksSql() (sqltext string) {
+	sqltext = "update segment_blocks join (select seg_id0 as segId0, seg_id1 as segId1, block_id as blockId from file_blocks where region=? and bucket_name=?" + 
+		" and ino=? and generation=? and is_deleted=?) b set is_deleted=? where seg_id0=b.segId0 and seg_id1=b.segId1 and block_id=b.blockId;"
 	return sqltext
 }
 
@@ -180,60 +192,19 @@ func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegment
 	return
 }
 
-func(t *TidbClient) DeleteBlocksBySegsId(ctx context.Context, segs map[interface{}][]int64) (err error) {
-	var stmt *sql.Stmt
-	sqltext := "update segment_blocks set is_deleted=? where seg_id0=? and seg_id1=? and seg_start_addr=? and is_deleted=?"
-	stmt, err = t.Client.Prepare(sqltext)
+func(t *TidbClient) DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error) {
+	start := time.Now().UTC().UnixNano()
+	sqltext := DeleteSegBlocksSql()
+	_, err = t.Client.Exec(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, types.NotDeleted, types.Deleted)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare delete segment blocks, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Succeed to delete seg blocks for the file, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
 		err = ErrYIgFsInternalErr
 		return
 	}
-
-	defer func() {
-		closeErr := stmt.Close()
-		if closeErr != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close delete segment blocks stmt, err: %v", err))
-			err = ErrYIgFsInternalErr
-		}
-	}()
-
-	for segmentId, _:= range segs {
-		segIds := segmentId.([2]uint64)
-		sqltext := GetBlocksBySegId()
-		rows, err := t.Client.Query(sqltext, segIds[0], segIds[1], types.NotDeleted)
-		if err == sql.ErrNoRows {
-			return nil
-		} else if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get blocks for the seg, err: %v", err))
-			return ErrYIgFsInternalErr
-		}
-		defer rows.Close()
-
-		var startAddr int
-		for rows.Next() {
-			err = rows.Scan(
-				&startAddr,
-			)
-			if err != nil {
-				helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query segment blocks, segId0: %v, segId1: %v, err: %v", segIds[0], segIds[1], err))
-				return ErrYIgFsInternalErr
-			}
 	
-			_, err = stmt.Exec(types.Deleted, segIds[0], segIds[1], startAddr, types.NotDeleted)
-			if err != nil {
-				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the segment block, segId0: %v, segId1: %v, startAddr: %v, err: %v",
-					segIds[0], segIds[1], startAddr, err))
-				return ErrYIgFsInternalErr
-			}
-		}
-		err = rows.Err()
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for segment blocks, segId0: %v, segId1: %v, err: %v", segIds[0], segIds[1], err))
-			return ErrYIgFsInternalErr
-		}
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment blocks, segsNum: %v", len(segs)))
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete seg blocks for the file, region: %v, bucket: %v, ino: %v, generation: %v, cost: %v", 
+		file.Region, file.BucketName, file.Ino, file.Generation, end-start))
 	return
 }
