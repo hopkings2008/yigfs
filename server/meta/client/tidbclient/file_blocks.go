@@ -50,6 +50,13 @@ func GetSegExistedSql() (sqltext string) {
 	return sqltext
 }
 
+func InsertOrUpdateBlockSql() (sqltext string) {
+	sqltext = "insert into file_blocks(region, bucket_name, ino, generation, seg_id0, seg_id1, block_id, size, offset, end_addr, is_deleted)" + 
+		" values(?,?,?,?,?,?,?,?,?,?,?) on duplicate key update seg_id0=values(seg_id0), seg_id1=values(seg_id1), block_id=values(block_id)," +
+		" size=values(size), end_addr=values(end_addr), is_deleted=values(is_deleted);"
+	return sqltext
+}
+
 func(t *TidbClient) IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error) {
 	sqltext := GetSegExistedSql()
 	var f int
@@ -615,5 +622,21 @@ func(t *TidbClient) DeleteFileBlocks(ctx context.Context, file *types.DeleteFile
 	end := time.Now().UTC().UnixNano()
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete file blocks, region: %v, bucket: %v, ino: %v, generation: %v, cost: %v", 
 		file.Region, file.BucketName, file.Ino, file.Generation, end-start))
+	return
+}
+
+func(t *TidbClient) InsertOrUpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
+	sqltext := InsertOrUpdateBlockSql()
+	_, err = t.Client.Exec(sqltext, block.Region, block.BucketName, block.Ino, block.Generation, block.SegmentId0, block.SegmentId1, 
+		block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, types.NotDeleted)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update file block, region: %v, bucket: %v, ino: %v, generation: %v, offset: %v, err: %v", 
+			block.Region, block.BucketName, block.Ino, block.Generation, block.Offset, err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert or update file block, region: %v, bucket: %v, ino: %v, generation: %v, offset: %v", 
+		block.Region, block.BucketName, block.Ino, block.Generation, block.Offset))
 	return
 }

@@ -103,10 +103,10 @@ CREATE TABLE `file_blocks` (
   `size` int(11) DEFAULT 0,
   `offset` bigint(20) DEFAULT 0,
   `end_addr` bigint(20) DEFAULT 0,
-  `ctime` datetime DEFAULT NULL,
+  `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
-   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `seg_id0`, `seg_id1`, `block_id`, `offset`)
+   UNIQUE KEY `rowkey` (`region`, `bucket_name`, `ino`, `generation`, `offset`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -123,6 +123,6 @@ CREATE TABLE `segment_blocks` (
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
-   UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`, `seg_start_addr`)
+   UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

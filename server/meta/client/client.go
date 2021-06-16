@@ -88,7 +88,11 @@ type Client interface {
 	DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq) (err error) 
 	// delete the targe file
 	DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error)
+	// delete segment blocks
 	DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error)
+	// delete segments info
 	DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error)
+	// insert or update file block
+	InsertOrUpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error)
 }
 

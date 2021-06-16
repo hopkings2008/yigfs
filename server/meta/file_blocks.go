@@ -70,3 +70,7 @@ func(m *Meta) GetAllExistedFileSegs(ctx context.Context, file *types.DeleteFileR
 func(m *Meta) DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq) (err error)  {
 	return m.Client.DeleteFileBlocks(ctx, file) 
 }
+
+func(m *Meta) InsertOrUpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
+	return m.Client.InsertOrUpdateBlock(ctx, block)
+}

@@ -388,6 +388,36 @@ func insertOrMergeFileandSegBlock(ctx context.Context, blockInfo *types.Descript
 	return
 }
 
+func insertOrUpdateFileBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo, yigFs *YigFsStorage) (err error) {
+	// insert segment block
+	blockId, err := yigFs.MetaStorage.Client.InsertSegmentBlock(ctx, blockInfo, block)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to InsertSegmentBlock, offset: %v", block.Offset))
+		return
+	}
+
+	//insert file block
+	blockReq := &types.FileBlockInfo {
+		Region:     blockInfo.Region,
+		BucketName: blockInfo.BucketName,
+		Ino:        blockInfo.Ino,
+		Generation: blockInfo.Generation,
+		SegmentId0: blockInfo.SegmentId0,
+		SegmentId1: blockInfo.SegmentId1,
+		BlockId: blockId,
+		Size: block.Size,
+		Offset: block.Offset,
+		FileBlockEndAddr: block.FileBlockEndAddr,
+	}
+	err = yigFs.MetaStorage.Client.InsertOrUpdateBlock(ctx, blockReq)
+	if err != nil {
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert seg block and insert/update file block, offset: %v, blockId: %v", block.Offset, block.BlockId))
+	return
+}
+
 func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq, isLeaderExisted int) (err error) {
 	// Perform the following operations for each block:
 	// 1. get existed blocks fully covered by the uploading block, then deleted them.
@@ -486,7 +516,8 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 		// 4. check the uploading block in segment_blocks table and file_blocks table can be merged or not.
 		// if it can merge, merge it into segment_blocks table and file_blocks table.
 		// else insert it into segment_blocks table and file_blocks table.
-		err = insertOrMergeFileandSegBlock(ctx, blockInfo, block, yigFs)
+		//err = insertOrMergeFileandSegBlock(ctx, blockInfo, block, yigFs)
+		err = insertOrUpdateFileBlocks(ctx, blockInfo, block, yigFs)
 		if err != nil {
 			waitgroup.Wait()
 			return err
