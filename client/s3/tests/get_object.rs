@@ -3,6 +3,7 @@ use s3::s3_client::S3Client;
 use log::info;
 
 #[test]
+#[ignore]
 fn test_get_object()->Result<(), String> {
     let region = String::from("cn-bj-1");
     let endpoint = String::from("s3.test.com:8080");

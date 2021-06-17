@@ -28,6 +28,7 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
         ino: 1,
         leader: String::from(""),
         segments: Vec::new(),
+        garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
     };
@@ -62,6 +63,7 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
         ino: ino,
         leader: String::from(""),
         segments: Vec::new(),
+        garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
     };
@@ -115,6 +117,7 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         ino: ino,
         leader: String::from(""),
         segments: Vec::new(),
+        garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
     };

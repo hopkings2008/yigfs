@@ -211,6 +211,7 @@ pub struct FileHandle {
     // note: segments only contains meta, it doesn't contain blocks.
     // all the blocks are in block_tree.
     pub segments:  Vec<Segment>,
+    pub garbage_blocks: HashMap<u128, Segment>,
     pub block_tree: IntervalTree<Block>,
     pub is_dirty: u8,
 }
@@ -221,6 +222,7 @@ impl FileHandle {
             ino: ino,
             leader: leader,
             segments: segments,
+            garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             is_dirty: 0,
         }
@@ -230,6 +232,7 @@ impl FileHandle {
             ino: self.ino,
             leader: self.leader.clone(),
             segments: Vec::new(),
+            garbage_blocks: HashMap::new(),
             block_tree: self.block_tree.clone(),
             is_dirty: self.is_dirty,
         };
@@ -244,6 +247,7 @@ impl FileHandle {
             ino: ino,
             leader: String::from(""),
             segments: Vec::new(),
+            garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             is_dirty: 0,
         }
@@ -283,6 +287,25 @@ impl FileHandle {
         }
 
         return segments;
+    }
+
+    pub fn add_garbage_block(&mut self, b: Block){
+        let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
+        if let Some(s) = self.garbage_blocks.get_mut(&id) {
+            s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+            return;
+        }
+        let mut s = Segment{
+            seg_id0: b.seg_id0,
+            seg_id1: b.seg_id1,
+            capacity: 0,
+            size: 0,
+            backend_size: 0,
+            leader: String::from(""),
+            blocks: Vec::new(),
+        };
+        s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+        self.garbage_blocks.insert(id, s);
     }
 }
 

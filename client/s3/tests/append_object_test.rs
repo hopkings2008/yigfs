@@ -4,6 +4,7 @@ use common::error::Errno;
 use log::info;
 
 #[test]
+#[ignore]
 fn test_append_object_by_path()->Result<(), String> {
     let region = String::from("cn-bj-1");
     let endpoint = String::from("s3.test.com:8080");
@@ -29,6 +30,7 @@ fn test_append_object_by_path()->Result<(), String> {
 }
 
 #[test]
+#[ignore]
 fn test_append_object()->Result<(), String> {
     let region = String::from("cn-bj-1");
     let endpoint = String::from("s3.test.com:8080");

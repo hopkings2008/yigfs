@@ -3,7 +3,6 @@ extern crate crossbeam_channel;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
-use common::numbers::NumberOp;
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
@@ -180,7 +179,7 @@ impl FileHandleMgr {
                 match ret {
                     Ok(ret) => {
                         match ret {
-                            Some(mut h) => {
+                            Some(h) => {
                                 return Ok(h);
                             }
                             None => {
@@ -378,7 +377,8 @@ impl HandleMgr {
                     blocks.push(msg.block.clone());
                     // [b.offset, b.offset+b.size) is the subset of [start, end)
                     if (b.offset + b.size as u64) <= end {
-                        // just skip this block.
+                        // just skip this block, add it to garbage
+                        h.add_garbage_block(b);
                         continue;
                     }
                     let size = end - start;
@@ -396,8 +396,10 @@ impl HandleMgr {
                     blocks.push(msg.block.clone());
                     continue;
                 }
-                // b.offset > start
+                // [start, [b.offset, b.offset+b.size), end)
+                // add to garbage
                 if (b.offset + b.size as u64) <= end {
+                    h.add_garbage_block(b);
                     continue;
                 }
                 let size = end - b.offset;
