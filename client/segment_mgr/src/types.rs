@@ -307,6 +307,19 @@ impl FileHandle {
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
         self.garbage_blocks.insert(id, s);
     }
+
+    pub fn has_garbage_blocks(&self) -> bool {
+        self.garbage_blocks.is_empty()
+    }
+
+    pub fn get_garbage_blocks(&self) -> Vec<Segment> {
+        let mut segs: Vec<Segment> = Vec::new();
+        for s in self.garbage_blocks.values(){
+            segs.push(s.copy());
+        }
+
+        return segs;
+    }
 }
 
 #[derive(Debug)]
