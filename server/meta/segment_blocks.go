@@ -23,6 +23,6 @@ func(m *Meta) IsBlockCanMerge(ctx context.Context, blockInfo *types.DescriptBloc
 	return m.Client.IsBlockCanMerge(ctx, blockInfo, block)
 }
 
-func(m *Meta) DeleteBlocksBySegsId(ctx context.Context, segs map[interface{}][]int64) (err error) {
-	return m.Client.DeleteBlocksBySegsId(ctx, segs)
+func(m *Meta) DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error) {
+	return m.Client.DeleteSegBlocks(ctx, file)
 }

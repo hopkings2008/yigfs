@@ -150,44 +150,36 @@ func(yigFs *YigFsStorage) SetFileAttr(ctx context.Context, file *types.SetFileAt
 }
 
 func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error) {
-	segs, err := yigFs.MetaStorage.Client.GetFileSegmentsInfo(ctx, file)
-	if err != nil {
-		return
-	}
-
-	if err == ErrYigFsNoVaildSegments || len(segs) == 0 {
-		helper.Logger.Warn(ctx, fmt.Sprintf("The file does not have segs to delete, region: %v, bucket: %v, ino: %v, generation: %v",
+	segs, err := yigFs.MetaStorage.Client.GetAllExistedFileSegs(ctx, file)
+	if err != nil && err != ErrYigFsNoVaildSegments {
+		return err
+	} else if err == ErrYigFsNoVaildSegments || len(segs) == 0 {
+		helper.Logger.Warn(ctx, fmt.Sprintf("The file does not have segments to deleted, region: %s, bucket: %s, ino: %d, generation: %v",
 			file.Region, file.BucketName, file.Ino, file.Generation))
-
-		// delete the file.
-		err = yigFs.MetaStorage.Client.DeleteFile(ctx, file)
-		if err != nil {
-			return
-		}
 		return
 	}
 
-	// delete blocks in file_blocks table.
-	waitgroup.Add(1)
-	var deleteFileBlocksErr error
-	go func() {
-		defer waitgroup.Done()
-		deleteFileBlocksErr = yigFs.MetaStorage.Client.DeleteFileBlocks(ctx, file, segs)
-		if deleteFileBlocksErr != nil {
-			return
-		}
-	}()
-
-	// delete blocks in segment_blocks table.
-	err = yigFs.MetaStorage.Client.DeleteBlocksBySegsId(ctx, segs)
+	// delete seg blocks
+	err = yigFs.MetaStorage.Client.DeleteSegBlocks(ctx, file)
 	if err != nil {
-		waitgroup.Wait()
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
 		return
 	}
 
-	waitgroup.Wait()
-	
-	if deleteFileBlocksErr != nil {
+	// delete seg info
+	err = yigFs.MetaStorage.Client.DeleteSegInfo(ctx, file, segs)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg info, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		return
+	}
+
+	// delete file blocks.
+	err = yigFs.MetaStorage.Client.DeleteFileBlocks(ctx, file)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted file and seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
 		return
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
@@ -17,6 +18,11 @@ func GetSegmentInfoSql() (sqltext string) {
 
 func CreateSegmentInfoSql() (sqltext string) {
 	sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity) values(?,?,?,?,?)"
+	return sqltext
+}
+
+func DeleteSegmentInfoSql() (sqltext string) {
+	sqltext = "update segment_info set is_deleted=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
 	return sqltext
 }
 
@@ -207,4 +213,48 @@ func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.G
 	return
 }
 
+func(t *TidbClient) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error) {
+	start := time.Now().UTC().UnixNano()
+	var stmt *sql.Stmt
+	sqltext := DeleteSegmentInfoSql()
+	checkSql := CheckSegHasBlocksSql()
+	stmt, err = t.Client.Prepare(sqltext)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare delete segment info, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
 
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close delete segment info stmt, err: %v", err))
+			err = ErrYIgFsInternalErr
+		}
+	}()
+
+	var r int
+	for segmentIds, _ := range segs {
+		segmentId := segmentIds.([2]uint64)
+		row := t.Client.QueryRow(checkSql, segmentId[0], segmentId[1], types.NotDeleted)
+		err = row.Scan (
+			&r,
+		)
+		if err == sql.ErrNoRows {
+			_, err = stmt.Exec(types.Deleted, file.Region, file.BucketName, segmentId[0], segmentId[1], types.NotDeleted)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the segment info, seg_id0: %v, seg_id1: %v, err: %v", segmentId[0], segmentId[1], err))
+				err = ErrYIgFsInternalErr
+				return
+			}
+		} else if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+	}
+
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment blocks, blocksNum: %v, cost: %v", len(segs), end - start))
+	return
+}

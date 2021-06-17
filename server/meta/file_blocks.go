@@ -63,10 +63,14 @@ func(m *Meta) IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (
 	return m.Client.IsFileHasSegments(ctx, seg)
 }
 
-func(m *Meta) GetFileSegmentsInfo(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}][]int64, err error) {
-	return m.Client.GetFileSegmentsInfo(ctx, file)
+func(m *Meta) GetAllExistedFileSegs(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}]struct{}, err error) {
+	return m.Client.GetAllExistedFileSegs(ctx, file)
 }
 
-func(m *Meta) DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int64) (err error) {
-	return m.Client.DeleteFileBlocks(ctx, file, segs)
+func(m *Meta) DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq) (err error)  {
+	return m.Client.DeleteFileBlocks(ctx, file) 
+}
+
+func(m *Meta) InsertOrUpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
+	return m.Client.InsertOrUpdateBlock(ctx, block)
 }

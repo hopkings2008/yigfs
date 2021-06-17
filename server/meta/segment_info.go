@@ -26,3 +26,7 @@ func(m *Meta) UpdateSegSize(ctx context.Context, seg *types.UpdateSegBlockInfoRe
 func(m *Meta) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error) {
 	return m.Client.GetTheSlowestGrowingSeg(ctx, segReq, segIds)
 }
+
+func(m *Meta) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error) {
+	return m.Client.DeleteSegInfo(ctx, file, segs) 
+}
