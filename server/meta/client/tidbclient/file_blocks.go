@@ -13,7 +13,7 @@ import (
 
 
 func GetCoveredBlocksInfoSql() (sqltext string) {
-	sqltext = "select offset from file_blocks where region=? and bucket_name=? and ino=? and generation=? and is_deleted=? and offset >= ? and end_addr <= ?;"
+	sqltext = "select offset from file_blocks where region=? and bucket_name=? and ino=? and generation=? and is_deleted=? and offset > ? and end_addr <= ?;"
 	return sqltext
 }
 
@@ -208,7 +208,7 @@ func(t *TidbClient) GetCoveredUploadingBlock(ctx context.Context, blockInfo *typ
 	var createTime string
 
 	sqltext := "select seg_id0, seg_id1, block_id, size, offset, end_addr, ctime from file_blocks where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and is_deleted=? and offset <= ? and end_addr >= ?;"
+		" and generation=? and is_deleted=? and offset < ? and end_addr >= ?;"
 	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, 
 			types.NotDeleted, block.Offset, block.FileBlockEndAddr)
 	err = row.Scan(
@@ -396,7 +396,7 @@ func (t *TidbClient) GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.G
 
 	args := make([]interface{}, 0)
 	sqltext := "select seg_id0, seg_id1, block_id, offset from file_blocks where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and is_deleted=? and offset <= ? and end_addr > ? order by offset;"
+		" and generation=? and is_deleted=? and offset < ? and end_addr > ? order by offset;"
 	args = append(args, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted, checkOffset, checkOffset)
 
 	rows, err := t.Client.Query(sqltext, args...)
