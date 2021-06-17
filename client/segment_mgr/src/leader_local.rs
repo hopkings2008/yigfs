@@ -88,18 +88,6 @@ impl Leader for LeaderLocal {
     }
 
     fn read(&self, ino: u64, offset: u64, size: u32) -> Result<Vec<u8>, Errno> {
-        let file_handle : FileHandle;
-        let ret = self.handle_mgr.get(ino);
-        match ret{
-            Ok(ret) => {
-                file_handle = ret;
-            }
-            Err(err) => {
-                error!("read: failed to get file_handle for ino: {}, offset: {}, size: {}, err: {:?}", 
-                ino, offset, size, err);
-                return Err(err);
-            }
-        }
         let mut start = offset;
         let mut total_read = size;
         let mut data = Vec::<u8>::new();
