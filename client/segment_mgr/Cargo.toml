@@ -11,6 +11,7 @@ common = {path="../common"}
 metaservice_mgr = {path = "../metaservice_mgr"}
 io_engine = {path = "../io_engine"}
 yig_backend = { path = "../yig_backend" }
+interval_tree = { path = "../interval_tree" }
 tokio = { version = "1", features = ["full"] }
 hash_ring = "0.2.0"
 crossbeam-channel = "0.4"

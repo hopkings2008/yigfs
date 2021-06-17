@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use crossbeam_channel::{Sender};
 use common::uuid;
+use common::numbers::NumberOp;
 use metaservice_mgr::types::Block as MetaBlock;
 use metaservice_mgr::types::Segment as MetaSegment;
+use interval_tree::tree::IntervalTree;
 
 
 #[derive(Debug, Default)]
@@ -22,8 +24,6 @@ pub struct Segment {
     pub backend_size: u64,
     pub leader: String,
     pub blocks: Vec<Block>,
-    // ino --> largest_offset
-    file_largest_offsets: HashMap<u64, u64>,
 }
 
 impl Default for Segment {
@@ -36,7 +36,6 @@ impl Default for Segment {
             backend_size: 0,
             leader: Default::default(),
             blocks: Default::default(),
-            file_largest_offsets: HashMap::new(),
         }
     }
 }
@@ -52,7 +51,6 @@ impl Segment {
             backend_size: 0,
             leader: leader.clone(),
             blocks: Vec::<Block>::new(),
-            file_largest_offsets: HashMap::new(),
         }
     }
 
@@ -65,7 +63,6 @@ impl Segment {
             backend_size: 0,
             leader: leader,
             blocks: Vec::<Block>::new(),
-            file_largest_offsets: HashMap::new(),
         }
     }
 
@@ -78,13 +75,9 @@ impl Segment {
             backend_size: self.backend_size,
             leader: self.leader.clone(),
             blocks: Vec::<Block>::new(),
-            file_largest_offsets: HashMap::new(),
         };
         for b in &self.blocks{
             s.blocks.push(b.copy());
-        }
-        for (k,v) in &self.file_largest_offsets {
-            s.file_largest_offsets.insert(*k, *v);
         }
         return s;
     }
@@ -94,32 +87,15 @@ impl Segment {
             ino: ino,
             generation: 0,
             offset: offset,
+            seg_id0: self.seg_id0,
+            seg_id1: self.seg_id1,
             seg_start_addr: seg_start_offset,
             seg_end_addr: seg_start_offset+nwrite as u64,
             size: nwrite,
         };
-        for bb in &mut self.blocks {
-            // original offset keeps the same, but we concatenate the two consecutive blocks.
-            if bb.offset + bb.size as u64 == offset && bb.seg_end_addr == seg_start_offset {
-                bb.seg_end_addr = seg_start_offset + nwrite as u64;
-                bb.size += nwrite;
-                return;
-            }
-        }
         // we cannot find the consecutive block.
         self.blocks.push(b);
-        // set the largest file offset.
-        let o = self.file_largest_offsets.get(&ino);
-        match o {
-            Some(o) => {
-                if *o < offset {
-                    self.file_largest_offsets.insert(ino, offset);
-                }
-            }
-            None => {
-                self.file_largest_offsets.insert(ino, offset);
-            }
-        }
+        
     }
 
     pub fn usage(&self) -> u64 {
@@ -128,18 +104,6 @@ impl Segment {
             total += b.size as u64;
         }
         total
-    }
-
-    pub fn get_largest_offset(&self, ino: u64) -> u64 {
-        let o = self.file_largest_offsets.get(&ino);
-        match o {
-            Some(o) => {
-                *o
-            }
-            None => {
-                0
-            }
-        }
     }
 
     pub fn is_empty(&self)->bool {
@@ -166,12 +130,16 @@ impl Segment {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Block {
+    // file ino
     pub ino: u64,
     pub generation: u64,
     // the offset in the file specified by ino & generation
     pub offset: u64,
+    // segment ids
+    pub seg_id0: u64,
+    pub seg_id1: u64,
     // the offset in this segment
     // note: range in segment is: [seg_start_addr, seg_end_addr)
     pub seg_start_addr: u64,
@@ -182,11 +150,25 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn default() -> Self {
+        Block{
+            ino: 0,
+            generation: 0,
+            offset: 0,
+            seg_id0: 0,
+            seg_id1: 0,
+            seg_start_addr: 0,
+            seg_end_addr: 0,
+            size: -1,
+        }
+    }
     pub fn copy(&self) -> Self{
         Block{
             ino: self.ino,
             generation: self.generation,
             offset: self.offset,
+            seg_id0: self.seg_id0,
+            seg_id1: self.seg_id1,
             seg_start_addr: self.seg_start_addr,
             seg_end_addr: self.seg_end_addr,
             size: self.size,
@@ -226,16 +208,29 @@ pub struct BlockIo {
 pub struct FileHandle {
     pub ino: u64,
     pub leader: String,
-    pub segments: Vec<Segment>,
+    // note: segments only contains meta, it doesn't contain blocks.
+    // all the blocks are in block_tree.
+    pub segments:  Vec<Segment>,
+    pub block_tree: IntervalTree<Block>,
     pub is_dirty: u8,
 }
 
 impl FileHandle {
+    pub fn create(ino: u64, leader: String, segments: Vec<Segment>) -> Self {
+        FileHandle{
+            ino: ino,
+            leader: leader,
+            segments: segments,
+            block_tree: IntervalTree::new(Block::default()),
+            is_dirty: 0,
+        }
+    }
     pub fn copy(&self)->Self {
         let mut handle = FileHandle{
             ino: self.ino,
             leader: self.leader.clone(),
-            segments: Vec::<Segment>::new(),
+            segments: Vec::new(),
+            block_tree: self.block_tree.clone(),
             is_dirty: self.is_dirty,
         };
         for s in &self.segments {
@@ -248,7 +243,8 @@ impl FileHandle {
         FileHandle{
             ino: ino,
             leader: String::from(""),
-            segments: Vec::<Segment>::new(),
+            segments: Vec::new(),
+            block_tree: IntervalTree::new(Block::default()),
             is_dirty: 0,
         }
     }
@@ -259,6 +255,34 @@ impl FileHandle {
 
     pub fn is_dirty(&self) -> bool {
         self.is_dirty == 1
+    }
+
+    pub fn get_segments(&self) -> Vec<Segment> {
+        let mut segments = Vec::<Segment>::new();
+        let mut msegs = HashMap::<u128, usize>::new();
+        let mut idx = 0;
+        for s in &self.segments {
+            segments.push(s.copy());
+            let id = NumberOp::to_u128(s.seg_id0, s.seg_id1);
+            msegs.insert(id, idx);
+            idx += 1;
+        }
+        let blocks = self.block_tree.traverse();
+        for b in blocks {
+            let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
+            let e = msegs.get(&id);
+            match e {
+                Some(idx) => {
+                    segments[*idx].add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+                }
+                None => {
+                    panic!("got invalid block whose segment doesn't exists, id0: {}, id1: {}", 
+                b.seg_id0, b.seg_id1);
+                }
+            }
+        }
+
+        return segments;
     }
 }
 
@@ -303,11 +327,20 @@ pub struct MsgAddSegment{
 }
 
 #[derive(Debug)]
+pub struct MsgGetBlocks{
+    pub ino: u64,
+    pub offset: u64,
+    pub size: u64,
+    pub tx: Sender<Vec<Block>>,
+}
+
+#[derive(Debug)]
 pub enum MsgFileHandleOp{
     Add(FileHandle),
     AddBlock(MsgAddBlock),
     Del(u64),
     Get(MsgQueryHandle),
+    GetBlocks(MsgGetBlocks),
     GetLastSegment(MsgGetLastSegment),
     AddSegment(MsgAddSegment),
 }

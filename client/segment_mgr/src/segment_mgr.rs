@@ -53,6 +53,8 @@ impl SegmentMgr {
                     ino: ino,
                     generation: 0,
                     offset: b.offset,
+                    seg_id0: s.seg_id0,
+                    seg_id1: s.seg_id1,
                     seg_start_addr: b.seg_start_addr,
                     seg_end_addr: b.seg_end_addr,
                     size: b.size,

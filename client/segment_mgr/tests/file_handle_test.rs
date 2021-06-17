@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use segment_mgr::{file_handle::FileHandleMgr, types::Block};
 use segment_mgr::types::{FileHandle, Segment};
+use interval_tree::tree::IntervalTree;
 
 #[test]
 fn test_file_handle_mgr_start()->Result<(), String> {
@@ -25,7 +27,8 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
     let h1 = FileHandle{
         ino: 1,
         leader: String::from(""),
-        segments: Vec::<Segment>::new(),
+        segments: Vec::new(),
+        block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
     };
     let ret = mgr.add(&h1);
@@ -58,7 +61,8 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
     let h1 = FileHandle{
         ino: ino,
         leader: String::from(""),
-        segments: Vec::<Segment>::new(),
+        segments: Vec::new(),
+        block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
     };
     let ret = mgr.add(&h1);
@@ -110,7 +114,8 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
     let h1 = FileHandle{
         ino: ino,
         leader: String::from(""),
-        segments: Vec::<Segment>::new(),
+        segments: Vec::new(),
+        block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
     };
     let ret = mgr.add(&h1);
@@ -162,6 +167,8 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         ino: ino,
         generation: 0,
         offset: 0,
+        seg_id0: id0,
+        seg_id1: id1,
         seg_start_addr: 0,
         seg_end_addr: 5,
         size: 5,
@@ -191,6 +198,8 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         ino: ino,
         generation: 0,
         offset: 5,
+        seg_id0: seg1.seg_id0,
+        seg_id1: seg1.seg_id1,
         seg_start_addr: 5,
         seg_end_addr: 10,
         size: 5,

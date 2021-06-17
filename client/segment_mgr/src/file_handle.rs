@@ -3,9 +3,11 @@ extern crate crossbeam_channel;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
+use common::numbers::NumberOp;
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
+use crate::types::MsgGetBlocks;
 use crate::types::{Block, FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle, Segment};
 use log::{warn, error};
 
@@ -30,7 +32,7 @@ impl FileHandleMgr {
         let mgr = FileHandleMgr{
             handle_op_tx: tx,
             stop_tx: stop_tx,
-            handle_mgr_th: Some(thread::spawn(move || handle_mgr.start())),
+            handle_mgr_th: Some(thread::spawn(move|| handle_mgr.start())),
         };
 
         return mgr;
@@ -179,19 +181,6 @@ impl FileHandleMgr {
                     Ok(ret) => {
                         match ret {
                             Some(mut h) => {
-                                //sort the segments.
-                                let mut iter_seg = h.segments.iter_mut();
-                                loop {
-                                    let i = iter_seg.next();
-                                    match i {
-                                        Some(i) => {
-                                            i.blocks.sort_by(|a, b| a.offset.cmp(&b.offset));
-                                        }
-                                        None => {
-                                            break;
-                                        }
-                                    }
-                                }
                                 return Ok(h);
                             }
                             None => {
@@ -227,6 +216,41 @@ impl FileHandleMgr {
             }
         }
     }
+
+    pub fn get_blocks(&self, ino: u64, offset: u64, size: u64) -> Vec<Block> {
+        let (tx, rx) = bounded::<Vec<Block>>(1);
+        let msg = MsgGetBlocks{
+            ino: ino,
+            offset: offset,
+            size: size,
+            tx: tx,
+        };
+        defer!{
+            let rxc = rx.clone();
+            drop(rxc);
+        };
+        let ret = self.handle_op_tx.send(MsgFileHandleOp::GetBlocks(msg));
+        match ret {
+            Ok(_) => {
+            }
+            Err(err) => {
+                error!("get_blocks: failed to send GetBlocks msg for ino: {}, offset: {}, size: {}, err: {}",
+            ino, offset, size, err);
+                return Vec::new();
+            }
+        }
+        let ret = rx.recv();
+        match ret {
+            Ok(blocks) => {
+                return blocks;
+            }
+            Err(err) => {
+                error!("get_blocks: failed to recv GetBlocks resp for ino: {}, offset: {}, size: {}, err: {}",
+                ino, offset, size, err);
+                return Vec::new();
+            }
+        }
+    }
 }
 
 struct HandleMgr {
@@ -235,6 +259,8 @@ struct HandleMgr {
     handle_op_rx: Receiver<MsgFileHandleOp>,
     stop_rx: Receiver<u32>,
 }
+
+unsafe impl Send for HandleMgr {}
 
 impl HandleMgr {
     pub fn start(&mut self) {
@@ -266,6 +292,10 @@ impl HandleMgr {
                         }
                         MsgFileHandleOp::Get(m) => {
                             self.get(m);
+                        }
+                        MsgFileHandleOp::GetBlocks(m) => {
+                            // query the blocks
+                            self.get_blocks(m);
                         }
                         MsgFileHandleOp::GetLastSegment(m) => {
                             self.get_last_segment(&m);
@@ -306,18 +336,89 @@ impl HandleMgr {
 
     fn add_block(&mut self, msg: &MsgAddBlock) {
         if let Some(h) = self.handles.get_mut(&msg.ino) {
-            for s in &mut h.segments {
-                if s.seg_id0 != msg.id0 || s.seg_id1 != msg.id1 {
-                    continue;
-                }
-                s.add_block(msg.ino, msg.block.offset, msg.block.seg_start_addr, msg.block.size);
+            let start = msg.block.offset;
+            let end = msg.block.offset + msg.block.size as u64;
+
+            //check the sequence write
+            let last_node = h.block_tree.get_largest_node();
+            if last_node.borrow().is_nil() {
+                // no block yet. just insert this new one.
+                h.block_tree.insert_node(start, end, msg.block.clone());
                 h.mark_dirty();
                 return;
             }
+            // check whether it is the sequence write.
+            let last_block = last_node.borrow().get_value();
+            if last_block.seg_id0 == msg.block.seg_id0 && last_block.seg_id1 == msg.block.seg_id1 && 
+            (last_block.offset + last_block.size as u64) == start && 
+            last_block.seg_end_addr == msg.block.seg_start_addr{
+                //merge the last block with the new one.
+                let mut new_block = last_block.clone();
+                new_block.size += msg.block.size;
+                new_block.seg_end_addr = msg.block.seg_end_addr;
+                h.block_tree.delete(&last_node);
+                h.block_tree.insert_node(new_block.offset, new_block.offset+new_block.size as u64, new_block);
+                h.mark_dirty();
+                return;
+            }
+
+            // check overlap.
+            let nodes = h.block_tree.get(start, end);
+            if nodes.is_empty() {
+                // no overlap, just insert the new nodes.
+                h.block_tree.insert_node(start, end, msg.block.clone());
+                h.mark_dirty();
+                return;
+            }
+            let mut blocks: Vec<Block> = Vec::new();
+            for n in &nodes {
+                let mut b = n.borrow().get_value();
+                h.block_tree.delete(n);
+                if b.offset == start {
+                    blocks.push(msg.block.clone());
+                    // [b.offset, b.offset+b.size) is the subset of [start, end)
+                    if (b.offset + b.size as u64) <= end {
+                        // just skip this block.
+                        continue;
+                    }
+                    let size = end - start;
+                    b.offset += size;
+                    b.size -= size as i64;
+                    b.seg_start_addr += size;
+                    blocks.push(b);
+                    continue;                    
+                }
+                if b.offset < start {
+                    let size = start - b.offset;
+                    b.size = size as i64;
+                    b.seg_end_addr = b.seg_start_addr + b.size as u64;
+                    blocks.push(b);
+                    blocks.push(msg.block.clone());
+                    continue;
+                }
+                // b.offset > start
+                if (b.offset + b.size as u64) <= end {
+                    continue;
+                }
+                let size = end - b.offset;
+                b.offset = end;
+                b.size -= size as i64;
+                b.seg_start_addr += size;
+                blocks.push(b);
+            }
+            // insert the merged blocks.
+            for b in &blocks {
+                h.block_tree.insert_node(b.offset, b.offset+b.size as u64, b.clone());
+            }
+            h.mark_dirty();
         }
     }
 
     fn del(&mut self, ino: u64) {
+        // free the block_tree
+        if let Some(h) = self.handles.get_mut(&ino) {
+            h.block_tree.free();
+        }
         self.handles.remove(&ino);
     }
     
@@ -375,6 +476,27 @@ impl HandleMgr {
             Ok(_) => {}
             Err(err) => {
                 error!("failed to send handle for ino: {}, err: {}", msg.ino, err);
+            }
+        }
+    }
+
+    fn get_blocks(&self, msg: MsgGetBlocks) {
+        let mut blocks: Vec<Block> = Vec::new();
+        if let Some(h) = self.handles.get(&msg.ino) {
+            let nodes = h.block_tree.get(msg.offset, msg.offset+msg.size);
+            for n in nodes {
+                if n.borrow().is_nil() {
+                    continue;
+                }
+                blocks.push(n.borrow().get_value());
+            }
+        }
+        let ret = msg.tx.send(blocks);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("get_blocks: failed to send blocks for ino: {}, offset: {}, size: {}, err: {}",
+                msg.ino, msg.offset, msg.size, err);
             }
         }
     }

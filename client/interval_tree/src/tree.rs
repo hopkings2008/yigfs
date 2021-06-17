@@ -2,9 +2,19 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::tnode::TNode;
 
+#[derive(Debug)]
 pub struct IntervalTree<T: Clone>{
     root: Option<Rc<RefCell<TNode<T>>>>,
     nil: Rc<RefCell<TNode<T>>>,
+}
+
+impl <T: Clone> Clone for IntervalTree<T>{
+    fn clone(&self) -> IntervalTree<T> {
+        IntervalTree{
+            root: self.root.clone(),
+            nil: self.nil.clone(),
+        }
+    }
 }
 
 impl<T: Clone> IntervalTree<T>{
@@ -20,6 +30,11 @@ impl<T: Clone> IntervalTree<T>{
     pub fn new_node(&self, start: u64, end: u64, val: T) -> Rc<RefCell<TNode<T>>>{
         let n = TNode::new(start, end, val, &self.nil);
         return Rc::new(RefCell::new(n));
+    }
+
+    pub fn insert_node(&mut self, start: u64, end: u64, val: T) {
+        let n = self.new_node(start, end, val);
+        self.insert(&n);
     }
 
     pub fn get_root(&self) -> &Option<Rc<RefCell<TNode<T>>>> {
@@ -180,6 +195,40 @@ impl<T: Clone> IntervalTree<T>{
     }
 
     // traverse the tree in sequence and free it.
+    pub fn traverse(&self) -> Vec<T> {
+        let mut values: Vec<T> = Vec::new();
+        let mut n = self.tree_node_minum(&self.root);
+        // note: when access n, means that n's left children have already been accessed.
+        // try to traverse the tree in mid sequence order.
+        while n.as_ref().unwrap().borrow().is_not_nil() {
+            values.push(n.as_ref().unwrap().borrow().get_value());
+            if n.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().borrow().is_not_nil() {
+                n = self.tree_node_minum(&n.clone().as_ref().unwrap().borrow().get_rchild());
+                continue;
+            }
+            // free the node if it doesn't have children.
+            let mut p = n.as_ref().unwrap().borrow().get_parent().clone();
+            loop {
+                if p.as_ref().unwrap().borrow().is_nil() || n.as_ref().unwrap().as_ptr() == p.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().as_ptr() {
+                    n = p.clone();
+                    if p.as_ref().unwrap().borrow().is_not_nil(){
+                        p = p.clone().as_ref().unwrap().borrow().get_parent().clone();
+                        continue;
+                    }
+                    break;
+                }
+                n = p;
+                break;
+            }
+        }
+        return values;
+    }
+
+    pub fn free(&mut self) {
+        self.traverse_and_free();
+        self.root = None;
+    }
+
     pub fn traverse_and_free(&mut self) -> Vec<T> {
         let mut values: Vec<T> = Vec::new();
         let mut n = self.tree_node_minum(&self.root);
@@ -214,6 +263,16 @@ impl<T: Clone> IntervalTree<T>{
         // set root the nil.
         self.root = Some(self.nil.clone());
         return values;
+    }
+
+    pub fn get_largest_node(&self) ->Rc<RefCell<TNode<T>>>{
+        let mut x = self.root.as_ref().unwrap().clone();
+        let mut p = self.nil.clone();
+        while x.borrow().is_not_nil() {
+            p = x.clone();
+            x = p.borrow().get_rchild().as_ref().unwrap().clone();
+        }
+        return p;
     }
 
     fn insert_fixup(&mut self, node: &Rc<RefCell<TNode<T>>>){

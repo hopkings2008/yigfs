@@ -81,12 +81,7 @@ impl Leader for LeaderLocal {
             return ret;
         }
 
-        let file_handle = FileHandle {
-            ino: ino,
-            leader: self.machine.clone(),
-            segments: segments,
-            is_dirty: 0,
-        };
+        let file_handle = FileHandle::create(ino, self.machine.clone(), segments);
         self.handle_mgr.add(&file_handle);
 
         return Errno::Esucc;
@@ -108,22 +103,50 @@ impl Leader for LeaderLocal {
         let mut start = offset;
         let mut total_read = size;
         let mut data = Vec::<u8>::new();
-        for s in &file_handle.segments {
-            for b in &s.blocks {
-                if b.offset <= start && start <= (b.offset + b.size as u64) {
-                    let mut to_read = total_read;
-                    if to_read >= b.size as u32 {
-                        to_read = b.size as u32;
+        let blocks = self.handle_mgr.get_blocks(ino, offset, size as u64);
+        for b in &blocks {
+            if b.offset <= start && start <= (b.offset + b.size as u64) {
+                let mut to_read = total_read;
+                if to_read >= b.size as u32 {
+                    to_read = b.size as u32;
+                }
+                // read the data.
+                let mut need_read_backend_store = false;
+                let seg_dir = self.segment_mgr.get_segment_dir(b.seg_id0, b.seg_id1);
+                let seg_offset = b.seg_start_addr + start - b.offset;
+                let ret = self.cache_store.read(b.seg_id0, 
+                    b.seg_id1, &seg_dir, seg_offset, to_read);
+                match ret {
+                    Ok(ret) => {
+                        if let Some(d) = ret{
+                            let l = d.len() as u32;
+                            total_read -= l as u32;
+                            start += l as u64;
+                            data.extend(d);
+                        }
                     }
-                    // read the data.
-                    let mut need_read_backend_store = false;
-                    let seg_dir = self.segment_mgr.get_segment_dir(s.seg_id0, s.seg_id1);
-                    let seg_offset = b.seg_start_addr + start - b.offset;
-                    let ret = self.cache_store.read(s.seg_id0, 
-                        s.seg_id1, &seg_dir, seg_offset, to_read);
+                    Err(err) => {
+                        if err.is_eof() {
+                            info!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, start: {}, size: {}",
+                            ino, b.seg_id0, b.seg_id1, offset, start, to_read);
+                            continue;
+                        }
+                        if err.is_bad_offset(){
+                            need_read_backend_store = true;
+                        } else {
+                            error!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
+                            ino, offset, start, to_read, err);
+                            return Err(err);
+                        }
+                    }
+                }
+                // need to read the backend store?
+                if need_read_backend_store {
+                    let ret = self.backend_store.read(b.seg_id0, 
+                        b.seg_id1, seg_offset, to_read);
                     match ret {
                         Ok(ret) => {
-                            if let Some(d) = ret{
+                            if let Some(d) = ret {
                                 let l = d.len() as u32;
                                 total_read -= l as u32;
                                 start += l as u64;
@@ -131,50 +154,22 @@ impl Leader for LeaderLocal {
                             }
                         }
                         Err(err) => {
-                            if err.is_eof() {
-                                info!("LeadLocal: read: ino: {}, got eof for seg(id0: {}, id1: {}) offset: {}, start: {}, size: {}",
-                                ino, s.seg_id0, s.seg_id1, offset, start, to_read);
+                            if err.is_invalid_range() {
+                                error!("LeadLocal: backend_read: ino: {}, offset: {}, start: {}, size: {} 
+                                exceeds the backend store's range", ino, offset, start, to_read);
                                 continue;
                             }
-                            if err.is_bad_offset(){
-                                need_read_backend_store = true;
-                            } else {
-                                error!("LeadLocal: read: failed to read for ino: {}, offset: {}, start: {}, size: {}, err: {:?}", 
-                                ino, offset, start, to_read, err);
-                                return Err(err);
-                            }
                         }
                     }
-                    // need to read the backend store?
-                    if need_read_backend_store {
-                        let ret = self.backend_store.read(s.seg_id0, 
-                            s.seg_id1, seg_offset, to_read);
-                        match ret {
-                            Ok(ret) => {
-                                if let Some(d) = ret {
-                                    let l = d.len() as u32;
-                                    total_read -= l as u32;
-                                    start += l as u64;
-                                    data.extend(d);
-                                }
-                            }
-                            Err(err) => {
-                                if err.is_invalid_range() {
-                                    error!("LeadLocal: backend_read: ino: {}, offset: {}, start: {}, size: {} 
-                                    exceeds the backend store's range", ino, offset, start, to_read);
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                    if total_read == 0 {
-                        warn!("LeadLocal: read: finished for ino: {}, offset: {}, start: {}, size: {}", 
-                        ino, offset, start, size);
-                        return Ok(data);
-                    }
+                }
+                if total_read == 0 {
+                    warn!("LeadLocal: read: finished for ino: {}, offset: {}, start: {}, size: {}", 
+                    ino, offset, start, size);
+                    return Ok(data);
                 }
             }
         }
+
         return Ok(data);
     }
 
@@ -240,6 +235,8 @@ impl Leader for LeaderLocal {
                         ino: ino,
                         generation: 0,
                         offset: offset,
+                        seg_id0: id0,
+                        seg_id1: id1,
                         seg_start_addr: r.offset,
                         seg_end_addr: r.offset + r.nwrite as u64,
                         size: r.nwrite as i64,
@@ -309,15 +306,16 @@ impl Leader for LeaderLocal {
             }
         }
         // update the segments into meta server.
-        if handle.is_dirty() && !handle.segments.is_empty() {
-            let ret = self.segment_mgr.update_segments(ino, &handle.segments);
+        let segments = handle.get_segments();
+        if handle.is_dirty() && !segments.is_empty() {
+            let ret = self.segment_mgr.update_segments(ino, &segments);
             if !ret.is_success(){
                 error!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);
                 return ret;
             }
         }
         // close the segments file handles.
-        for s in &handle.segments {
+        for s in &segments {
             for b in &s.blocks {
                 info!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
                 ino, s.seg_id0, s.seg_id1, b.offset, b.size);
