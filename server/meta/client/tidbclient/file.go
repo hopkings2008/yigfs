@@ -393,19 +393,6 @@ func (t *TidbClient) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq
 	return
 }
 
-func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, size uint64, blocksNum uint32) (err error) {
-	sqltext := UpdateFileSizeAndBlocksSql()
-	_, err = t.Client.Exec(sqltext, size, blocksNum, file.Region, file.BucketName, file.Ino, file.Generation)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-	
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number to tidb, size: %v, number: %v", size, blocksNum))
-	return
-}
-
 func(t *TidbClient) GetFileSizeAndBlocksNum(ctx context.Context, file *types.CreateSegmentReq) (size uint64, blocksNum uint32, err error) {
 	sqltext := GetFileSizeAndBlocksSql()
 	row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino, file.Generation)
@@ -436,5 +423,21 @@ func(t *TidbClient) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (
 	
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the file, region: %v, bucket: %v, ino: %v, generation: %v", 
 		file.Region, file.BucketName, file.Ino, file.Generation))
+	return
+}
+
+func(t *TidbClient) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+	start := time.Now().UTC().UnixNano()
+	sqltext := "update file join (select sum(size) as totalSize, count(*) as number from file_blocks where region=? and bucket_name=? and ino=?" + 
+		" and generation=? and is_deleted=0) b set file.size=b.totalSize, file.blocks=b.number where region=? and bucket_name=? and ino=? and generation=?;"
+	_, err = t.Client.Exec(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, file.Region, file.BucketName, file.Ino, file.Generation)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number by one, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, "UpdateSizeAndBlocksNum cost: ", end - start)
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number by one, ino: %v", file.Ino))
 	return
 }

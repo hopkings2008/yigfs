@@ -17,7 +17,7 @@ func GetSegmentInfoSql() (sqltext string) {
 }
 
 func CreateSegmentInfoSql() (sqltext string) {
-	sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity) values(?,?,?,?,?)"
+	sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity, size) values(?,?,?,?,?,?) on duplicate key update size=values(size);"
 	return sqltext
 }
 
@@ -26,10 +26,22 @@ func DeleteSegmentInfoSql() (sqltext string) {
 	return sqltext
 }
 
-func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
+func getInsertOrUpdateSegInfoSql(ctx context.Context, maxNum int) (sqltext string) {
+	for i := 0; i < maxNum; i ++ {
+		if i == 0 {
+			sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity, size) values(?,?,?,?,?,?)"
+		} else {
+			sqltext += ",(?,?,?,?,?,?)"
+		}
+	}
+	sqltext += " on duplicate key update size=values(size);"
+	return
+}
+
+func (t *TidbClient) CreateSegmentInfoAndZoneInfo(ctx context.Context, segment *types.CreateSegmentReq, maxSize int) (err error) {
 	sqltext := CreateSegmentZoneSql()
 	args := []interface{}{segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0,
-		segment.Segment.SegmentId1, segment.Machine}
+		segment.Segment.SegmentId1, segment.Machine, types.NotDeleted}
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment zone to tidb, err: %v", err))
@@ -38,7 +50,7 @@ func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.Creat
 	}
 
 	sqltext = CreateSegmentInfoSql()
-	args = []interface{}{segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, segment.Segment.Capacity}
+	args = []interface{}{segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, segment.Segment.Capacity, maxSize}
 	_, err = t.Client.Exec(sqltext, args...)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create segment info to tidb, err: %v", err))
@@ -46,7 +58,8 @@ func (t *TidbClient) CreateSegmentInfo(ctx context.Context, segment *types.Creat
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create segment info and zone to tidb, sqltext: %v", sqltext))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to create segment info and zone to tidb, seg_id0: %v, seg_id1: %v", segment.Segment.SegmentId0,
+		segment.Segment.SegmentId1))
 	return
 }
 
@@ -108,35 +121,6 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.
 	}
 
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.UploadSegments)))
-	return
-}
-
-func (t *TidbClient) UpdateSegSize(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error) {
-	sqltext := "select size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-	var size int
-	row := t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
-	err = row.Scan (
-		&size,
-	)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("UpdateSegSize: Failed to get the segment size, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	if seg.SegBlockInfo.Size > size {
-		sqltext = "update segment_info set size=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
-		_, err = t.Client.Exec(sqltext, seg.SegBlockInfo.Size, seg.Region, seg.BucketName, 
-			seg.SegBlockInfo.SegmentId0, seg.SegBlockInfo.SegmentId1, types.NotDeleted)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to update segment size, err: %v", err))
-			err = ErrYIgFsInternalErr
-			return
-		}
-		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update the segment size, size: %v", seg.SegBlockInfo.Size))
-	}
-
-	helper.Logger.Info(ctx, "Succeed to update segment size")
 	return
 }
 

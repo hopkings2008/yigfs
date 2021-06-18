@@ -43,3 +43,8 @@ const (
 	NotExisted = iota + 1
 	Existed
 )
+
+const (
+	UpdateSegs = iota
+	RemoveSegs
+)

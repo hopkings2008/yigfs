@@ -81,8 +81,7 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 	case nil:
 		// if leader exist, determine whether the leader status is up or not.
 		leader.Machine = resp.LeaderInfo.Leader
-		var getMachineInfoResp = &types.GetMachineInfoResp{}
-		getMachineInfoResp, err = yigFs.MetaStorage.Client.GetMachineInfo(ctx, leader)
+		getMachineInfoResp, err := yigFs.MetaStorage.Client.GetMachineInfo(ctx, leader)
 		if err != nil && err != ErrYigFsNoSuchMachine {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get machine info, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
 				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err))
@@ -91,7 +90,7 @@ func GetUpFileLeader(ctx context.Context, leader *types.GetLeaderReq, yigFs *Yig
 
 		// if status does not up or the target leader is not existed in zone, get a up machine from zone and update leader info.
 		if err == ErrYigFsNoSuchMachine || getMachineInfoResp.Status != types.MachineUp {
-			helper.Logger.Error(ctx, fmt.Sprintf("The file leader existed, but the status is not valid, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v, status: %v", 
+			helper.Logger.Error(ctx, fmt.Sprintf("The machine does not existed, or the status does not up, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v, status: %v", 
 				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err, getMachineInfoResp.Status))
 			getMachineResp, err := GetMachineAndUpdateFileLeader(ctx, leader, yigFs)
 			if err != nil {
@@ -160,7 +159,7 @@ func(yigFs *YigFsStorage) GetFileLeader(ctx context.Context, leader *types.GetLe
 	return
 }
 
-func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (isExisted int, err error) {
+func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error) {
 	// get segment leader
 	segLeader := &types.GetSegLeaderReq {
 		ZoneId: segment.ZoneId,
@@ -173,39 +172,59 @@ func(yigFs *YigFsStorage) CheckSegmentLeader(ctx context.Context, segment *types
 	getSegLeaderResp, err := yigFs.MetaStorage.Client.GetSegmentLeader(ctx, segLeader)
 	switch err {
 	case ErrYigFsNoSuchLeader:
-		// if not segment leader, get file leader
+		// if not segment leader, check the machine is valid
 		leader := &types.GetLeaderReq {
 			ZoneId: segment.ZoneId,
 			Region: segment.Region,
 			BucketName: segment.BucketName,
-			Ino: segment.Ino,
+			Machine: segment.Machine,
 		}
 
-		// get file leader
-		var getFileLeaderResp = &types.GetLeaderResp{}
-		getFileLeaderResp, err = GetUpFileLeader(ctx, leader, yigFs)
-		if err != nil {
-			return
+		getMachineInfoResp, err := yigFs.MetaStorage.Client.GetMachineInfo(ctx, leader)
+		if err != nil && err != ErrYigFsNoSuchMachine {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get machine info, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v",
+				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err))
+			return err
 		}
 
-		// check request machine match leader or not
-		if getFileLeaderResp.LeaderInfo.ZoneId != segment.ZoneId || getFileLeaderResp.LeaderInfo.Leader != segment.Machine {
-			err = ErrYigFsMachineNotMatchSegLeader
+		if err == ErrYigFsNoSuchMachine || getMachineInfoResp.Status != types.MachineUp {
+			helper.Logger.Error(ctx, fmt.Sprintf("The machine does not existed, or the status does not up, zone_id: %s, region: %s, bucket: %s, machine: %s, err: %v, status: %v", 
+				leader.ZoneId, leader.Region, leader.BucketName, leader.Machine, err, getMachineInfoResp.Status))
+			return err
 		}
 
-		isExisted = types.NotExisted
-		return
+		return nil
 	case nil:
 		// if segment leader exist, check request machine match leader or not
 		if getSegLeaderResp.ZoneId != segment.ZoneId || getSegLeaderResp.Leader != segment.Machine {
 			err = ErrYigFsMachineNotMatchSegLeader
 		}
 		
-		isExisted = types.Existed
 		return
 	default:
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get segment leader, zone_id: %s, region: %s, bucket: %s, seg_id0: %d, seg_id1: %d, err: %v",
 			segment.ZoneId, segment.Region, segment.BucketName, segment.Segment.SegmentId0, segment.Segment.SegmentId1, err))
 		return
 	}
+}
+
+func(yigFs *YigFsStorage) CheckSegmentsLeader(ctx context.Context, segments *types.UpdateSegmentsReq) (err error) {
+	// check upload segments leader
+	segsReq := make([]*types.CreateBlocksInfo, 0)
+	zone := &types.GetSegLeaderReq {
+		ZoneId: segments.ZoneId,
+		Region: segments.Region,
+		BucketName: segments.BucketName,
+	}
+	segsReq = append(segsReq, segments.Segments...)
+	segsReq = append(segsReq, segments.RemoveSegments...)
+	isValid, err := yigFs.MetaStorage.Client.CheckSegsmachine(ctx, zone, segsReq)
+	if err != nil || !isValid {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to checkSegmentsLeader, err: %v, isValid: %v", err, isValid))
+		return
+	}
+
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to check segments leader, zoneId: %v, region: %v, bucket: %v", 
+		segments.ZoneId, segments.Region, segments.BucketName))
+	return
 }

@@ -67,7 +67,70 @@ func (t *TidbClient) GetMachineInfo(ctx context.Context, zone *types.GetLeaderRe
 		return
 	}
 	
-	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get machine info, sqltext: %v", sqltext))
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to get machine info, machine: %v", zone.Machine))
 	return
 }
 
+func (t *TidbClient) CheckSegsmachine(ctx context.Context, zone *types.GetSegLeaderReq, segs []*types.CreateBlocksInfo) (isValid bool, err error) {
+	getLeaderSql := GetSegmentLeaderSql()
+	sqltext := "select status from zone where id=? and region=? and bucket_name=? and machine=?"
+	var stmt *sql.Stmt
+	var status int
+	stmt, err = t.Client.Prepare(sqltext)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare get machines info, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+	defer func() {
+		closeErr := stmt.Close()
+		if closeErr != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close get machine info stmt, err: %v", err))
+			err = ErrYIgFsInternalErr
+		}
+	}()
+
+	var leader string
+	for _, seg := range segs {
+		row := t.Client.QueryRow(getLeaderSql, zone.ZoneId, zone.Region, zone.BucketName, seg.SegmentId0, seg.SegmentId1, types.NotDeleted)
+		err = row.Scan (
+			&leader,
+		)
+	
+		if err == sql.ErrNoRows {
+			row := stmt.QueryRow(zone.ZoneId, zone.Region, zone.BucketName, seg.Leader)
+			err = row.Scan(
+				&status,
+			)
+	
+			if err == sql.ErrNoRows {
+				err = ErrYigFsNoSuchMachine
+				return
+			} else if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to get machine info, err: %v", err))
+				err = ErrYIgFsInternalErr
+				return
+			} else if status != types.MachineUp {
+				helper.Logger.Error(ctx, fmt.Sprintf("The machine is not up, machine: %v", seg.Leader))
+				err = ErrYigFsLeaderStatusIsInvalid
+				return
+			}
+		} else if err == nil {
+			if leader != seg.Leader {
+				helper.Logger.Error(ctx, fmt.Sprintf("The segment machine is not match leader, seg_id0: %v, seg_id1: %v, leader: %v, err: %v", 
+					seg.SegmentId0, seg.SegmentId1, leader, err))
+				err = ErrYigFsMachineNotMatchSegLeader
+				return
+			}
+		} else {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the segment leader, err: %v", err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+	}
+
+	isValid = true
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to check machines, machines number: %v", len(segs)))
+	return
+}

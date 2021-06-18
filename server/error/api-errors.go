@@ -42,6 +42,7 @@ const (
 	ErrYigFsMissingSegmentLeader
 	ErrYigFsNoVaildSegments
 	ErrYigFsMachineNotMatchFileLeader
+	ErrYigFsLeaderStatusIsInvalid
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -129,6 +130,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsMachineNotMatchFileLeader",
 		Description:    "The request machine does not match file leader.",
 		HttpStatusCode: 40015,
+	},
+	ErrYigFsLeaderStatusIsInvalid: {
+		AwsErrorCode:   "ErrYigFsLeaderStatusIsInvalid",
+		Description:    "The leader's status is not up.",
+		HttpStatusCode: 40016,
 	},
 }
 

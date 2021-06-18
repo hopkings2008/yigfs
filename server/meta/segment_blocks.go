@@ -7,22 +7,14 @@ import (
 )
 
 
-func (m *Meta) InsertSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (blockId int64, err error) {
-	return m.Client.InsertSegmentBlock(ctx, blockInfo, block)
-}
-
-func(m *Meta) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segmentMap map[interface{}][]int64, offsetMap map[int64]int64) (resp *types.GetSegmentResp, err error) {
-	return m.Client.GetSegsBlockInfo(ctx, seg, segmentMap, offsetMap)
-}
-
-func(m *Meta) MergeSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (err error) {
-	return m.Client.MergeSegmentBlock(ctx, blockInfo, block)
-}
-
-func(m *Meta) IsBlockCanMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isCanMerge bool, resp *types.BlockInfo, err error) {
-	return m.Client.IsBlockCanMerge(ctx, blockInfo, block)
+func(m *Meta) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segs map[interface{}][]*types.BlockInfo) (resp *types.GetSegmentResp, err error) {
+	return m.Client.GetSegsBlockInfo(ctx, seg, segs)
 }
 
 func(m *Meta) DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error) {
 	return m.Client.DeleteSegBlocks(ctx, file)
+}
+
+func(m *Meta) RemoveSegBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum int) (err error) {
+	return m.Client.RemoveSegBlocks(ctx, segs, blocksNum)
 }

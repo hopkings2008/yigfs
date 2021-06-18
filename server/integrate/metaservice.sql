@@ -67,6 +67,7 @@ CREATE TABLE `segment_zone` (
   `leader` varchar(255) DEFAULT NULL,
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `is_deleted` tinyint(1) DEFAULT 0,
    UNIQUE KEY `rowkey` (`zone_id`, `region`, `bucket_name`, `seg_id0`, `seg_id1`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -99,10 +100,9 @@ CREATE TABLE `file_blocks` (
   `generation` bigint(20) UNSIGNED DEFAULT 0,
   `seg_id0` bigint(20) UNSIGNED DEFAULT 0,
   `seg_id1` bigint(20) UNSIGNED DEFAULT 0,
-  `block_id` bigint(20) DEFAULT 0,
   `size` int(11) DEFAULT 0,
   `offset` bigint(20) DEFAULT 0,
-  `end_addr` bigint(20) DEFAULT 0,
+  `seg_start_addr` int(11) DEFAULT 0,
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
@@ -116,13 +116,11 @@ DROP TABLE IF EXISTS `segment_blocks`;
 CREATE TABLE `segment_blocks` (
   `seg_id0` bigint(20) UNSIGNED DEFAULT 0,
   `seg_id1` bigint(20) UNSIGNED DEFAULT 0,
-  `block_id` bigint(20) DEFAULT 0,
   `seg_start_addr` int(11) DEFAULT 0,
-  `seg_end_addr` int(11) DEFAULT 0,
   `size` int(11) DEFAULT 0,
   `ctime` datetime DEFAULT CURRENT_TIMESTAMP,
   `mtime` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `is_deleted` tinyint(1) DEFAULT 0,
-   UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `block_id`)
+   UNIQUE KEY `rowkey` (`seg_id0`, `seg_id1`, `seg_start_addr`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 /*!40101 SET character_set_client = @saved_cs_client */;

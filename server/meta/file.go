@@ -31,10 +31,10 @@ func(m *Meta) SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err 
 	return m.Client.SetFileAttr(ctx, file)
 }
 
-func(m *Meta) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, size uint64, blocksNum uint32) (err error) {
-	return m.Client.UpdateFileSizeAndBlocksNum(ctx, file, size, blocksNum)
-}
-
 func(m *Meta) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error) {
 	return m.Client.DeleteFile(ctx, file)
+}
+
+func(m *Meta) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+	return m.Client.UpdateSizeAndBlocksNum(ctx, file)
 }

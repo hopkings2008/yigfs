@@ -32,44 +32,18 @@ type Client interface {
 	SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (err error)
 	// get segment leader
 	GetSegmentLeader(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error)
-	// create segment info
-	CreateSegmentInfo(ctx context.Context, segment *types.CreateSegmentReq) (err error)
-	// get covered blocks
-	GetCoveredExistedBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (blocks []*types.BlockInfo, err error)
-	// deleted blocks
-	DeleteBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, blocks []*types.BlockInfo) (err error)
-	// insert segment block and check whether it can be merge or not.
-	InsertSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (blockId int64, err error)
-	// get merge block info from file_blocks table
-	GetMergeBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isExisted bool, fileBlockResp *types.FileBlockInfo, err error)
-	// update file block info
-	UpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error)
-	// create file block
-	CreateFileBlock(ctx context.Context, block *types.FileBlockInfo) (err error)
-	// get the block that offset in uploading blocks
-	GetOffsetInUploadingBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isExisted bool, blockResp *types.FileBlockInfo, err error)
-	// get the existed block that uploading block's offset between it's offset and end_addr
-	GetOffsetInExistedBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isExisted bool, blockResp *types.FileBlockInfo, err error)
-	// get the existed block that covered the uploading block
-	GetCoveredUploadingBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isExisted bool, blockResp *types.FileBlockInfo, err error)
-	// deal overlapping blocks
-	DealOverlappingBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, updateBlocks []*types.FileBlockInfo, deleteBlocks []*types.FileBlockInfo, insertBlocks []*types.FileBlockInfo) (err error)
-	// get all blocks size and number for the target file
-	GetFileBlockSize(ctx context.Context, file *types.GetFileInfoReq) (blocksSize uint64, blocksNum uint32, err error)
-	// update file size and blocks number
-	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, size uint64, blocksNum uint32) (err error)
+	// create segment and zone info
+	CreateSegmentInfoAndZoneInfo(ctx context.Context, segment *types.CreateSegmentReq, maxSize int) (err error)
 	// get include offset index segments
-	GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error)
+	GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (getSegs map[interface{}][]*types.BlockInfo, err error)
 	// get greater than offset index segments
-	GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error)
+	GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (getSegs map[interface{}][]*types.BlockInfo, err error)
 	// get segments block info
-	GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segmentMap map[interface{}][]int64, offsetMap map[int64]int64) (resp *types.GetSegmentResp, err error)
+	GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segs map[interface{}][]*types.BlockInfo) (resp *types.GetSegmentResp, err error)
 	// update segment block info
 	UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 	// get incomplete upload segments
 	GetIncompleteUploadSegs(ctx context.Context, segInfo *types.GetIncompleteUploadSegsReq, segs []*types.IncompleteUploadSegInfo) (segsResp *types.GetIncompleteUploadSegsResp, err error)
-	// update seg's size
-	UpdateSegSize(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 	// get the slowest growing segment
 	GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error)
 	// get blocks by the target segment id
@@ -78,10 +52,6 @@ type Client interface {
 	GetSegsByLeader(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp []*types.IncompleteUploadSegInfo, err error)
 	// check whether the file has segments or not
 	IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error)
-	// merge the block in segment_blocks table
-	MergeSegmentBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (err error)
-	// check whether the block can be merge in segment_blocks table or not.
-	IsBlockCanMerge(ctx context.Context, blockInfo *types.DescriptBlockInfo, block *types.BlockInfo) (isCanMerge bool, resp *types.BlockInfo, err error)
 	// get segments info for the file
 	GetAllExistedFileSegs(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}]struct{}, err error)
 	// delete blocks in file_blocks table
@@ -92,7 +62,13 @@ type Client interface {
 	DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error)
 	// delete segments info
 	DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error)
-	// insert or update file block
-	InsertOrUpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error)
+	// insert or update blocks in file_blocks and seg_blocks table
+	InsertOrUpdateFileAndSegBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, isUpdateInfo bool, blocksNum int) (err error)
+	// update size and blocks number for the file
+	UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error)
+	// check segments machine
+	CheckSegsmachine(ctx context.Context, zone *types.GetSegLeaderReq, segs []*types.CreateBlocksInfo) (isValid bool, err error)
+	// remove segments in seg_blocks table.
+	RemoveSegBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum int) (err error)
 }
 

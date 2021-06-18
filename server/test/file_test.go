@@ -192,70 +192,16 @@ func Test_WriteFile(t *testing.T) {
 
 	offset := Offset
 	startAddr := SegStartAddr
-	endAddr := SegEndAddr
-
-	for i := 0; i < 3; i++ {
-		block := &types.BlockInfo {
-			Offset: int64(offset),
-			SegStartAddr: startAddr,
-			SegEndAddr: endAddr,
-			Size: Size,
-		}
-
-		segment.Blocks = append(segment.Blocks, block)
-		if i != 0 {
-			segment.Blocks = segment.Blocks[1:]
-			createSegmentReq.Segment = *segment
-			t.Logf("block info: %v", block)
-		} else {
-			createSegmentReq.Segment = *segment
-			t.Logf("block info: %v", block)
-		}
-
-		t.Logf("Ready to upload block, req: %v", createSegmentReq.Segment)
-
-		createSegResp, createSegInfo, err := PutSegmentInfo(createSegmentReq)
-		r.Nil(err)
-		r.Equal(createSegResp.Result.ErrCode, 0)
-		t.Logf("Succeed to upload block, resp: %s", createSegInfo)
-
-		offset += Size 
-		startAddr += Size
-		endAddr += Size
-	}
-
-	// get segments
-	getSegmentReq := &types.GetSegmentReq {
-		ZoneId: ZoneIdNew,
-		Region:     Region,
-		BucketName: BucketName,
-		Ino:        getDirFileResp.File.Ino,
-		Generation: Generation,
-		Machine: Machine2,
-		Offset:     0,
-		Size: 0,
-	}
-	
-	getSegResp, getSegInfo, err := GetSegmentInfo(getSegmentReq)
-	r.Nil(err)
-	r.Equal(getSegResp.Result.ErrCode, 0)
-	t.Logf("Succeed to get segment info from new zone, result: %s", getSegInfo)
-	
-	segment.SegmentId0 ++
-	segment.SegmentId1 ++
-
 	for i := 0; i < 10; i++ {
-		block := &types.BlockInfo {
+		block := types.BlockInfo {
 			Offset: int64(offset),
 			SegStartAddr: startAddr,
-			SegEndAddr: endAddr,
 			Size: Size,
 		}
-
-		segment.Blocks = append(segment.Blocks, block)
 		offset += 2 * Size
 		startAddr += 2 * Size
-		endAddr += 2 * Size
+		t.Logf("block info: %v", block)
+		segment.Blocks = append(segment.Blocks, &block)
 	}
 
 	createSegmentReq.Segment = *segment
@@ -267,15 +213,25 @@ func Test_WriteFile(t *testing.T) {
 	t.Logf("Succeed to upload block, resp: %s", createSegInfo)
 	
 	// get segments
+	getSegmentReq := &types.GetSegmentReq {
+		ZoneId: ZoneIdNew,
+		Region:     Region,
+		BucketName: BucketName,
+		Ino:        getDirFileResp.File.Ino,
+		Generation: Generation,
+		Machine: Machine2,
+		Offset:     0,
+		Size: 0,
+	}
 	getSegmentReq.ZoneId = ZoneId
 	getSegmentReq.Machine = Machine
-	getSegResp, getSegInfo, err = GetSegmentInfo(getSegmentReq)
+	getSegResp, getSegInfo, err := GetSegmentInfo(getSegmentReq)
 	r.Nil(err)
 	r.Equal(getSegResp.Result.ErrCode, 0)
 	t.Logf("Succeed to get segment info, result: %s", getSegInfo)
 
 	blockNum := getBlockNumber(getSegResp)
-	r.Equal(blockNum, int64(11))
+	r.Equal(blockNum, int64(10))
 	
 	// get segments when offset is not 0
 	getSegmentReq.Offset = 3 * Size + int64(6)
@@ -285,7 +241,7 @@ func Test_WriteFile(t *testing.T) {
 	t.Logf("Succeed to get segment info, when offset is: %d, result: %s", getSegmentReq.Offset, getSegInfo)
 	
 	blockNum = getBlockNumber(getSegResp)
-	r.Equal(blockNum, int64(10))
+	r.Equal(blockNum, int64(8))
 
 	// get segments when offset and size both not 0
 	getSegmentReq.Offset = Size
@@ -296,7 +252,7 @@ func Test_WriteFile(t *testing.T) {
 	t.Logf("Succeed to get segment info, when offset is: %d, size is: %d, result: %s", getSegmentReq.Offset, getSegmentReq.Size, getSegInfo)
 
 	blockNum = getBlockNumber(getSegResp)
-	r.Equal(blockNum, int64(5))
+	r.Equal(blockNum, int64(3))
 }
 
 func Test_GetSegmentsForNewFile(t *testing.T) {
@@ -461,36 +417,62 @@ func Test_UpdateSegments(t *testing.T) {
 	var segId1 uint64 = SegmentId1
 	offset := UpdateOffset
 	startAddr := SegStartAddr
-	endAddr := SegEndAddr
 
-	for i := 0; i < 50; i++ {
-		segment := &types.CreateBlocksInfo {
+	for j := 0; j < 10; j++ {
+		segment := types.CreateBlocksInfo {
 			SegmentId0: segId0,
 			SegmentId1: segId1,
+			ZoneId: ZoneId,
 			Leader: Machine,
 			Capacity: Capacity,
 		}
 
-		block := &types.BlockInfo {
-			Offset: int64(i * offset) + int64(Size),
-			SegStartAddr: startAddr,
-			SegEndAddr: endAddr,
-			Size: Size,
+		for i := 0; i < 1000; i++ {
+			block := types.BlockInfo {
+				Offset: int64(offset),
+				SegStartAddr: startAddr,
+				Size: Size,
+			}
+			offset += 2 * Size
+			startAddr += Size
+			segment.Blocks = append(segment.Blocks, &block)
 		}
 
 		segId0++
 		segId1++
-
-		segment.Blocks = append(segment.Blocks, block)
-		updateSegmentsReq.Segments = append(updateSegmentsReq.Segments, segment)
+		updateSegmentsReq.Segments = append(updateSegmentsReq.Segments, &segment)
 	}
 
+	removeSegments := make([]*types.CreateBlocksInfo, 0)
+	removeSegment := types.CreateBlocksInfo {
+		SegmentId0: SegmentId0,
+		SegmentId1: SegmentId1,
+		Leader: Machine,
+	}
+
+	offset = 0
+	startAddr = 0
+	for i := 0; i < 10; i++ {
+		block := types.BlockInfo {
+			Offset: int64(offset),
+			SegStartAddr: startAddr,
+			Size: Size,
+		}
+
+		removeSegment.Blocks = append(removeSegment.Blocks, &block)
+
+		offset += 2 * Size
+		startAddr += 2 * Size
+	}
+	removeSegments = append(removeSegments, &removeSegment)
+
+	updateSegmentsReq.RemoveSegments = removeSegments
 	updateSegsResp, updateSegsInfo, err := PutSegmentsInfo(updateSegmentsReq)
 	r.Nil(err)
 	r.Equal(updateSegsResp.Result.ErrCode, 0)
-	t.Logf("Succeed to upload block, resp: %s", updateSegsInfo)
+	t.Logf("Succeed to upload block, resp: %s, updateSegmentsReq: %v", updateSegsInfo, updateSegmentsReq.Segments)
 }
-
+/*
 func Test_HeartBeat(t *testing.T) {
 	r := require.New(t)
  	// get incomplete upload segs
@@ -555,3 +537,4 @@ func Test_DeleteFile(t *testing.T) {
 
 	t.Logf("Succeed to delete file, resp: %s", deleteFileRespInfo)
 }
+*/

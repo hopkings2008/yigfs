@@ -44,7 +44,7 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 	segReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// check segment leader
-	isExisted, err := yigFs.YigFsAPI.CheckSegmentLeader(reqContext, segReq)
+	err := yigFs.YigFsAPI.CheckSegmentLeader(reqContext, segReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -52,7 +52,7 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 	}
 
 	// create segment info to tidb
-	err = yigFs.YigFsAPI.CreateFileSegment(reqContext, segReq, isExisted)
+	err = yigFs.YigFsAPI.CreateFileSegment(reqContext, segReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -60,13 +60,13 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 	}
 
 	//  update file size and blocks number.
-	file := &types.GetFileInfoReq{
+	file := &types.GetFileInfoReq {
 		Region: segReq.Region,
 		BucketName: segReq.BucketName,
 		Ino: segReq.Ino,
 		Generation: segReq.Generation,
 	}
-	err = yigFs.YigFsAPI.UpdateFileSizeAndBlock(reqContext, file)
+	err = yigFs.YigFsAPI.UpdateFileSizeAndBlocksNum(reqContext, file)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -98,7 +98,7 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 	}
 
 	// check req params
-	err := CheckUpdateSegmentsParams(reqContext, segsReq)
+	err := CheckUpdateSegmentsParams(reqContext, segsReq, yigFs)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -109,37 +109,11 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 	segsReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// update segments
-	for _, segment := range segsReq.Segments {
-		segmentInfo := types.CreateBlocksInfo {
-			SegmentId0: segment.SegmentId0,
-			SegmentId1: segment.SegmentId1,
-			Capacity: segment.Capacity,
-			Blocks: segment.Blocks,
-		}
-
-		segReq := &types.CreateSegmentReq {
-			Region: segsReq.Region,
-			BucketName: segsReq.BucketName,
-			ZoneId: segsReq.ZoneId,
-			Machine: segment.Leader,
-			Ino: segsReq.Ino,
-			Segment: segmentInfo,
-		}
-
-		isExisted, err := yigFs.YigFsAPI.CheckSegmentLeader(reqContext, segReq)
-		if err != nil {
-			resp.Result = GetErrInfo(err)
-			ctx.JSON(resp)
-			return
-		}
-
-		// update segment info to tidb
-		err = yigFs.YigFsAPI.CreateFileSegment(reqContext, segReq, isExisted)
-		if err != nil {
-			resp.Result = GetErrInfo(err)
-			ctx.JSON(resp)
-			return
-		}
+	err = yigFs.YigFsAPI.UpdateFileSegments(reqContext, segsReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
 	}
 
 	//  update file size and blocks number.
@@ -149,7 +123,7 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 		Ino: segsReq.Ino,
 		Generation: segsReq.Generation,
 	}
-	err = yigFs.YigFsAPI.UpdateFileSizeAndBlock(reqContext, file)
+	err = yigFs.YigFsAPI.UpdateFileSizeAndBlocksNum(reqContext, file)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)

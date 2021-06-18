@@ -191,3 +191,11 @@ func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFile
 
 	return
 }
+
+func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+	err = yigFs.MetaStorage.Client.UpdateSizeAndBlocksNum(ctx, file)
+	if err != nil {
+		return
+	}
+	return
+}

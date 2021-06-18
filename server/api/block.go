@@ -8,7 +8,7 @@ import (
 	"github.com/hopkings2008/yigfs/server/helper"
 )
 
-func CheckUpdateSegmentsParams(ctx context.Context, segsReq *types.UpdateSegmentsReq) (err error) {
+func CheckUpdateSegmentsParams(ctx context.Context, segsReq *types.UpdateSegmentsReq, yigFs MetaAPIHandlers) (err error) {
 	if len(segsReq.Segments) == 0 {
 		helper.Logger.Error(ctx, "No vaild segments to upload.")
 		return ErrYigFsNoVaildSegments
@@ -20,12 +20,10 @@ func CheckUpdateSegmentsParams(ctx context.Context, segsReq *types.UpdateSegment
 		return ErrYigFsMissingRequiredParams
 	}
 
-	for _, segment := range segsReq.Segments {
-		// check segment leader
-		if segment.Leader == "" {
-			helper.Logger.Error(ctx, "UpdateSegmentsReq required segments leader are missing.")
-			return ErrYigFsMissingSegmentLeader
-		}
+	// check segments leader
+	err = yigFs.YigFsAPI.CheckSegmentsLeader(ctx, segsReq)
+	if err != nil {
+		return
 	}
 
 	if segsReq.Region == "" {

@@ -12,48 +12,8 @@ import (
 )
 
 
-func GetCoveredBlocksInfoSql() (sqltext string) {
-	sqltext = "select offset from file_blocks where region=? and bucket_name=? and ino=? and generation=? and is_deleted=? and offset > ? and end_addr <= ?;"
-	return sqltext
-}
-
-func GetTargetFileBlockSql() (sqltext string) {
-	sqltext = "select end_addr from file_blocks where region=? and bucket_name=? and ino=? and generation=? and offset=? and is_deleted=?;"
-	return sqltext
-}
-
-func DeleteBlockSql() (sqltext string) {
-	sqltext = "update file_blocks set is_deleted=? where region=? and bucket_name=? and ino=? and generation=? and offset=?;"
-	return sqltext
-}
-
-func UpdateBlockSql() (sqltext string) {
-	sqltext = "update file_blocks set block_id=?, size=?, end_addr=? where region=?" + 
-		" and bucket_name=? and ino=? and generation=? and offset=? and is_deleted=?;"
-	return sqltext
-}
-
-func GetInsertBlockSql() (sqltext string) {
-	sqltext = "insert into file_blocks(region, bucket_name, ino, generation, seg_id0, seg_id1, block_id, size, offset, end_addr, ctime)" +
-		" values(?,?,?,?,?,?,?,?,?,?,?);"
-	return sqltext
-}
-
-func DeletePartialCoverBlockSql() (sqltext string) {
-	sqltext = "insert into file_blocks values(?,?,?,?,?,?,?,?,?,?,?,?,?) on duplicate key" +
-		" update size=values(size), end_addr=values(end_addr), is_deleted=values(is_deleted);"
-	return sqltext
-}
-
 func GetSegExistedSql() (sqltext string) {
 	sqltext = "select 1 from file_blocks where region=? and bucket_name=? and ino=? and generation=? and is_deleted=? limit 1;"
-	return sqltext
-}
-
-func InsertOrUpdateBlockSql() (sqltext string) {
-	sqltext = "insert into file_blocks(region, bucket_name, ino, generation, seg_id0, seg_id1, block_id, size, offset, end_addr, is_deleted)" + 
-		" values(?,?,?,?,?,?,?,?,?,?,?) on duplicate key update seg_id0=values(seg_id0), seg_id1=values(seg_id1), block_id=values(block_id)," +
-		" size=values(size), end_addr=values(end_addr), is_deleted=values(is_deleted);"
 	return sqltext
 }
 
@@ -81,322 +41,16 @@ func(t *TidbClient) IsFileHasSegments(ctx context.Context, seg *types.GetSegment
 	return
 }
 
-func(t *TidbClient) GetCoveredExistedBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
-	block *types.BlockInfo) (blocks []*types.BlockInfo, err error) {
-	sqltext := GetCoveredBlocksInfoSql()
-	rows, err := t.Client.Query(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, 
-		types.NotDeleted, block.Offset, block.FileBlockEndAddr)
-	if err == sql.ErrNoRows {
-		err = nil
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get covered existed blocks, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-	defer rows.Close()
-	
-	var offset int64
-
-	for rows.Next() {
-		err = rows.Scan (
-			&offset,
-		)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get block in row, err: %v", err))
-			err = ErrYIgFsInternalErr
-			return
-		}
-
-		block := &types.BlockInfo{
-			Offset: offset,
-		}
-
-		blocks = append(blocks, block)
-	}
-	err = rows.Err()
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to iterator rows for covered existed blocks, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get covered existed blocks, offset: %v, blocksNum: %v", block.Offset, len(blocks)))
-	return blocks, nil
-}
-
-func(t *TidbClient) GetOffsetInUploadingBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
-	block *types.BlockInfo) (isExisted bool, blockResp *types.FileBlockInfo, err error) {
-	blockResp = &types.FileBlockInfo{}
-	isExisted = false
-	var createTime string
-
-	sqltext := "select seg_id0, seg_id1, block_id, size, offset, end_addr, ctime from file_blocks where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and is_deleted=? and offset > ? and offset < ? and end_addr > ?;"
-	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, 
-			types.NotDeleted, block.Offset, block.FileBlockEndAddr, block.FileBlockEndAddr)
-	err = row.Scan(
-		&blockResp.SegmentId0,
-		&blockResp.SegmentId1,
-		&blockResp.BlockId,
-		&blockResp.Size,
-		&blockResp.Offset,
-		&blockResp.FileBlockEndAddr,
-		&createTime)
-	
-	if err == sql.ErrNoRows{
-		err = nil
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetOffsetInUploadingBlock, offset: %d, err: %v", block.Offset, err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	blockResp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, createTime)
-	if err != nil {
-		return
-	}
-
-	isExisted = true
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to GetOffsetInUploadingBlock, offset: %d, ctime: %v", blockResp.Offset, blockResp.Ctime))
-	return
-}
-
-func(t *TidbClient) GetOffsetInExistedBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
-	block *types.BlockInfo) (isExisted bool, blockResp *types.FileBlockInfo, err error) {
-	blockResp = &types.FileBlockInfo{}
-	isExisted = false
-	var createTime string
-
-	sqltext := "select seg_id0, seg_id1, block_id, size, offset, end_addr, ctime from file_blocks where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and is_deleted=? and offset < ? and end_addr > ? and end_addr < ?;"
-	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, 
-			types.NotDeleted, block.Offset, block.Offset, block.FileBlockEndAddr)
-	err = row.Scan(
-		&blockResp.SegmentId0,
-		&blockResp.SegmentId1,
-		&blockResp.BlockId,
-		&blockResp.Size,
-		&blockResp.Offset,
-		&blockResp.FileBlockEndAddr,
-		&createTime)
-	
-	if err == sql.ErrNoRows{
-		err = nil
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetOffsetInUploadingBlocks, offset: %d, err: %v", block.Offset, err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	blockResp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, createTime)
-	if err != nil {
-		return
-	}
-
-	isExisted = true
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to GetOffsetInExistedBlock, offset: %d, ctime: %v", blockResp.Offset, blockResp.Ctime))
-	return
-}
-
-func(t *TidbClient) GetCoveredUploadingBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
-	block *types.BlockInfo) (isExisted bool, blockResp *types.FileBlockInfo, err error) {
-	blockResp = &types.FileBlockInfo{}
-	isExisted = false
-	var createTime string
-
-	sqltext := "select seg_id0, seg_id1, block_id, size, offset, end_addr, ctime from file_blocks where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and is_deleted=? and offset < ? and end_addr >= ?;"
-	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, 
-			types.NotDeleted, block.Offset, block.FileBlockEndAddr)
-	err = row.Scan(
-		&blockResp.SegmentId0,
-		&blockResp.SegmentId1,
-		&blockResp.BlockId,
-		&blockResp.Size,
-		&blockResp.Offset,
-		&blockResp.FileBlockEndAddr,
-		&createTime)
-	
-	if err == sql.ErrNoRows{
-		err = nil
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetCoveredUploadingBlock, offset: %d, err: %v", block.Offset, err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	if blockResp.Offset == block.Offset && blockResp.FileBlockEndAddr == block.FileBlockEndAddr {
-		return false, &types.FileBlockInfo{}, nil
-	}
-
-	blockResp.Ctime, err = time.Parse(types.TIME_LAYOUT_TIDB, createTime)
-	if err != nil {
-		return
-	}
-
-	isExisted = true
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to GetCoveredUploadingBlock, offset: %d, ctime: %v", blockResp.Offset, blockResp.Ctime))
-	return
-}
-
-func(t *TidbClient) DealOverlappingBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, updateBlocks []*types.FileBlockInfo, 
-	deleteBlocks []*types.FileBlockInfo, insertBlocks []*types.FileBlockInfo) (err error) {
-	if len(updateBlocks) != 0 {
-		sqltext := UpdateBlockSql()
-		for _, block := range updateBlocks {
-			_, err = t.Client.Exec(sqltext, block.BlockId, block.Size, block.FileBlockEndAddr, blockInfo.Region, blockInfo.BucketName, 
-				blockInfo.Ino, blockInfo.Generation, block.Offset, types.NotDeleted)
-			if err != nil {
-				helper.Logger.Error(ctx, fmt.Sprintf("DealOverlappingBlocks:Failed to update file block info, seg_id0: %v, seg_id1: %v, offset: %v, err: %v", 
-					blockInfo.SegmentId0, blockInfo.SegmentId1, block.Offset, err))
-				err = ErrYIgFsInternalErr
-				return
-			}
-			helper.Logger.Info(ctx, fmt.Sprintf("DealOverlappingBlocks:Succeed to update file block info, seg_id0: %v, seg_id1: %v, offset: %v", 
-				block.SegmentId0, block.SegmentId1, block.Offset))
-		}
-	}
-
-	if len(deleteBlocks) != 0 {
-		sqltext := DeletePartialCoverBlockSql()
-		for _, block := range deleteBlocks {
-			now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-			ctime := block.Ctime.Format(types.TIME_LAYOUT_TIDB)
-			_, err = t.Client.Exec(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, block.SegmentId0, block.SegmentId1,
-				block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, ctime, now, types.Deleted)
-			if err != nil {
-				helper.Logger.Error(ctx, fmt.Sprintf("DealOverlappingBlocks:Failed to delete the file block from tidb, offset: %d, err: %v", block.Offset, err))
-				err = ErrYIgFsInternalErr
-				return
-			}
-			helper.Logger.Info(ctx, fmt.Sprintf("DealOverlappingBlocks:Succeed to delete the file block info, seg_id0: %v, seg_id1: %v, offset: %v", block.SegmentId0, block.SegmentId1, block.Offset))
-		}
-	}
-
-	if len(insertBlocks) != 0 {
-		sqltext := GetInsertBlockSql()
-		for _, block := range insertBlocks {
-			ctime := block.Ctime.Format(types.TIME_LAYOUT_TIDB)
-			_, err = t.Client.Exec(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, block.SegmentId0, block.SegmentId1,
-				block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, ctime)
-			if err != nil {
-				helper.Logger.Error(ctx, fmt.Sprintf("DealOverlappingBlocks:Failed to create the file segment to tidb, err: %v", err))
-				err = ErrYIgFsInternalErr
-				return
-			}
-			helper.Logger.Info(ctx, fmt.Sprintf("DealOverlappingBlocks:Succeed to insert file block, seg_id0: %v, seg_id1: %v, offset: %v", block.SegmentId0, block.SegmentId1, block.Offset))
-		}
-	}
-
-	return
-}
-
-func(t *TidbClient) DeleteBlocks(ctx context.Context, blockInfo *types.DescriptBlockInfo, blocks []*types.BlockInfo) (err error) {
-	for _, block := range blocks {
-		sqltext := DeleteBlockSql()
-		_, err = t.Client.Exec(sqltext, types.Deleted, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, blockInfo.Generation, block.Offset)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the file block from tidb, offset: %d, err: %v", block.Offset, err))
-			return ErrYIgFsInternalErr
-		}
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the the file blocks: %d", len(blocks)))
-	return
-}
-
-func(t *TidbClient) GetMergeBlock(ctx context.Context, blockInfo *types.DescriptBlockInfo, 
-	block *types.BlockInfo) (isExisted bool, fileBlockResp *types.FileBlockInfo, err error) {
-	fileBlockResp = &types.FileBlockInfo{}
-	isExisted = false
-
-	sqltext := "select size, offset, end_addr from file_blocks where region=? and bucket_name=?" + 
-		" and ino=? and generation=? and seg_id0=? and seg_id1=? and block_id=? and end_addr=? and is_deleted=?"
-	row := t.Client.QueryRow(sqltext, blockInfo.Region, blockInfo.BucketName, blockInfo.Ino, 
-		blockInfo.Generation, blockInfo.SegmentId0, blockInfo.SegmentId1, block.BlockId, block.Offset, types.NotDeleted)
-	err = row.Scan(
-		&fileBlockResp.Size,
-		&fileBlockResp.Offset,
-		&fileBlockResp.FileBlockEndAddr)
-
-	if err == sql.ErrNoRows {
-		err = nil
-		return
-	} else if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the merge file block info, seg_id0: %d, seg_id1: %v, offset: %v, err: %v", 
-			blockInfo.SegmentId0, blockInfo.SegmentId1, block.Offset, err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	isExisted = true
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get the merge file block info, size: %d, offset: %v", fileBlockResp.Size, fileBlockResp.Offset))
-	return
-}
-
-func(t *TidbClient) UpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
-	sqltext := UpdateBlockSql()
-	_, err = t.Client.Exec(sqltext, block.BlockId, block.Size, block.FileBlockEndAddr, block.Region, block.BucketName, 
-		block.Ino, block.Generation, block.Offset, types.NotDeleted)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to update file block info, seg_id0: %v, seg_id1: %v, offset: %v, err: %v", 
-			block.SegmentId0, block.SegmentId1, block.Offset, err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file block info, offset: %v, blockId: %v, size: %v, end_addr: %v",
-		block.Offset, block.BlockId, block.Size, block.FileBlockEndAddr))
-	return
-}
-
-func (t *TidbClient) CreateFileBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
-	sqltext := GetInsertBlockSql()
-	now := time.Now().UTC().Format(types.TIME_LAYOUT_TIDB)
-	_, err = t.Client.Exec(sqltext, block.Region, block.BucketName, block.Ino, block.Generation, block.SegmentId0, block.SegmentId1,
-		block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, now)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to create the file segment to tidb, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-			
-	helper.Logger.Info(ctx, fmt.Sprintf("Successed to create the file segment, blockId: %v", block.BlockId))
-	return
-}
-
-func(t *TidbClient) GetFileBlockSize(ctx context.Context, file *types.GetFileInfoReq) (blocksSize uint64, blocksNum uint32, err error) {
-	sqltext := "select sum(size), count(*) from file_blocks where region=? and bucket_name=? and ino=? and generation=? and is_deleted=?"
-	row := t.Client.QueryRow(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, types.NotDeleted)
-
-	err = row.Scan(
-		&blocksSize,
-		&blocksNum,
-	)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get all blocks size and number for the target file, ino: %d, err: %v", file.Ino, err))
-		err = ErrYIgFsInternalErr
-		return
-	}
-
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get all blocks file and number for the target file, size: %v, number: %v", blocksSize, blocksNum))
-	return
-}
-
 func (t *TidbClient) GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, 
-	checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error) {
+	checkOffset int64) (getSegs map[interface{}][]*types.BlockInfo, err error) {
 	var segmentId0, segmentId1 uint64
-	var blockId, offset int64
-	segmentMap = make(map[interface{}][]int64)
-	offsetMap = make(map[int64]int64)
+	var offset int64
+	var segStartAddr, size int
+	getSegs = make(map[interface{}][]*types.BlockInfo)
 
 	args := make([]interface{}, 0)
-	sqltext := "select seg_id0, seg_id1, block_id, offset from file_blocks where region=? and bucket_name=? and ino=?" + 
-		" and generation=? and is_deleted=? and offset < ? and end_addr > ? order by offset;"
+	sqltext := "select seg_id0, seg_id1, size, offset, seg_start_addr from file_blocks where region=? and bucket_name=? and ino=?" + 
+		" and generation=? and is_deleted=? and offset <= ? and size + offset > ? order by offset;"
 	args = append(args, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted, checkOffset, checkOffset)
 
 	rows, err := t.Client.Query(sqltext, args...)
@@ -414,8 +68,9 @@ func (t *TidbClient) GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.G
 		err = rows.Scan(
 			&segmentId0,
 			&segmentId1,
-			&blockId,
-			&offset)
+			&size,
+			&offset,
+			&segStartAddr,)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetIncludeOffsetIndexInfo in row, err: %v", err))
 			err = ErrYIgFsInternalErr
@@ -423,8 +78,12 @@ func (t *TidbClient) GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.G
 		}
 
 		segmentId := [2]uint64{segmentId0, segmentId1}
-		segmentMap[segmentId] = append(segmentMap[segmentId], blockId)
-		offsetMap[blockId] = offset
+		block := types.BlockInfo {
+			Size: size,
+			Offset: offset,
+			SegStartAddr: segStartAddr,
+		}
+		getSegs[segmentId] = append(getSegs[segmentId], &block)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -433,26 +92,25 @@ func (t *TidbClient) GetIncludeOffsetIndexSegs(ctx context.Context, seg *types.G
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("GetIncludeOffsetIndexInfo: segmentMap is %v", segmentMap))
+	helper.Logger.Info(ctx, fmt.Sprintf("GetIncludeOffsetIndexInfo: getSegments length is %v", len(getSegs)))
 	return
 }
 
-func (t *TidbClient) GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, 
-	checkOffset int64) (segmentMap map[interface{}][]int64, offsetMap map[int64]int64, err error) {
+func (t *TidbClient) GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64) (getSegs map[interface{}][]*types.BlockInfo, err error) {
 	var segmentId0, segmentId1 uint64
-	var blockId, offset int64
-	segmentMap = make(map[interface{}][]int64)
-	offsetMap = make(map[int64]int64)
+	var offset int64
+	var segStartAddr, size int
+	getSegs = make(map[interface{}][]*types.BlockInfo)
 
 	args := make([]interface{}, 0)
 	var sqltext string
 
 	if checkOffset > 0 {
-		sqltext = "select seg_id0, seg_id1, block_id, offset from file_blocks where region=? and bucket_name=? and ino=?" + 
+		sqltext = "select seg_id0, seg_id1, size, offset, seg_start_addr from file_blocks where region=? and bucket_name=? and ino=?" + 
 			" and generation=? and is_deleted=? and offset > ? order by offset;"
 		args = append(args, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted, checkOffset)
 	} else {
-		sqltext = "select seg_id0, seg_id1, block_id, offset from file_blocks where region=? and bucket_name=? and ino=?" + 
+		sqltext = "select seg_id0, seg_id1, size, offset, seg_start_addr from file_blocks where region=? and bucket_name=? and ino=?" + 
 			" and generation=? and is_deleted=? order by offset;"
 		args = append(args, seg.Region, seg.BucketName, seg.Ino, seg.Generation, types.NotDeleted)
 	}
@@ -472,8 +130,9 @@ func (t *TidbClient) GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.G
 		err = rows.Scan(
 			&segmentId0,
 			&segmentId1,
-			&blockId,
-			&offset)
+			&size,
+			&offset,
+			&segStartAddr,)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to GetGreaterOffsetIndexInfo in row, err: %v", err))
 			err = ErrYIgFsInternalErr
@@ -481,8 +140,12 @@ func (t *TidbClient) GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.G
 		}
 
 		segmentId := [2]uint64{segmentId0, segmentId1}
-		segmentMap[segmentId] = append(segmentMap[segmentId], blockId)
-		offsetMap[blockId] = offset
+		block := types.BlockInfo {
+			Size: size,
+			Offset: offset,
+			SegStartAddr: segStartAddr,
+		}
+		getSegs[segmentId] = append(getSegs[segmentId], &block)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -491,7 +154,7 @@ func (t *TidbClient) GetGreaterOffsetIndexSegs(ctx context.Context, seg *types.G
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("GetGreaterOffsetIndexInfo: segmentMap is %v", segmentMap))
+	helper.Logger.Info(ctx, fmt.Sprintf("GetGreaterOffsetIndexInfo: getSegments length is %v", len(getSegs)))
 	return
 }
 
@@ -500,7 +163,7 @@ func (t *TidbClient) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlow
 		Segments: []*types.SegmentInfo{},
 	}
 
-	sqltext := "select block_id, offset from file_blocks where seg_id0=? and seg_id1=? and is_deleted=? order by offset;"
+	sqltext := "select size, offset, seg_start_addr from file_blocks where seg_id0=? and seg_id1=? and is_deleted=? order by offset;"
 	rows, err := t.Client.Query(sqltext, seg.SegmentId0, seg.SegmentId1, types.NotDeleted)
 	if err == sql.ErrNoRows {
 		err = ErrYigFsNoTargetSegment
@@ -512,7 +175,8 @@ func (t *TidbClient) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlow
 	}
 	defer rows.Close()
 
-	var blockId, offset int64
+	var offset int64
+	var size, segStartAddr int
 	segment := &types.SegmentInfo {
 		SegmentId0: seg.SegmentId0,
 		SegmentId1: seg.SegmentId1,
@@ -525,8 +189,9 @@ func (t *TidbClient) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlow
 
 	for rows.Next() {
 		err = rows.Scan(
-			&blockId,
-			&offset)
+			&size,
+			&offset,
+			&segStartAddr)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to scan query blocks getting by segId, segId0: %v, segId1: %v, err: %v", 
 				seg.SegmentId0, seg.SegmentId1, err))
@@ -534,22 +199,13 @@ func (t *TidbClient) GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlow
 			return
 		}
 
-		sqltext = GetBlockInfoSql()
-		row := t.Client.QueryRow(sqltext, seg.SegmentId0, seg.SegmentId1, blockId)
-		block := &types.BlockInfo{}
-		err = row.Scan(
-			&block.SegStartAddr,
-			&block.SegEndAddr,
-			&block.Size)
-
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get block info, err: %v", err))
-			err = ErrYIgFsInternalErr
-			return
+		block := types.BlockInfo {
+			Size: size,
+			Offset: offset,
+			SegStartAddr: segStartAddr,
 		}
 
-		block.Offset = offset
-		segment.Blocks = append(segment.Blocks, block)
+		segment.Blocks = append(segment.Blocks, &block)
 	}
 	err = rows.Err()
 	if err != nil {
@@ -625,18 +281,109 @@ func(t *TidbClient) DeleteFileBlocks(ctx context.Context, file *types.DeleteFile
 	return
 }
 
-func(t *TidbClient) InsertOrUpdateBlock(ctx context.Context, block *types.FileBlockInfo) (err error) {
-	sqltext := InsertOrUpdateBlockSql()
-	_, err = t.Client.Exec(sqltext, block.Region, block.BucketName, block.Ino, block.Generation, block.SegmentId0, block.SegmentId1, 
-		block.BlockId, block.Size, block.Offset, block.FileBlockEndAddr, types.NotDeleted)
+func getInsertOrUpdateFileBlocksSql(ctx context.Context, maxNum int) (sqltext string) {
+	for i := 0; i < maxNum; i ++ {
+		if i == 0 {
+			sqltext = "insert into file_blocks(region, bucket_name, ino, generation, seg_id0, seg_id1, size, offset, seg_start_addr, is_deleted)" + 
+				" values(?,?,?,?,?,?,?,?,?,?)"
+		} else {
+			sqltext += ",(?,?,?,?,?,?,?,?,?,?)"
+		}
+	}
+	sqltext += " on duplicate key update seg_id0=values(seg_id0), seg_id1=values(seg_id1), size=values(size), offset=values(offset)," +
+		" seg_start_addr=values(seg_start_addr), is_deleted=values(is_deleted);"
+	return
+}
+
+func getInsertFileAndSegBlocksArgs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo) (fileArgs []interface{}, segArgs []interface{}) {
+	for _, seg := range segs {
+		for _, block := range seg.Blocks {
+			fileArgs = append(fileArgs, segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, seg.SegmentId0, seg.SegmentId1,
+				block.Size, block.Offset, block.SegStartAddr, types.NotDeleted)
+			segArgs = append(segArgs, seg.SegmentId0, seg.SegmentId1, block.SegStartAddr, block.Size, types.NotDeleted)
+		}
+	}
+	return
+}
+
+func getInsertSegZoneAndInfoArgs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo) (zoneArgs []interface{}, infoArgs []interface{}) {
+	for _, seg := range segs {
+		zoneArgs = append(zoneArgs, seg.ZoneId, segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, seg.Leader, types.NotDeleted)
+		infoArgs = append(infoArgs, segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, seg.Capacity, seg.MaxSize)
+	}
+	return
+}
+
+func (t *TidbClient) InsertOrUpdateFileAndSegBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, 
+	isUpdateInfo bool, blocksNum int) (err error) {
+	start := time.Now().UTC().UnixNano()
+	var tx interface{}
+	var sqlTx *sql.Tx
+	tx, err = t.Client.Begin()
+	defer func() {
+		if err == nil {
+				err = sqlTx.Commit()
+		} else {
+				sqlTx.Rollback()
+		}
+	}()
+
+	sqlTx, _ = tx.(*sql.Tx)
+
+	insertSegBlocksSql := getInsertOrUpdateSegBlocksSql(ctx, blocksNum)
+	insertFileBlocksArgs, insertSegBlocksArgs := getInsertFileAndSegBlocksArgs(ctx, segInfo, segs)
+	_, err = sqlTx.Exec(insertSegBlocksSql, insertSegBlocksArgs...)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update file block, region: %v, bucket: %v, ino: %v, generation: %v, offset: %v, err: %v", 
-			block.Region, block.BucketName, block.Ino, block.Generation, block.Offset, err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update seg blocks, region: %v, bucket: %v, ino: %v, generation: %v, err: %v",
+			segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	end1 := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("insert seg blocks cost: %v, segsNum: %v", end1 - start, blocksNum))
+
+	insertFileBlocksSql := getInsertOrUpdateFileBlocksSql(ctx, blocksNum)
+	_, err = sqlTx.Exec(insertFileBlocksSql, insertFileBlocksArgs...)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update file blocks, region: %v, bucket: %v, ino: %v, generation: %v, err: %v",
+			segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert or update file block, region: %v, bucket: %v, ino: %v, generation: %v, offset: %v", 
-		block.Region, block.BucketName, block.Ino, block.Generation, block.Offset))
+	end2 := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("insert file blocks cost: %v, segsNum: %v", end2 - end1, blocksNum))
+
+	if isUpdateInfo {
+		start1 := time.Now().UTC().UnixNano()
+		segsNum := len(segs)
+		insertSegZoneSql := getInsertOrUpdateSegZoneSql(ctx, segsNum)
+		insertSegZoneArgs, insertSegInfoArgs := getInsertSegZoneAndInfoArgs(ctx, segInfo, segs)
+		_, err = sqlTx.Exec(insertSegZoneSql, insertSegZoneArgs...)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update seg zone, region: %v, bucket: %v, ino: %v, generation: %v, err: %v",
+				segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+
+		end3 := time.Now().UTC().UnixNano()
+		helper.Logger.Info(ctx, fmt.Sprintf("insert seg zone, cost: %v", end3 - start1))
+	
+		insertSegInfoSql := getInsertOrUpdateSegInfoSql(ctx, segsNum)
+		_, err = sqlTx.Exec(insertSegInfoSql, insertSegInfoArgs...)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update seg info, region: %v, bucket: %v, ino: %v, generation: %v, err: %v",
+				segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, err))
+			err = ErrYIgFsInternalErr
+			return
+		}
+		end4 := time.Now().UTC().UnixNano()
+		helper.Logger.Info(ctx, fmt.Sprintf("insert seg info cost: %v", end4 - end3))
+	}
+
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to insert or update file blocks, region: %v, bucket: %v, ino: %v, generation: %v, cost: %v, segsNum: %v",
+		segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, end - start, len(segs)))
 	return
 }

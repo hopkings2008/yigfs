@@ -11,12 +11,13 @@ import (
 )
 
 func GetSegmentLeaderSql() (sqltext string) {
-	sqltext = "select leader from segment_zone where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+	sqltext = "select leader from segment_zone where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
 	return sqltext
 }
 
 func CreateSegmentZoneSql() (sqltext string) {
-	sqltext = "insert into segment_zone(zone_id, region, bucket_name, seg_id0, seg_id1, leader) values(?,?,?,?,?,?)"
+	sqltext = "insert into segment_zone(zone_id, region, bucket_name, seg_id0, seg_id1, leader, is_deleted) values(?,?,?,?,?,?,?)" + 
+		" on duplicate key update leader=values(leader), is_deleted=values(is_deleted);"
 	return sqltext
 }
 
@@ -25,11 +26,23 @@ func GetSegmentsByLeaderSql() (sqltext string) {
 	return sqltext
 }
 
+func getInsertOrUpdateSegZoneSql(ctx context.Context, maxNum int) (sqltext string) {
+	for i := 0; i < maxNum; i ++ {
+		if i == 0 {
+			sqltext = "insert into segment_zone(zone_id, region, bucket_name, seg_id0, seg_id1, leader, is_deleted) values(?,?,?,?,?,?,?)"
+		} else {
+			sqltext += ",(?,?,?,?,?,?,?)"
+		}
+	}
+	sqltext += " on duplicate key update leader=values(leader), is_deleted=values(is_deleted);"
+	return
+}
+
 func (t *TidbClient) GetSegmentLeader(ctx context.Context, segment *types.GetSegLeaderReq) (resp *types.LeaderInfo, err error) {
 	resp = &types.LeaderInfo {}
 
 	sqltext := GetSegmentLeaderSql()
-	row := t.Client.QueryRow(sqltext, segment.ZoneId, segment.Region, segment.BucketName, segment.SegmentId0, segment.SegmentId1)
+	row := t.Client.QueryRow(sqltext, segment.ZoneId, segment.Region, segment.BucketName, segment.SegmentId0, segment.SegmentId1, types.NotDeleted)
 	err = row.Scan (
 		&resp.Leader,
 	)
