@@ -346,9 +346,32 @@ impl Filesystem for Yigfs {
         reply.ok();
     }
 
-    fn unlink(&mut self, req: &Request, ino: u64, _name: &OsStr, reply: ReplyEmpty) {
-        info!("unlink: uid: {}, gid: {}, ino: {}", req.uid(), req.gid(), ino);
-        let ret = self.meta_service_mgr.delete_file(ino);
+    fn unlink(&mut self, req: &Request, ino: u64, name: &OsStr, reply: ReplyEmpty) {
+        let file_name: String;
+        if let Some(n) = name.to_str() {
+            file_name = n.to_string();
+        } else {
+            error!("unlink: uid: {}, gid: {}, parent ino: {}, got invalid name",
+            req.uid(), req.gid(), ino);
+            reply.error(libc::EBADMSG);
+            return;
+        }
+        let file_ino: u64;
+        let ret = self.meta_service_mgr.read_dir_file_attr(ino, &file_name);
+        match ret {
+            Ok(attr) => {
+                file_ino = attr.ino;
+            }
+            Err(err) => {
+                error!("unlink: uid: {}, gid: {}, parent ino: {}, name: {}, failed to get file attr, err: {:?}",
+                req.uid(), req.gid(), ino, file_name, err);
+                reply.error(libc::EBADMSG);
+                return;
+            }
+        }
+        info!("unlink: uid: {}, gid: {}, parent ino: {}, name: {}, ino: {}", 
+        req.uid(), req.gid(), ino, file_name, file_ino);
+        let ret = self.meta_service_mgr.delete_file(file_ino);
         if !ret.is_success(){
             error!("unlink: failed to remove the file, ino: {}", ino);
             reply.error(libc::EIO);
