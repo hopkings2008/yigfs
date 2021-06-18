@@ -110,7 +110,6 @@ pub struct Segment {
 pub struct Block {
     pub offset: u64,
     pub seg_start_addr: u64,
-    pub seg_end_addr: u64,
     pub size: i64,
 }
 

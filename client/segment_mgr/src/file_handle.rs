@@ -350,11 +350,10 @@ impl HandleMgr {
             let last_block = last_node.borrow().get_value();
             if last_block.seg_id0 == msg.block.seg_id0 && last_block.seg_id1 == msg.block.seg_id1 && 
             (last_block.offset + last_block.size as u64) == start && 
-            last_block.seg_end_addr == msg.block.seg_start_addr{
+            (last_block.seg_start_addr + last_block.size as u64) == msg.block.seg_start_addr{
                 //merge the last block with the new one.
                 let mut new_block = last_block.clone();
                 new_block.size += msg.block.size;
-                new_block.seg_end_addr = msg.block.seg_end_addr;
                 h.block_tree.delete(&last_node);
                 h.block_tree.insert_node(new_block.offset, new_block.offset+new_block.size as u64, new_block);
                 h.mark_dirty();
@@ -391,7 +390,6 @@ impl HandleMgr {
                 if b.offset < start {
                     let size = start - b.offset;
                     b.size = size as i64;
-                    b.seg_end_addr = b.seg_start_addr + b.size as u64;
                     blocks.push(b);
                     blocks.push(msg.block.clone());
                     continue;

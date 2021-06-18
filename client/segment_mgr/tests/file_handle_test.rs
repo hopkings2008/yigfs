@@ -173,7 +173,6 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         seg_id0: id0,
         seg_id1: id1,
         seg_start_addr: 0,
-        seg_end_addr: 5,
         size: 5,
     };
     let ret = mgr.add_block(ino, id0, id1, &b1);
@@ -204,7 +203,6 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         seg_id0: seg1.seg_id0,
         seg_id1: seg1.seg_id1,
         seg_start_addr: 5,
-        seg_end_addr: 10,
         size: 5,
     };
     mgr.add_block(ino, seg1.seg_id0, seg1.seg_id1, &b2);
@@ -260,7 +258,6 @@ fn test_file_handle_add_block() -> Result<(), String>{
         seg_id0: id0,
         seg_id1: id1,
         seg_start_addr: 0,
-        seg_end_addr: 5,
         size: 5,
     };
     let ret = mgr.add_block(ino, id0, id1, &b1);
@@ -295,7 +292,6 @@ fn test_file_handle_add_block() -> Result<(), String>{
         seg_id0: seg.seg_id0,
         seg_id1: seg.seg_id1,
         seg_start_addr: 5,
-        seg_end_addr: 10,
         size: 5,
     };
     mgr.add_block(ino, seg.seg_id0, seg.seg_id1, &b2);
@@ -313,7 +309,7 @@ fn test_file_handle_add_block() -> Result<(), String>{
     }
     if blocks[0].seg_id0 != seg.seg_id0 || blocks[0].seg_id1 != seg.seg_id1
     || blocks[0].offset != b2.offset || blocks[0].size != b2.size 
-    || blocks[0].seg_start_addr != 5 || blocks[0].seg_end_addr != 10 {
+    || blocks[0].seg_start_addr != 5 {
         mgr.stop();
         return Err(format!("got invalid overwriten block: {:?}, expect: {:?}", blocks[0], b1));
     }

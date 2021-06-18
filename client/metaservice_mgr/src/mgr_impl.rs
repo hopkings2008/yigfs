@@ -396,7 +396,6 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 let block = Block{
                     offset: b.offset,
                     seg_start_addr: b.seg_start_addr,
-                    seg_end_addr: b.seg_end_addr,
                     size: b.size,
                 };
                 segment.blocks.push(block);
@@ -424,7 +423,6 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             let bl = MsgBlock {
                 offset: b.offset,
                 seg_start_addr: b.seg_start_addr,
-                seg_end_addr: b.seg_end_addr,
                 size: b.size,
             };
             s.blocks.push(bl);
@@ -768,7 +766,6 @@ impl MetaServiceMgrImpl {
         MsgBlock{
             offset: b.offset,
             seg_start_addr: b.seg_start_addr,
-            seg_end_addr: b.seg_end_addr,
             size: b.size,
         }
     }

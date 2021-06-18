@@ -226,7 +226,6 @@ impl Leader for LeaderLocal {
                         seg_id0: id0,
                         seg_id1: id1,
                         seg_start_addr: r.offset,
-                        seg_end_addr: r.offset + r.nwrite as u64,
                         size: r.nwrite as i64,
                     };
                     let ret = self.handle_mgr.add_block(ino, id0, id1, &b);

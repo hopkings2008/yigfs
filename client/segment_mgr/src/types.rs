@@ -90,7 +90,6 @@ impl Segment {
             seg_id0: self.seg_id0,
             seg_id1: self.seg_id1,
             seg_start_addr: seg_start_offset,
-            seg_end_addr: seg_start_offset+nwrite as u64,
             size: nwrite,
         };
         // we cannot find the consecutive block.
@@ -143,8 +142,6 @@ pub struct Block {
     // the offset in this segment
     // note: range in segment is: [seg_start_addr, seg_end_addr)
     pub seg_start_addr: u64,
-    // the end in this segment
-    pub seg_end_addr: u64,
     // the size of this block
     pub size: i64,
 }
@@ -158,7 +155,6 @@ impl Block {
             seg_id0: 0,
             seg_id1: 0,
             seg_start_addr: 0,
-            seg_end_addr: 0,
             size: -1,
         }
     }
@@ -170,7 +166,6 @@ impl Block {
             seg_id0: self.seg_id0,
             seg_id1: self.seg_id1,
             seg_start_addr: self.seg_start_addr,
-            seg_end_addr: self.seg_end_addr,
             size: self.size,
         }
     }
@@ -179,7 +174,6 @@ impl Block {
         MetaBlock{
             offset: self.offset,
             seg_start_addr: self.seg_start_addr,
-            seg_end_addr: self.seg_end_addr,
             size: self.size,
         }
     }
