@@ -225,3 +225,98 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
     mgr.stop();
     return Ok(());
 }
+
+#[test]
+fn test_file_handle_add_block() -> Result<(), String>{
+    let ino: u64 = 1;
+    let mut mgr = FileHandleMgr::create();
+    let h1 = FileHandle{
+        ino: ino,
+        leader: String::from(""),
+        segments: Vec::new(),
+        garbage_blocks: HashMap::new(),
+        block_tree: IntervalTree::new(Block::default()),
+        is_dirty: 0,
+    };
+    let ret = mgr.add(&h1);
+    if !ret.is_success(){
+        mgr.stop();
+        return Err(String::from("estfailed to add handle."));
+    }
+
+    let seg = Segment::new(&String::from("local"));
+    let id0 = seg.seg_id0;
+    let id1 = seg.seg_id1;
+    let ret = mgr.add_segment(ino, &seg);
+    if !ret.is_success() {
+        mgr.stop();
+        return Err(format!("failed to add segment"));
+    }
+    
+    let b1 = Block{
+        ino: ino,
+        generation: 0,
+        offset: 0,
+        seg_id0: id0,
+        seg_id1: id1,
+        seg_start_addr: 0,
+        seg_end_addr: 5,
+        size: 5,
+    };
+    let ret = mgr.add_block(ino, id0, id1, &b1);
+    if !ret.is_success(){
+        mgr.stop();
+        return Err(format!("failed to add block"));
+    }
+
+    let blocks = mgr.get_blocks(ino, 0, 5);
+    if blocks.is_empty() {
+        mgr.stop();
+        return Err(format!("got empty blocks for ino: {}, offset: 0, size: 5", ino));
+    }
+    if blocks.len() > 1 {
+        for b in blocks {
+            println!("got extra block: {:?}", b);
+        }
+        mgr.stop();
+        return Err(format!("got more than 1 blocks"));
+    }
+    println!("got original block: {:?}", blocks[0]);
+    if blocks[0].seg_id0 != seg.seg_id0 || blocks[0].seg_id1 != seg.seg_id1
+    || blocks[0].offset != b1.offset || blocks[0].size != b1.size {
+        mgr.stop();
+        return Err(format!("got invalid block: {:?}, expect: {:?}", blocks[0], b1));
+    }
+    
+    let b2 = Block{
+        ino: ino,
+        generation: 0,
+        offset: 0,
+        seg_id0: seg.seg_id0,
+        seg_id1: seg.seg_id1,
+        seg_start_addr: 5,
+        seg_end_addr: 10,
+        size: 5,
+    };
+    mgr.add_block(ino, seg.seg_id0, seg.seg_id1, &b2);
+    let blocks = mgr.get_blocks(ino, 0, 5);
+    if blocks.is_empty() {
+        mgr.stop();
+        return Err(format!("got empty blocks for ino: {}, overwriten offset: 0, size: 5", ino));
+    }
+    if blocks.len() > 1 {
+        for b in blocks {
+            println!("got extra overwriten block: {:?}", b);
+        }
+        mgr.stop();
+        return Err(format!("got more than 1 overwriten blocks"));
+    }
+    if blocks[0].seg_id0 != seg.seg_id0 || blocks[0].seg_id1 != seg.seg_id1
+    || blocks[0].offset != b2.offset || blocks[0].size != b2.size 
+    || blocks[0].seg_start_addr != 5 || blocks[0].seg_end_addr != 10 {
+        mgr.stop();
+        return Err(format!("got invalid overwriten block: {:?}, expect: {:?}", blocks[0], b1));
+    }
+    mgr.stop();
+    return Ok(());
+}
