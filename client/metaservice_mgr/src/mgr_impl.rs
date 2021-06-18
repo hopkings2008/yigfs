@@ -712,7 +712,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         let resp_body: String;
         let url = format!("{}/v1/file/remove", self.meta_server_url);
-        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body.as_bytes(), &HttpMethod::Delete, false));
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body.as_bytes(), &HttpMethod::Post, false));
         match ret {
             Ok(text) => {
                 if text.status >= 300 {
