@@ -212,14 +212,31 @@ pub struct FileHandle {
 
 impl FileHandle {
     pub fn create(ino: u64, leader: String, segments: Vec<Segment>) -> Self {
-        FileHandle{
+        let mut h = FileHandle{
             ino: ino,
             leader: leader,
-            segments: segments,
+            segments: Vec::new(),
             garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             is_dirty: 0,
+        };
+
+        for s in segments {
+            h.segments.push(Segment{
+                seg_id0: s.seg_id0,
+                seg_id1: s.seg_id1,
+                capacity: s.capacity,
+                size: s.size,
+                backend_size: s.backend_size,
+                leader: s.leader.clone(),
+                blocks: Vec::new(),
+            });
+            for b in s.blocks {
+                h.add_block(b);
+            }
         }
+        
+        return h;
     }
     pub fn copy(&self)->Self {
         let mut handle = FileHandle{
@@ -281,6 +298,10 @@ impl FileHandle {
         }
 
         return segments;
+    }
+
+    pub fn add_block(&mut self, b: Block){
+        self.block_tree.insert_node(b.offset, b.offset + b.size as u64, b);
     }
 
     pub fn add_garbage_block(&mut self, b: Block){
