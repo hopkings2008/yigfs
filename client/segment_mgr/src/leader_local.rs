@@ -303,10 +303,10 @@ impl Leader for LeaderLocal {
         }
         // close the segments file handles.
         for s in &segments {
-            for b in &s.blocks {
+            /*for b in &s.blocks {
                 info!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
                 ino, s.seg_id0, s.seg_id1, b.offset, b.size);
-            }
+            }*/
             //close the segment.
             let ret = self.cache_store.close(s.seg_id0, s.seg_id1);
             if ret.is_success(){
