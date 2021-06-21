@@ -31,6 +31,7 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
+        reference: 1,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){
@@ -66,6 +67,7 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
+        reference: 1,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){
@@ -120,6 +122,7 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
+        reference: 1,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){
@@ -235,6 +238,7 @@ fn test_file_handle_add_block() -> Result<(), String>{
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
         is_dirty: 0,
+        reference: 1,
     };
     let ret = mgr.add(&h1);
     if !ret.is_success(){

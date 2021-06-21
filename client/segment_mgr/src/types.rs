@@ -208,6 +208,7 @@ pub struct FileHandle {
     pub garbage_blocks: HashMap<u128, Segment>,
     pub block_tree: IntervalTree<Block>,
     pub is_dirty: u8,
+    pub reference: i64,
 }
 
 impl FileHandle {
@@ -219,6 +220,7 @@ impl FileHandle {
             garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             is_dirty: 0,
+            reference: 1,
         };
 
         for s in segments {
@@ -246,6 +248,7 @@ impl FileHandle {
             garbage_blocks: HashMap::new(),
             block_tree: self.block_tree.clone(),
             is_dirty: self.is_dirty,
+            reference: self.reference,
         };
         for s in &self.segments {
             handle.segments.push(s.copy());
@@ -261,6 +264,7 @@ impl FileHandle {
             garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             is_dirty: 0,
+            reference: 1,
         }
     }
 
@@ -391,6 +395,7 @@ pub enum MsgFileHandleOp{
     AddBlock(MsgAddBlock),
     Del(u64),
     Get(MsgQueryHandle),
+    GetAndLock(MsgQueryHandle),
     GetBlocks(MsgGetBlocks),
     GetLastSegment(MsgGetLastSegment),
     AddSegment(MsgAddSegment),

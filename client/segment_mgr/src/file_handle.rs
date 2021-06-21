@@ -200,6 +200,45 @@ impl FileHandleMgr {
         }
     }
 
+    pub fn get_and_lock(&self, ino: u64) -> Result<FileHandle, Errno>{
+        let (tx, rx) = bounded::<Option<FileHandle>>(1);
+        let query = MsgQueryHandle{
+            ino: ino,
+            tx: tx,
+        };
+        defer!{
+            let rxc = rx.clone();
+            drop(rxc);
+        };
+        let msg = MsgFileHandleOp::GetAndLock(query);
+        let ret = self.handle_op_tx.send(msg);
+        match ret {
+            Ok(_) => {
+                let ret = rx.recv();
+                match ret {
+                    Ok(ret) => {
+                        match ret {
+                            Some(h) => {
+                                return Ok(h);
+                            }
+                            None => {
+                                return Err(Errno::Enoent);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        error!("get: failed to get handle for ino: {}, recv failed with err: {}", ino, err);
+                        return Err(Errno::Eintr);
+                    }
+                }
+            }
+            Err(err) => {
+                error!("get: failed to get handle for ino: {}, failed to send query with err: {}", ino, err);
+                return Err(Errno::Eintr);
+            }
+        }
+    }
+
     pub fn is_leader(&self, machine: &String, ino: u64) -> bool {
         let ret = self.get(ino);
         match ret {
@@ -292,6 +331,9 @@ impl HandleMgr {
                         MsgFileHandleOp::Get(m) => {
                             self.get(m);
                         }
+                        MsgFileHandleOp::GetAndLock(m) => {
+                            self.get_and_lock(m);
+                        }
                         MsgFileHandleOp::GetBlocks(m) => {
                             // query the blocks
                             self.get_blocks(m);
@@ -322,6 +364,10 @@ impl HandleMgr {
     }
 
     fn add(&mut self, handle: FileHandle) {
+        if let Some(h) = self.handles.get_mut(&handle.ino) {
+            h.reference += 1;
+            return;
+        }
         self.handles.insert(handle.ino, handle);
     }
 
@@ -417,9 +463,12 @@ impl HandleMgr {
     fn del(&mut self, ino: u64) {
         // free the block_tree
         if let Some(h) = self.handles.get_mut(&ino) {
-            h.block_tree.free();
+            h.reference -= 1;
+            if h.reference <=0 {
+                h.block_tree.free();
+                self.handles.remove(&ino);
+            }
         }
-        self.handles.remove(&ino);
     }
     
     fn get_last_segment(&self, msg: &MsgGetLastSegment) {
@@ -469,6 +518,25 @@ impl HandleMgr {
             drop(tx);
         };
         if let Some(h) = self.handles.get(&msg.ino) {
+            handle = Some(h.copy());
+        }
+        let ret = msg.tx.send(handle);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("failed to send handle for ino: {}, err: {}", msg.ino, err);
+            }
+        }
+    }
+
+    fn get_and_lock(&mut self, msg: MsgQueryHandle){
+        let mut handle: Option<FileHandle> = None;
+        let tx = msg.tx.clone();
+        defer!{
+            drop(tx);
+        };
+        if let Some(h) = self.handles.get_mut(&msg.ino) {
+            h.reference += 1;
             handle = Some(h.copy());
         }
         let ret = msg.tx.send(handle);

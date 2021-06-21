@@ -22,7 +22,7 @@ pub struct LeaderLocal {
 impl Leader for LeaderLocal {
     fn open(&self, ino: u64) -> Errno {
         let segments : Vec<Segment>;
-        let ret = self.handle_mgr.get(ino);
+        let ret = self.handle_mgr.get_and_lock(ino);
         match ret {
             Ok(ret) => {
                 info!("open: got handle for ino: {}, leader: {}", ino, ret.leader);
