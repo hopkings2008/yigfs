@@ -26,6 +26,7 @@ pub struct FileHandleInfo {
     pub leader: String,
 }
 
+// FileHandleInfoMgr is accessed by multi-threads in a YigFs instance.
 pub struct FileHandleInfoMgr {
     op_tx: Sender<FileHandleInfoOp>,
     stop_tx: Sender<u32>,
@@ -132,10 +133,16 @@ impl FileHandleInfoMgr {
     }
 }
 
+#[derive(Debug)]
+struct FileInfoCache {
+    pub ino: u64,
+    pub leader: String,
+    pub reference: i64,
+}
 struct HandleCacher{
     op_rx: Receiver<FileHandleInfoOp>,
     stop_rx: Receiver<u32>,
-    handles: HashMap<u64, FileHandleInfo>,
+    handles: HashMap<u64, FileInfoCache>,
 }
 
 impl HandleCacher {
@@ -194,7 +201,15 @@ impl HandleCacher {
     }
 
     fn add_handle_info(&mut self, h: FileHandleInfo) {
-        self.handles.insert(h.ino, h);
+        if let Some(info) = self.handles.get_mut(&h.ino){
+            info.reference += 1;
+            return;
+        }
+        self.handles.insert(h.ino, FileInfoCache{
+            ino: h.ino,
+            leader: h.leader.clone(),
+            reference: 1,
+        });
     }
 
     fn get_handle_info(&mut self, msg: &MsgGetHandleInfo){
@@ -219,7 +234,12 @@ impl HandleCacher {
     }
 
     fn del_handle_info(&mut self, ino: u64) {
-        self.handles.remove(&ino);
+        if let Some(info) = self.handles.get_mut(&ino){
+            info.reference -= 1;
+            if info.reference <= 0 {
+                self.handles.remove(&ino);
+            }
+        }
     }
 
 }
