@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 use common::runtime::Executor;
 use common::error::Errno;
 use io_engine::cache_store::CacheStore;
@@ -35,6 +36,7 @@ impl Leader for LeaderLocal {
                 }
             }
         }
+        let begin = Instant::now();
         let ret = self.segment_mgr.get_file_segments(ino, &self.machine);
         match ret {
             Ok(ret) => {
@@ -45,6 +47,9 @@ impl Leader for LeaderLocal {
                 return err;
             }
         }
+        let dur = begin.elapsed().as_nanos();
+        info!("get_file_segments for ino: {} takes: {}", ino, dur);
+        let begin = Instant::now();
         for seg in &segments {
             let seg_dir = self.segment_mgr.get_segment_dir(seg.seg_id0, seg.seg_id1);
             // currently, open in cache_store will create the seg file if it doesn't exist.
@@ -81,8 +86,13 @@ impl Leader for LeaderLocal {
             return ret;
         }
 
+        let dur = begin.elapsed().as_nanos();
+        info!("open: open segments for ino: {} takes: {}", ino, dur);
+        let begin = Instant::now();
         let file_handle = FileHandle::create(ino, self.machine.clone(), segments);
         self.handle_mgr.add(&file_handle);
+        let dur = begin.elapsed().as_nanos();
+        info!("open: add file_handle for ino: {} takes: {}", ino, dur);
 
         return Errno::Esucc;
     }
