@@ -2,7 +2,7 @@ extern crate tokio;
 #[path="./message.rs"]
 mod message;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use crate::{mgr, types::{Block, FileLeader, NewFileInfo, Segment, SetFileAttr}};
 use crate::types::DirEntry;
 use crate::types::FileAttr;
@@ -353,6 +353,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         }
         let url = format!("{}/v1/file/segments", self.meta_server_url);
         let resp_text: RespText;
+        let begin = Instant::now();
         let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &body.as_bytes(), &HttpMethod::Get, false));
         match ret  {
             Ok(ret) => {
@@ -363,6 +364,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 return Err(Errno::Eintr);
             }
         }
+        let dur = begin.elapsed().as_nanos();
+        info!("meta: get_file_segments for ino: {} takes: {}", ino, dur);
         if resp_text.status >= 300 {
             info!("get_file_segments failed with status_code: {}, resp: {}", resp_text.status, resp_text.body);
             return Err(Errno::Eintr);

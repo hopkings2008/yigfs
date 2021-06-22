@@ -101,7 +101,10 @@ impl Leader for LeaderLocal {
         let mut start = offset;
         let mut total_read = size;
         let mut data = Vec::<u8>::new();
+        let begin = Instant::now();
         let blocks = self.handle_mgr.get_blocks(ino, offset, size as u64);
+        let dur = begin.elapsed().as_nanos();
+        info!("read: ino: {}, offset: {}, size: {}, get_blocks takes: {}", ino, offset, size, dur);
         for b in &blocks {
             if b.offset <= start && start <= (b.offset + b.size as u64) {
                 let mut to_read = total_read;
