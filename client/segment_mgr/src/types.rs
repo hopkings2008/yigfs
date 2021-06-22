@@ -305,10 +305,18 @@ impl FileHandle {
     }
 
     pub fn add_block(&mut self, b: Block){
+        if b.ino != self.ino {
+            panic!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            b.ino, b.offset, b.size, self.ino);
+        }
         self.block_tree.insert_node(b.offset, b.offset + b.size as u64, b);
     }
 
     pub fn add_garbage_block(&mut self, b: Block){
+        if b.ino != self.ino {
+            panic!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            b.ino, b.offset, b.size, self.ino);
+        }
         let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
         if let Some(s) = self.garbage_blocks.get_mut(&id) {
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
