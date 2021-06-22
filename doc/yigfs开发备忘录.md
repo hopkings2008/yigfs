@@ -13,9 +13,10 @@
 4. client中获取目录的可用空间及使用量判断，可以使用statfs
 5. client加一个io的queue，目前用的channel来代替的，但是channel中有个数限制
 6. 多个连续的write操作可以合并为一个操作
-7. 优化read接口中，对于offset+size在segment中的定位，目前是O(n)的时间，可以优化为O(log(n))的时间
+7. 优化read接口中，对于offset+size在segment中的定位，目前是O(n)的时间，可以优化为O(log(n))的时间(已完成)
 8. add request identifier and record it in the log
 9. 减少segments及blocks的拷贝次数
+10. 记录被修改的block，对于文件的修改和写入，只传输被修改的blocks
 
 
 # yigfs测试说明
