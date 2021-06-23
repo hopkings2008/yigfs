@@ -104,8 +104,12 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.
 			&backendSize,
 			&size,
 		)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, seg_id0: %v, seg_id1: %v, err: %v", seg.SegmentId0, seg.SegmentId1, err))
+		if err == sql.ErrNoRows {
+			helper.Logger.Warn(ctx, fmt.Sprintf("The seg is not existed, seg_id0: %v, seg_id1: %v, err: %v", seg.SegmentId0, seg.SegmentId1, err))
+			err = nil
+			continue
+		} else if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the seg info, seg_id0: %v, seg_id1: %v, err: %v", seg.SegmentId0, seg.SegmentId1, err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -120,7 +124,7 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.
 		}
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.UploadSegments)))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs info, segs number: %v", len(segsResp.UploadSegments)))
 	return
 }
 
