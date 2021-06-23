@@ -109,6 +109,7 @@ type DescriptBlockInfo struct {
 	Generation uint64 `json:"generation,omitempty"`
 	SegmentId0 uint64 `json:"seg_id0,omitempty"`
 	SegmentId1 uint64 `json:"seg_id1,omitempty"`
+	ZoneId string `json:"zone,omitempty"`
 }
 
 type GetTheSlowestGrowingSeg struct {

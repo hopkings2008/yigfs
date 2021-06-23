@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/types"
@@ -72,6 +73,7 @@ func (t *TidbClient) GetMachineInfo(ctx context.Context, zone *types.GetLeaderRe
 }
 
 func (t *TidbClient) CheckSegsmachine(ctx context.Context, zone *types.GetSegLeaderReq, segs []*types.CreateBlocksInfo) (isValid bool, err error) {
+	start := time.Now().UTC().UnixNano()
 	getLeaderSql := GetSegmentLeaderSql()
 	sqltext := "select status from zone where id=? and region=? and bucket_name=? and machine=?"
 	var stmt *sql.Stmt
@@ -131,6 +133,7 @@ func (t *TidbClient) CheckSegsmachine(ctx context.Context, zone *types.GetSegLea
 	}
 
 	isValid = true
-	helper.Logger.Info(ctx, fmt.Sprintf("succeed to check machines, machines number: %v", len(segs)))
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("succeed to check machines, machines number: %v, cost: %v", len(segs), end - start))
 	return
 }

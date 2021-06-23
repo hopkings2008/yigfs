@@ -192,8 +192,16 @@ func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFile
 	return
 }
 
-func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
-	err = yigFs.MetaStorage.Client.UpdateSizeAndBlocksNum(ctx, file)
+func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, blocksNum uint32, size uint64) (err error) {
+	err = yigFs.MetaStorage.Client.UpdateSizeAndBlocksNum(ctx, file, blocksNum, size)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNumByCheck(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+	err = yigFs.MetaStorage.Client.UpdateFileSizeAndBlocksNum(ctx, file)
 	if err != nil {
 		return
 	}

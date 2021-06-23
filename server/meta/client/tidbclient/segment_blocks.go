@@ -52,7 +52,7 @@ func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegment
 
 		// get segment info
 		sqltext = GetSegmentInfoSql()
-		row = t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1)
+		row = t.Client.QueryRow(sqltext, seg.Region, seg.BucketName, segment.SegmentId0, segment.SegmentId1, types.NotDeleted)
 		err = row.Scan (
 			&segment.Capacity,
 			&segment.BackendSize,
@@ -76,7 +76,7 @@ func(t *TidbClient) DeleteSegBlocks(ctx context.Context, file *types.DeleteFileR
 	sqltext := DeleteSegBlocksSql()
 	_, err = t.Client.Exec(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, types.NotDeleted, types.Deleted)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Succeed to delete seg blocks for the file, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete seg blocks for the file, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
 			file.Region, file.BucketName, file.Ino, file.Generation, err))
 		err = ErrYIgFsInternalErr
 		return

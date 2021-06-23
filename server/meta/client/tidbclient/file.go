@@ -426,18 +426,32 @@ func(t *TidbClient) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (
 	return
 }
 
-func(t *TidbClient) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+func(t *TidbClient) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, blocksNum uint32, size uint64) (err error) {
+	start := time.Now().UTC().UnixNano()
+	sqltext := "update file set size=?, blocks=? where region=? and bucket_name=? and ino=? and generation=?;"
+	_, err = t.Client.Exec(sqltext, size, blocksNum, file.Region, file.BucketName, file.Ino, file.Generation)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number, ino: %v, size: %v, blocksNum: %v, cost: %v", 
+		file.Ino, size, blocksNum, end - start))
+	return
+}
+
+func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
 	start := time.Now().UTC().UnixNano()
 	sqltext := "update file join (select sum(size) as totalSize, count(*) as number from file_blocks where region=? and bucket_name=? and ino=?" + 
 		" and generation=? and is_deleted=0) b set file.size=b.totalSize, file.blocks=b.number where region=? and bucket_name=? and ino=? and generation=?;"
 	_, err = t.Client.Exec(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, file.Region, file.BucketName, file.Ino, file.Generation)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number by one, err: %v", err))
+		helper.Logger.Error(ctx, fmt.Sprintf("CreateFileSegment: Failed to update the file size and blocks number, err: %v", err))
 		err = ErrYIgFsInternalErr
 		return
 	}
 	end := time.Now().UTC().UnixNano()
-	helper.Logger.Info(ctx, "UpdateSizeAndBlocksNum cost: ", end - start)
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number by one, ino: %v", file.Ino))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number, ino: %v, cost: %v", file.Ino, end - start))
 	return
 }

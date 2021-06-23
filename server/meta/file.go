@@ -35,6 +35,10 @@ func(m *Meta) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err er
 	return m.Client.DeleteFile(ctx, file)
 }
 
-func(m *Meta) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
-	return m.Client.UpdateSizeAndBlocksNum(ctx, file)
+func(m *Meta) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, blocksNum uint32, size uint64) (err error) {
+	return m.Client.UpdateSizeAndBlocksNum(ctx, file, blocksNum, size)
+}
+
+func(m *Meta) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
+	return m.Client.UpdateFileSizeAndBlocksNum(ctx, file)
 }

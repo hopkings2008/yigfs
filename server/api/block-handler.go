@@ -66,7 +66,7 @@ func(yigFs MetaAPIHandlers) CreateSegmentHandler(ctx iris.Context) {
 		Ino: segReq.Ino,
 		Generation: segReq.Generation,
 	}
-	err = yigFs.YigFsAPI.UpdateFileSizeAndBlocksNum(reqContext, file)
+	err = yigFs.YigFsAPI.UpdateFileSizeAndBlocksNumByCheck(reqContext, file)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -96,6 +96,7 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 		ctx.JSON(resp)
 		return
 	}
+	helper.Logger.Info(reqContext, fmt.Sprintf("segsReq: %+v", segsReq))
 
 	// check req params
 	err := CheckUpdateSegmentsParams(reqContext, segsReq, yigFs)
@@ -109,7 +110,7 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 	segsReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// update segments
-	err = yigFs.YigFsAPI.UpdateFileSegments(reqContext, segsReq)
+	blocksNum, fileSize, err := yigFs.YigFsAPI.UpdateFileSegments(reqContext, segsReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -123,7 +124,7 @@ func(yigFs MetaAPIHandlers) UpdateSegmentsHandler(ctx iris.Context) {
 		Ino: segsReq.Ino,
 		Generation: segsReq.Generation,
 	}
-	err = yigFs.YigFsAPI.UpdateFileSizeAndBlocksNum(reqContext, file)
+	err = yigFs.YigFsAPI.UpdateFileSizeAndBlocksNum(reqContext, file, blocksNum, fileSize)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -140,7 +141,7 @@ func(yigFs MetaAPIHandlers) GetSegmentsHandler(ctx iris.Context) {
 	resp := &types.GetSegmentResp {
 		Result: types.YigFsMetaError {},
 	}
-	defer GetSpendTime("GetSegmentHandler")()
+	defer GetSpendTime("GetSegmentsHandler")()
 
 	r := ctx.Request()
 	reqContext := r.Context()
