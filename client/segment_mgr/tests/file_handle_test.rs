@@ -31,6 +31,7 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
         segments: Vec::new(),
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
+        seg_status: HashMap::new(),
         is_dirty: 0,
         reference: 1,
     };
@@ -67,6 +68,7 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
         segments: Vec::new(),
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
+        seg_status: HashMap::new(),
         is_dirty: 0,
         reference: 1,
     };
@@ -122,6 +124,7 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         segments: Vec::new(),
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
+        seg_status: HashMap::new(),
         is_dirty: 0,
         reference: 1,
     };
@@ -238,6 +241,7 @@ fn test_file_handle_add_block() -> Result<(), String>{
         segments: Vec::new(),
         garbage_blocks: HashMap::new(),
         block_tree: IntervalTree::new(Block::default()),
+        seg_status: HashMap::new(),
         is_dirty: 0,
         reference: 1,
     };

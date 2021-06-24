@@ -62,6 +62,8 @@ impl Leader for LeaderLocal {
                 match ret {
                     Ok(ret) => {
                         if ret.size < seg.size {
+                            // set the need_sync for this segment.
+                            self.handle_mgr.set_seg_status(ino, seg.seg_id0, seg.seg_id1, true);
                             // perform the download from backend store.
                             info!("open: seg: id0: {}, id1: {}, cache size: {}, real size: {}",
                             seg.seg_id0, seg.seg_id1, ret.size, seg.size);
@@ -197,6 +199,11 @@ impl Leader for LeaderLocal {
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
         let mut seg_size = last_segment[3];
+        let mut need_sync = last_segment[4];
+        let mut direct_io = false;
+        if need_sync == 1 {
+            direct_io = true;
+        }
         
         //println!("write: seg(id0: {}, id1: {}, max_size: {}, ino: {}, offset: {})", id0, id1, seg_max_size, ino, offset);
         loop {
@@ -204,19 +211,8 @@ impl Leader for LeaderLocal {
             let seg_dir = self.segment_mgr.get_segment_dir(id0, id1);
             // must check whether cache size is smaller than segment size or not. if so, write the backend directly.
             // or if O_DIRECT, write to backend directly too.
-            let cache_size: u64;
-            let ret = self.cache_store.stat(id0, id1, &seg_dir);
-            match ret {
-                Ok(ret) => {
-                    cache_size = ret.size;
-                }
-                Err(err) => {
-                    error!("write: failed to perform cache stat for seg: id0: {}, id1: {}, dir: {}, err: {:?}",
-                    id0, id1, seg_dir, err);
-                    cache_size = 0;
-                }
-            }
-            if cache_size < seg_size {
+            
+            if direct_io {
                 // write to backend store directly.
                 let ret = self.backend_store.write(id0, id1, seg_size, data);
                 if ret.err.is_success() {

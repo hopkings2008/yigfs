@@ -33,6 +33,13 @@ pub struct BlockIo {
     pub size: u32,
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct SegStatus {
+    pub id0: u64,
+    pub id1: u64,
+    pub need_sync: bool,
+}
+
 #[derive(Debug)]
 pub struct FileHandle {
     pub ino: u64,
@@ -42,6 +49,7 @@ pub struct FileHandle {
     pub segments:  Vec<Segment>,
     pub garbage_blocks: HashMap<u128, Segment>,
     pub block_tree: IntervalTree<Block>,
+    pub seg_status: HashMap<u128, SegStatus>,
     pub is_dirty: u8,
     pub reference: i64,
 }
@@ -54,6 +62,7 @@ impl FileHandle {
             segments: Vec::new(),
             garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
+            seg_status: HashMap::new(),
             is_dirty: 0,
             reference: 1,
         };
@@ -87,6 +96,7 @@ impl FileHandle {
             segments: Vec::new(),
             garbage_blocks: HashMap::new(),
             block_tree: self.block_tree.clone(),
+            seg_status: HashMap::new(),
             is_dirty: self.is_dirty,
             reference: self.reference,
         };
@@ -103,6 +113,7 @@ impl FileHandle {
             segments: Vec::new(),
             garbage_blocks: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
+            seg_status: HashMap::new(),
             is_dirty: 0,
             reference: 1,
         }
@@ -238,6 +249,14 @@ pub struct MsgGetBlocks{
 }
 
 #[derive(Debug)]
+pub struct MsgSetSegStatus{
+    pub ino: u64,
+    pub id0: u64,
+    pub id1: u64,
+    pub need_sync: bool,
+}
+
+#[derive(Debug)]
 pub enum MsgFileHandleOp{
     Add(FileHandle),
     AddBlock(MsgAddBlock),
@@ -247,6 +266,7 @@ pub enum MsgFileHandleOp{
     GetBlocks(MsgGetBlocks),
     GetLastSegment(MsgGetLastSegment),
     AddSegment(MsgAddSegment),
+    SetSegStatus(MsgSetSegStatus),
 }
 
 #[derive(Debug)]

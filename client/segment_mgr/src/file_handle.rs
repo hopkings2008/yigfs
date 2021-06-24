@@ -3,11 +3,14 @@ extern crate crossbeam_channel;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
+use common::numbers::NumberOp;
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
 use metaservice_mgr::types::{Segment, Block};
 use crate::types::MsgGetBlocks;
+use crate::types::MsgSetSegStatus;
+use crate::types::SegStatus;
 use crate::types::{FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle};
 use log::{warn, error};
 
@@ -290,6 +293,26 @@ impl FileHandleMgr {
             }
         }
     }
+
+    pub fn set_seg_status(&self, ino: u64, id0: u64, id1: u64, need_sync: bool) -> Errno {
+        let msg = MsgFileHandleOp::SetSegStatus(MsgSetSegStatus{
+            ino: ino,
+            id0: id0,
+            id1: id1,
+            need_sync: need_sync,
+        });
+        let ret = self.handle_op_tx.send(msg);
+        match ret {
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                error!("failed to set_seg_status for ino: {}, id0: {}, id1: {}, need_sync: {}, err: {}", 
+                ino, id0, id1, need_sync, err);
+                return Errno::Eintr;
+            }
+        }
+    }
 }
 
 struct HandleMgr {
@@ -341,7 +364,10 @@ impl HandleMgr {
                         }
                         MsgFileHandleOp::GetLastSegment(m) => {
                             self.get_last_segment(&m);
-                        }                        
+                        }
+                        MsgFileHandleOp::SetSegStatus(m) => {
+                            self.set_seg_status(m);
+                        }
                     }
                 },
                 recv(self.stop_rx) -> msg => {
@@ -479,6 +505,7 @@ impl HandleMgr {
         let mut id1: u64 = 0;
         let mut max_size: u64 = 0;
         let mut size: u64 = 0;
+        let mut need_sync = 0;
         let tx = msg.tx.clone();
         defer! {
             drop(tx);
@@ -491,6 +518,12 @@ impl HandleMgr {
                 id1 = l.seg_id1;
                 max_size = l.capacity;
                 size = l.size;
+                let id = NumberOp::to_u128(id0, id1);
+                if let Some(status) = h.seg_status.get(&id){
+                    if status.need_sync {
+                        need_sync = 1;
+                    }
+                }
             }
         }
         if found {
@@ -498,6 +531,7 @@ impl HandleMgr {
             v.push(id1);
             v.push(max_size);
             v.push(size);
+            v.push(need_sync);
         }
         let ret = msg.tx.send(v);
         match ret {
@@ -567,6 +601,21 @@ impl HandleMgr {
                 error!("get_blocks: failed to send blocks for ino: {}, offset: {}, size: {}, err: {}",
                 msg.ino, msg.offset, msg.size, err);
             }
+        }
+    }
+
+    fn set_seg_status(&mut self, m: MsgSetSegStatus) {
+        if let Some(h) = self.handles.get_mut(&m.ino) {
+            let id = NumberOp::to_u128(m.id0, m.id1);
+            if let Some(status) = h.seg_status.get_mut(&id) {
+                status.need_sync = m.need_sync;
+                return;
+            }
+            h.seg_status.insert(id, SegStatus{
+                id0: m.id0,
+                id1: m.id1,
+                need_sync: m.need_sync,
+            });
         }
     }
 }
