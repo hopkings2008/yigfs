@@ -90,6 +90,8 @@ impl Leader for LeaderLocal {
         let dur = begin.elapsed().as_nanos();
         info!("open: open segments for ino: {} takes: {}", ino, dur);
         let begin = Instant::now();
+        // note: the blocks in segments doesn't contain ino, seg_ids from meta service.
+        // must set it manually.
         let file_handle = FileHandle::create(ino, self.machine.clone(), segments);
         self.handle_mgr.add(&file_handle);
         let dur = begin.elapsed().as_nanos();

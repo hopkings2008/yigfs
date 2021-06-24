@@ -69,7 +69,12 @@ impl FileHandle {
                 blocks: Vec::new(),
             });
             for b in s.blocks {
-                h.add_block(b);
+                let mut block = b.clone();
+                block.ino = ino;
+                block.generation = 0;
+                block.seg_id0 = s.seg_id0;
+                block.seg_id1 = s.seg_id1;
+                h.add_block(block);
             }
         }
         
