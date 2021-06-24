@@ -77,5 +77,5 @@ pub enum IoEventResult{
     IoHeadResult(RespHeadObject),
     IoAppendResult(RespAppendObject),
     IoGetResult(RespGetObject),
-    IoDelResult(RespGetObject),
+    IoDelResult(RespDelObject),
 }
