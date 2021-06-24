@@ -371,6 +371,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             return Err(Errno::Eintr);
         }
         let resp : RespGetSegments;
+        let begin = Instant::now();
         let ret = json::decode_from_str::<RespGetSegments>(&resp_text.body);
         match ret {
             Ok(ret) => {
@@ -386,6 +387,8 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             body, resp.result.err_code, resp.result.err_msg);
             return Err(Errno::Eintr);
         }
+        let dur = begin.elapsed().as_nanos();
+        info!("get_file_segments: for ino: {}, decode from json takes: {}", ino, dur);
         return Ok(resp.segments.clone());
     }
 
