@@ -19,7 +19,7 @@ func(m *Meta) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.GetInc
 	return m.Client.GetIncompleteUploadSegs(ctx, segInfo, segs)
 }
 
-func(m *Meta) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error) {
+func(m *Meta) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.SegmentInfo, err error) {
 	return m.Client.GetTheSlowestGrowingSeg(ctx, segReq, segIds)
 }
 

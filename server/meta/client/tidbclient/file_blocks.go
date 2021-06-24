@@ -308,8 +308,8 @@ func getInsertFileAndSegBlocksArgs(ctx context.Context, segInfo *types.DescriptB
 
 func getInsertSegZoneAndInfoArgs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo) (zoneArgs []interface{}, infoArgs []interface{}) {
 	for _, seg := range segs {
-		zoneArgs = append(zoneArgs, seg.ZoneId, segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, seg.Leader, types.NotDeleted)
-		infoArgs = append(infoArgs, segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, seg.Capacity, seg.MaxSize)
+		zoneArgs = append(zoneArgs, segInfo.ZoneId, segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, seg.Leader, types.NotDeleted)
+		infoArgs = append(infoArgs, segInfo.Region, segInfo.BucketName, seg.SegmentId0, seg.SegmentId1, seg.Capacity, seg.MaxSize, types.NotDeleted)
 	}
 	return
 }
@@ -322,9 +322,10 @@ func (t *TidbClient) InsertOrUpdateFileAndSegBlocks(ctx context.Context, segInfo
 	tx, err = t.Client.Begin()
 	defer func() {
 		if err == nil {
-				err = sqlTx.Commit()
+			err = sqlTx.Commit()
 		} else {
-				sqlTx.Rollback()
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to InsertOrUpdateFileAndSegBlocks, err: %v", err))
+			sqlTx.Rollback()
 		}
 	}()
 

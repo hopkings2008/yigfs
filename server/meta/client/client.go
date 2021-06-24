@@ -45,7 +45,7 @@ type Client interface {
 	// get incomplete upload segments
 	GetIncompleteUploadSegs(ctx context.Context, segInfo *types.GetIncompleteUploadSegsReq, segs []*types.IncompleteUploadSegInfo) (segsResp *types.GetIncompleteUploadSegsResp, err error)
 	// get the slowest growing segment
-	GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error)
+	GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.SegmentInfo, err error)
 	// get blocks by the target segment id
 	GetBlocksBySegId(ctx context.Context, seg *types.GetTheSlowestGrowingSeg) (resp *types.GetSegmentResp, err error)
 	// get segments by leader
@@ -65,10 +65,11 @@ type Client interface {
 	// insert or update blocks in file_blocks and seg_blocks table
 	InsertOrUpdateFileAndSegBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, isUpdateInfo bool, blocksNum int) (err error)
 	// update size and blocks number for the file
-	UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error)
+	UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, blocksNum uint32, size uint64) (err error)
 	// check segments machine
 	CheckSegsmachine(ctx context.Context, zone *types.GetSegLeaderReq, segs []*types.CreateBlocksInfo) (isValid bool, err error)
 	// remove segments in seg_blocks table.
 	RemoveSegBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum int) (err error)
+	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error)
 }
 

@@ -12,7 +12,7 @@ import (
 )
 
 func GetSegmentInfoSql() (sqltext string) {
-	sqltext = "select capacity, backend_size, size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=?"
+	sqltext = "select capacity, backend_size, size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?;"
 	return sqltext
 }
 
@@ -22,19 +22,19 @@ func CreateSegmentInfoSql() (sqltext string) {
 }
 
 func DeleteSegmentInfoSql() (sqltext string) {
-	sqltext = "update segment_info set is_deleted=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	sqltext = "update segment_info set is_deleted=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?;"
 	return sqltext
 }
 
 func getInsertOrUpdateSegInfoSql(ctx context.Context, maxNum int) (sqltext string) {
 	for i := 0; i < maxNum; i ++ {
 		if i == 0 {
-			sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity, size) values(?,?,?,?,?,?)"
+			sqltext = "insert into segment_info(region, bucket_name, seg_id0, seg_id1, capacity, size, is_deleted) values(?,?,?,?,?,?,?)"
 		} else {
-			sqltext += ",(?,?,?,?,?,?)"
+			sqltext += ",(?,?,?,?,?,?,?)"
 		}
 	}
-	sqltext += " on duplicate key update size=values(size);"
+	sqltext += " on duplicate key update size=values(size), is_deleted=values(is_deleted);"
 	return
 }
 
@@ -104,8 +104,12 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.
 			&backendSize,
 			&size,
 		)
-		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, err: %v", err))
+		if err == sql.ErrNoRows {
+			helper.Logger.Warn(ctx, fmt.Sprintf("The seg is not existed, seg_id0: %v, seg_id1: %v, err: %v", seg.SegmentId0, seg.SegmentId1, err))
+			err = nil
+			continue
+		} else if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the seg info, seg_id0: %v, seg_id1: %v, err: %v", seg.SegmentId0, seg.SegmentId1, err))
 			err = ErrYIgFsInternalErr
 			return
 		}
@@ -120,13 +124,13 @@ func(t *TidbClient) GetIncompleteUploadSegs(ctx context.Context, segInfo *types.
 		}
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs by leader, segs number: %v", len(segsResp.UploadSegments)))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get incomplete segs info, segs number: %v", len(segsResp.UploadSegments)))
 	return
 }
 
 func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegmentReq, 
-	segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.GetTheSlowestGrowingSeg, err error) {
-	resp = &types.GetTheSlowestGrowingSeg{}
+	segIds []*types.IncompleteUploadSegInfo) (isExisted bool, resp *types.SegmentInfo, err error) {
+	resp = &types.SegmentInfo{}
 	sqltext := "select capacity, backend_size, size from segment_info where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
 	var stmt *sql.Stmt
 	stmt, err = t.Client.Prepare(sqltext)
@@ -184,7 +188,7 @@ func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.G
 		return
 	} else {
 		isExisted = true
-		resp = &types.GetTheSlowestGrowingSeg {
+		resp = &types.SegmentInfo {
 			SegmentId0: segIds[slowestGrowingSegIndex].SegmentId0,
 			SegmentId1: segIds[slowestGrowingSegIndex].SegmentId1,
 			Capacity: segCapacity,

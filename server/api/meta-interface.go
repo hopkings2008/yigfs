@@ -17,7 +17,7 @@ type YigFsLayer interface {
 	SetFileAttr(ctx context.Context, file *types.SetFileAttrReq) (resp *types.SetFileAttrResp, err error)
 	CheckSegmentLeader(ctx context.Context, segment *types.CreateSegmentReq) (err error) 
 	CreateFileSegment(ctx context.Context, seg *types.CreateSegmentReq) (err error)
-	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error)
+	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, blocksNum uint32, size uint64) (err error)
 	GetFileSegmentsInfo(ctx context.Context, seg *types.GetSegmentReq) (resp *types.GetSegmentResp, err error)
 	UpdateSegBlockInfo(ctx context.Context, seg *types.UpdateSegBlockInfoReq) (err error)
 	GetIncompleteUploadSegs(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segs *types.GetIncompleteUploadSegsResp, err error)
@@ -25,6 +25,7 @@ type YigFsLayer interface {
 	IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error)
 	DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error)
 	CheckFileLeader(ctx context.Context, file *types.DeleteFileReq) (err error)
-	UpdateFileSegments(ctx context.Context, segs *types.UpdateSegmentsReq) (err error)
+	UpdateFileSegments(ctx context.Context, segs *types.UpdateSegmentsReq) (allBlocksNum uint32, maxSize uint64, err error)
 	CheckSegmentsLeader(ctx context.Context, segments *types.UpdateSegmentsReq) (err error)
+	UpdateFileSizeAndBlocksNumByCheck(ctx context.Context, file *types.GetFileInfoReq) (err error)
 }

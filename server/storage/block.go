@@ -13,13 +13,8 @@ import (
 
 var (
 	waitgroup sync.WaitGroup
-	maxUploadNum = 3000
+	maxUploadNum = 5000
 )
-
-type UpdateSegments struct {
-	NeedBlocksNum int
-	LastBlocksNum int
-}
 
 func getIncludeOffsetIndexSegs(ctx context.Context, seg *types.GetSegmentReq, checkOffset int64, 
 	yigFs *YigFsStorage) (segments map[interface{}][]*types.BlockInfo, err error) {
@@ -141,6 +136,7 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 		BucketName: seg.BucketName,
 		Ino: seg.Ino,
 		Generation: seg.Generation,
+		ZoneId: seg.ZoneId,
 	}
 
 	maxEnd := seg.Segment.Blocks[blocksNum-1].SegStartAddr + seg.Segment.Blocks[blocksNum-1].Size
@@ -156,7 +152,6 @@ func (yigFs *YigFsStorage) CreateFileSegment(ctx context.Context, seg *types.Cre
 	segReq := types.CreateBlocksInfo {
 		SegmentId0: seg.Segment.SegmentId0,
 		SegmentId1: seg.Segment.SegmentId1,
-		ZoneId: seg.ZoneId,
 		Leader: seg.Machine,
 		Capacity: seg.Segment.Capacity,
 		MaxSize: maxEnd,
@@ -231,12 +226,9 @@ func(yigFs *YigFsStorage) GetTheSlowestGrowingSeg(ctx context.Context, seg *type
 			return resp, nil
 		}
 
-		// 2. get all the blocks info for the slowest growing segment. 
 		segInfo.Leader = seg.Machine
-		resp, err = yigFs.MetaStorage.Client.GetBlocksBySegId(ctx, segInfo)
-		if err != nil {
-			return
-		}
+		segInfo.Blocks = make([]*types.BlockInfo, 0)
+		resp.Segments = append(resp.Segments, segInfo)
 
 		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to get the slowest growing seg, zone: %v, region: %s, bucket: %s, machine: %v",
 			seg.ZoneId, seg.Region, seg.BucketName, seg.Machine))
@@ -259,8 +251,8 @@ func(yigFs *YigFsStorage) IsFileHasSegments(ctx context.Context, seg *types.GetS
 func uploadBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, blocksNum int, isUpdateInfo bool, yigFs *YigFsStorage) (err error) {
 	err = yigFs.MetaStorage.Client.InsertOrUpdateFileAndSegBlocks(ctx, segInfo, segs, isUpdateInfo, blocksNum)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update blocks, region: %s, bucket: %s, ino: %v, generation: %v",
-			segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to insert or update blocks, region: %s, bucket: %s, ino: %v, generation: %v, err: %v",
+			segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation, err))
 		return
 	}
 	return
@@ -291,9 +283,11 @@ func execUpdateBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, seg
 	return
 }
 
-func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, yigFs *YigFsStorage, action int) (err error) {
-	var lastBlocksNum, needBlocksNum int
+func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, 
+	yigFs *YigFsStorage, action int) (allBlocksNum uint32, maxSize uint64, err error) {
+	var currentBlocksNum int
 	segsReq := make([]*types.CreateBlocksInfo, 0)
+	var fileSize uint64
 
 	for _, seg := range segs {
 		blocksNum := len(seg.Blocks)
@@ -301,6 +295,8 @@ func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInf
 			helper.Logger.Warn(ctx, fmt.Sprintf("The segment does not have blocks to update, seg_id0: %v, seg_id1: %v", seg.SegmentId0, seg.SegmentId1))
 			continue
 		}
+
+		allBlocksNum += uint32(blocksNum)
 
 		maxEnd := seg.Blocks[blocksNum-1].SegStartAddr + seg.Blocks[blocksNum-1].Size
 		for _, block := range seg.Blocks {
@@ -314,108 +310,81 @@ func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInf
 		segReq := types.CreateBlocksInfo {
 			SegmentId0: seg.SegmentId0,
 			SegmentId1: seg.SegmentId1,
-			ZoneId: seg.ZoneId,
 			Leader: seg.Leader,
 			Capacity: seg.Capacity,
 			MaxSize: maxEnd,
 		}
+		segsReq = append(segsReq, &segReq)
 
-		needBlocksNum = 0
-		if lastBlocksNum > 0 {
-			needBlocksNum = maxUploadNum - lastBlocksNum
-			if blocksNum >= needBlocksNum {
-				segReq.Blocks = seg.Blocks[:needBlocksNum]
-				segsReq = append(segsReq, &segReq)
+		for j, block := range seg.Blocks {
+			segReq.Blocks = append(segReq.Blocks, block)
+			currentBlocksNum++
+			if currentBlocksNum == maxUploadNum {
 				err = execUpdateBlocks(ctx, segInfo, segsReq, maxUploadNum, true, action, yigFs)
 				if err != nil {
+					helper.Logger.Error(ctx, fmt.Sprintf("Failed to exec update blocks, segsNum: %v, err: %v", len(segsReq), err))
 					return
 				} else {
-					seg.Blocks = seg.Blocks[needBlocksNum:]
 					segsReq = segsReq[:0]
-					lastBlocksNum = 0
+					segReq.Blocks = segReq.Blocks[:0]
+					currentBlocksNum = 0
+					if j < blocksNum - 1 {
+						segsReq = append(segsReq, &segReq)
+					}
 				}
-			} else {
-				segReq.Blocks = seg.Blocks
-				segsReq = append(segsReq, &segReq)
-				lastBlocksNum += blocksNum
-				continue
 			}
-		}
-		
-		remaingBlocksNum := blocksNum - needBlocksNum
-		if remaingBlocksNum == 0 {
-			continue
-		}
 
-		if remaingBlocksNum > maxUploadNum {
-			cycleNums := int(math.Ceil(float64(remaingBlocksNum)/float64(maxUploadNum)))
-			for i := 0; i < cycleNums; i++ {
-				// update segments
-				if i == cycleNums - 1 {
-					alreadyUpload := (cycleNums - 1) * maxUploadNum
-					lastCycleBlocksNum := remaingBlocksNum - alreadyUpload
-					segReq.Blocks = seg.Blocks[alreadyUpload:]
-					segsReq = append(segsReq, &segReq)
-					if lastBlocksNum == maxUploadNum {
-						err = execUpdateBlocks(ctx, segInfo, segsReq, maxUploadNum, true, action, yigFs)
-						if err != nil {
-							return
-						} else {
-							segsReq = segsReq[:0]
-							lastBlocksNum = 0
-						}
-					} else {
-						lastBlocksNum += lastCycleBlocksNum
-					}
-				} else {
-					segReq.Blocks = seg.Blocks[i * maxUploadNum: (i+1) * maxUploadNum]
-					segsReq = append(segsReq, &segReq)
-					err = execUpdateBlocks(ctx, segInfo, segsReq, maxUploadNum, false, action, yigFs)
-					if err != nil {
-						return
-					} else {
-						segsReq = segsReq[:0]
-						lastBlocksNum = 0
-					}
-				}
+			fileSize = uint64(block.Offset) + uint64(block.Size)
+			if fileSize > maxSize {
+				maxSize = fileSize
 			}
-		} else {
-			segReq.Blocks = seg.Blocks[blocksNum - remaingBlocksNum:]
-			segsReq = append(segsReq, &segReq)
-			lastBlocksNum += remaingBlocksNum
 		}
 	}
 
 	if len(segsReq) > 0 {
-		err = execUpdateBlocks(ctx, segInfo, segsReq, lastBlocksNum, true, action, yigFs)
+		remainBlocksNum := 0
+		for _, seg := range segsReq {
+			remainBlocksNum += len(seg.Blocks)
+		}
+		err = execUpdateBlocks(ctx, segInfo, segsReq, remainBlocksNum, true, action, yigFs)
 		if err != nil {
 			return
 		}
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file segments, region: %s, bucket: %s, ino: %d, generation: %d,",
-		segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to del blocks, action: %v, region: %s, bucket: %s, ino: %d, generation: %d",
+		action, segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation))
 	return
 }
 
-func (yigFs *YigFsStorage) UpdateFileSegments(ctx context.Context, segs *types.UpdateSegmentsReq) (err error) {
+func (yigFs *YigFsStorage) UpdateFileSegments(ctx context.Context, segs *types.UpdateSegmentsReq) (allBlocksNum uint32, maxSize uint64, err error) {
 	segInfo := &types.DescriptBlockInfo {
 		Region: segs.Region,
 		BucketName: segs.BucketName,
 		Ino: segs.Ino,
 		Generation: segs.Generation,
+		ZoneId: segs.ZoneId,
 	}
 
-	err = delRemoveAndUploadSegs(ctx, segInfo, segs.Segments, yigFs, types.UpdateSegs)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to upload segments, region: %s, bucket: %s, ino: %d, generation: %d,",
-			segs.Region, segs.BucketName, segs.Ino, segs.Generation))
+	if len(segs.Segments) > 0 {
+		allBlocksNum, maxSize, err = delRemoveAndUploadSegs(ctx, segInfo, segs.Segments, yigFs, types.UpdateSegs)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to upload segments, region: %s, bucket: %s, ino: %d, generation: %d,",
+				segs.Region, segs.BucketName, segs.Ino, segs.Generation))
+			return 0, 0, err
+		}
 	}
 
-	err = delRemoveAndUploadSegs(ctx, segInfo, segs.RemoveSegments, yigFs, types.RemoveSegs)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to remove segments, region: %s, bucket: %s, ino: %d, generation: %d,",
-			segs.Region, segs.BucketName, segs.Ino, segs.Generation))
+	removeSegsNum := len(segs.RemoveSegments)
+	if removeSegsNum > 0 {
+		helper.Logger.Info(ctx, fmt.Sprintf("Begin to remove segments, region: %s, bucket: %s, ino: %d, generation: %d, removeSegsNum: %v",
+			segs.Region, segs.BucketName, segs.Ino, segs.Generation, removeSegsNum))
+		_, _, err = delRemoveAndUploadSegs(ctx, segInfo, segs.RemoveSegments, yigFs, types.RemoveSegs)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to remove segments, region: %s, bucket: %s, ino: %d, generation: %d,",
+				segs.Region, segs.BucketName, segs.Ino, segs.Generation))
+			return 0, 0, err
+		}
 	}
 
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file segments, region: %s, bucket: %s, ino: %d, generation: %d,",
