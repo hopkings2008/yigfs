@@ -6,8 +6,9 @@ use std::thread::JoinHandle;
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
+use metaservice_mgr::types::{Segment, Block};
 use crate::types::MsgGetBlocks;
-use crate::types::{Block, FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle, Segment};
+use crate::types::{FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle};
 use log::{warn, error};
 
 pub struct FileHandleMgr {

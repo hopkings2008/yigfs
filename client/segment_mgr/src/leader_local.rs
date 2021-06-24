@@ -2,12 +2,13 @@ use std::sync::Arc;
 use std::time::Instant;
 use common::runtime::Executor;
 use common::error::Errno;
+use metaservice_mgr::types::{Segment, Block};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
 use log::{info, warn, error};
 use crate::{leader::Leader, segment_sync::SegSyncer};
 use crate::file_handle::FileHandleMgr;
-use crate::types::{FileHandle, Block, BlockIo, Segment};
+use crate::types::{FileHandle, BlockIo};
 use crate::segment_mgr::SegmentMgr;
 
 pub struct LeaderLocal {

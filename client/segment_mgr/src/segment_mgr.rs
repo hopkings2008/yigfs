@@ -2,11 +2,11 @@ extern crate tokio;
 extern crate hash_ring;
 
 use std::sync::Arc;
-use crate::types::{Block, Segment, DataDir};
+use crate::types::DataDir;
 use common::{error::Errno, numbers::NumberOp};
 use common::config::Config;
 use metaservice_mgr::mgr::MetaServiceMgr;
-use metaservice_mgr::types::Segment as MetaSegment;
+use metaservice_mgr::types::{Segment, Block};
 use hash_ring::HashRing;
 use log::error;
 
@@ -22,8 +22,7 @@ pub struct SegmentMgr {
 impl SegmentMgr {
     // make sure this function is threadsafe.
     pub fn get_file_segments(&self, ino: u64, leader: &String)-> Result<Vec<Segment>, Errno> {
-        let mut segments : Vec<Segment> = Vec::new();
-        let segs : Vec<metaservice_mgr::types::Segment>;
+        let mut segs : Vec<Segment>;
         let ret = self.meta_service_mgr.get_file_segments(ino, None, None);
         match ret {
             Ok(ret) => {
@@ -37,34 +36,11 @@ impl SegmentMgr {
         if segs.is_empty() {
             // create new segment and set it's max_size.
             let seg = self.new_segment(leader);
-            segments.push(seg);
-            return Ok(segments);
+            segs.push(seg);
         }
-        for s in segs {
-            let mut segment : Segment = Default::default();
-            segment.seg_id0 = s.seg_id0;
-            segment.seg_id1 = s.seg_id1;
-            segment.capacity = s.capacity;
-            segment.leader = s.leader;
-            segment.size = s.size;
-            segment.backend_size = s.backend_size;
-            for b in s.blocks {
-                let block = Block{
-                    ino: ino,
-                    generation: 0,
-                    offset: b.offset,
-                    seg_id0: s.seg_id0,
-                    seg_id1: s.seg_id1,
-                    seg_start_addr: b.seg_start_addr,
-                    size: b.size,
-                };
-                segment.blocks.push(block);
-            }
-            segments.push(segment);
-        }
-
+        
         //println!("the segments of ino: {} are: {:?}", ino, segments);
-        Ok(segments)
+        Ok(segs)
     }
 
     pub fn new_segment(&self, leader: &String) -> Segment {
@@ -108,7 +84,7 @@ impl SegmentMgr {
         let data_dir = &self.data_dirs[idx];
         let mut seg = Segment::rich_new(seg_id0, seg_id1, data_dir.size, self.meta_service_mgr.get_machine_id());
         seg.add_block(ino, b.offset,b.seg_start_addr, b.size);
-        let ret = self.meta_service_mgr.add_file_block(ino, &seg.to_meta_segment());
+        let ret = self.meta_service_mgr.add_file_block(ino, &seg);
         return ret;
     }
 
@@ -118,11 +94,7 @@ impl SegmentMgr {
     }
 
     pub fn update_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno {
-        let mut ms = Vec::<MetaSegment>::new();
-        for s in segs {
-            ms.push(s.to_meta_segment());
-        }
-        let ret = self.meta_service_mgr.update_file_segments(ino, &ms);
+        let ret = self.meta_service_mgr.update_file_segments(ino, &segs);
         if !ret.is_success() {
             error!("update_segments: failed to update segments for ino: {}, err: {:?}", ino, ret);
             return ret;

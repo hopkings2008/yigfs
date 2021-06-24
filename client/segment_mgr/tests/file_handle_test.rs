@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use segment_mgr::{file_handle::FileHandleMgr, types::Block};
-use segment_mgr::types::{FileHandle, Segment};
+use metaservice_mgr::types::{Segment, Block};
+use segment_mgr::file_handle::FileHandleMgr;
+use segment_mgr::types::FileHandle;
 use interval_tree::tree::IntervalTree;
 
 #[test]

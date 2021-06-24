@@ -1,6 +1,7 @@
 extern crate serde;
 
 use serde::{Serialize, Deserialize};
+use crate::types::{Segment, Block};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ReqReadDir {
@@ -209,24 +210,6 @@ pub struct RespSetFileAttr {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct MsgSegment {
-    pub seg_id0: u64,
-    pub seg_id1: u64,
-    pub capacity: u64,
-    pub size: u64,
-    pub backend_size: u64,
-    pub leader: String,
-    pub blocks: Vec<MsgBlock>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct MsgBlock {
-    pub offset: u64,
-    pub seg_start_addr: u64,
-    pub size: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ReqGetSegments {
     pub region: String,
     pub bucket: String,
@@ -245,7 +228,7 @@ pub struct ReqGetSegments {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct RespGetSegments {
     pub result: RespResult,
-    pub segments: Vec<MsgSegment>,
+    pub segments: Vec<Segment>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -255,7 +238,7 @@ pub struct ReqUpdateSegments{
     pub zone: String,
     pub ino: u64,
     pub generation: u64,
-    pub segments: Vec<MsgSegment>,
+    pub segments: Vec<Segment>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -271,7 +254,7 @@ pub struct ReqAddBlock{
     pub machine: String,
     pub ino: u64,
     pub generation: u64,
-    pub segment: MsgSegment,
+    pub segment: Segment,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

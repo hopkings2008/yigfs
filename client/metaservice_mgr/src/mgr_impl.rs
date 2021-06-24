@@ -14,7 +14,7 @@ use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
 use common::runtime::Executor;
-use message::{MsgBlock, MsgFileAttr, MsgSegment, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, 
+use message::{MsgFileAttr, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, 
     ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, 
     RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment, ReqDeleteFile, RespDeleteFile};
 
@@ -386,26 +386,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             body, resp.result.err_code, resp.result.err_msg);
             return Err(Errno::Eintr);
         }
-        let mut segments: Vec<Segment> = Vec::new();
-        for s in resp.segments {
-            let mut segment : Segment = Default::default();
-            segment.seg_id0 = s.seg_id0;
-            segment.seg_id1 = s.seg_id1;
-            segment.capacity = s.capacity;
-            segment.backend_size = s.backend_size;
-            segment.size = s.size;
-            segment.leader = s.leader;
-            for b in s.blocks {
-                let block = Block{
-                    offset: b.offset,
-                    seg_start_addr: b.seg_start_addr,
-                    size: b.size,
-                };
-                segment.blocks.push(block);
-            }
-            segments.push(segment);
-        }
-        Ok(segments)
+        return Ok(resp.segments.clone());
     }
 
     fn get_machine_id(&self) -> String {
@@ -413,7 +394,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
     }
 
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno {
-        let mut s = MsgSegment{
+        let mut s = Segment{
             seg_id0: seg.seg_id0,
             seg_id1: seg.seg_id1,
             capacity: seg.capacity,
@@ -423,8 +404,12 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             blocks: Vec::new(),
         };
         for b in &seg.blocks {
-            let bl = MsgBlock {
+            let bl = Block {
+                ino: ino,
+                generation: 0,
                 offset: b.offset,
+                seg_id0: seg.seg_id0,
+                seg_id1: seg.seg_id1,
                 seg_start_addr: b.seg_start_addr,
                 size: b.size,
             };
@@ -493,18 +478,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
     }
 
     fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno{
-        let mut vs: Vec<MsgSegment> = Vec::new();
-        for s in segs {
-            vs.push(MetaServiceMgrImpl::to_msg_segment(s));
-        }
-
         let req_update_seg = ReqUpdateSegments {
             region: self.region.clone(),
             bucket: self.bucket.clone(),
             zone: self.zone.clone(),
             ino: ino,
             generation: 0,
-            segments: vs,
+            segments: segs.clone(),
         };
 
         let body: String;
@@ -763,30 +743,6 @@ impl MetaServiceMgrImpl {
             machine: meta_cfg.zone_config.machine.clone(),
             exec: exec.clone(),
         })
-    }
-
-    fn to_msg_block(b: &Block) -> MsgBlock {
-        MsgBlock{
-            offset: b.offset,
-            seg_start_addr: b.seg_start_addr,
-            size: b.size,
-        }
-    }
-
-    fn to_msg_segment(s: &Segment) -> MsgSegment {
-        let mut m = MsgSegment {
-            seg_id0: s.seg_id0,
-            seg_id1: s.seg_id1,
-            capacity: s.capacity,
-            size: s.size,
-            backend_size: s.backend_size,
-            leader: s.leader.clone(),
-            blocks: Vec::new(),
-        };
-        for b in &s.blocks {
-            m.blocks.push(MetaServiceMgrImpl::to_msg_block(b));
-        }
-        return m;
     }
 
     fn to_file_attr(&self, msg_attr: &MsgFileAttr) -> FileAttr {
