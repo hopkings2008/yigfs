@@ -239,6 +239,7 @@ pub struct ReqUpdateSegments{
     pub ino: u64,
     pub generation: u64,
     pub segments: Vec<Segment>,
+    pub remove_segments: Vec<Segment>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

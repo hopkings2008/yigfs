@@ -15,7 +15,7 @@ pub trait MetaServiceMgr: Send + Sync {
     fn get_file_segments(&self, ino: u64, offset: Option<u64>, size: Option<i64>) -> Result<Vec<Segment>, Errno>;
     fn get_machine_id(&self) -> String;
     fn add_file_block(&self, ino: u64, seg: &Segment) -> Errno;
-    fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno;
+    fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>, removed_segs: &Vec<Segment>) -> Errno;
     fn upload_segment(&self, id0: u64, id1: u64, next_offset: u64) -> Errno;
     fn heartbeat(&self)-> Result<HeartbeatResult, Errno>;
     fn delete_file(&self, ino: u64) -> Errno;

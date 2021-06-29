@@ -306,8 +306,9 @@ impl Leader for LeaderLocal {
         }
         // update the segments into meta server.
         let segments = handle.get_segments();
-        if handle.is_dirty() && !segments.is_empty() {
-            let ret = self.segment_mgr.update_segments(ino, &segments);
+        let removed_segs = handle.get_garbage_blocks();
+        if handle.is_dirty() && (!segments.is_empty() || !removed_segs.is_empty()) {
+            let ret = self.segment_mgr.update_segments(ino, &segments, &removed_segs);
             if !ret.is_success(){
                 error!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);
                 return ret;

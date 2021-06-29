@@ -93,8 +93,8 @@ impl SegmentMgr {
         self.data_dirs[idx].dir.clone()
     }
 
-    pub fn update_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno {
-        let ret = self.meta_service_mgr.update_file_segments(ino, &segs);
+    pub fn update_segments(&self, ino: u64, segs: &Vec<Segment>, removed_segs: &Vec<Segment>) -> Errno {
+        let ret = self.meta_service_mgr.update_file_segments(ino, &segs, &removed_segs);
         if !ret.is_success() {
             error!("update_segments: failed to update segments for ino: {}, err: {:?}", ino, ret);
             return ret;

@@ -480,7 +480,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
         return Errno::Esucc;
     }
 
-    fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>) -> Errno{
+    fn update_file_segments(&self, ino: u64, segs: &Vec<Segment>, removed_segs: &Vec<Segment>) -> Errno{
         let req_update_seg = ReqUpdateSegments {
             region: self.region.clone(),
             bucket: self.bucket.clone(),
@@ -488,6 +488,7 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
             ino: ino,
             generation: 0,
             segments: segs.clone(),
+            remove_segments: removed_segs.clone(),
         };
 
         let body: String;
