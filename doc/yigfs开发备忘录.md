@@ -16,8 +16,9 @@
 6. 多个连续的write操作可以合并为一个操作
 7. 优化read接口中，对于offset+size在segment中的定位，目前是O(n)的时间，可以优化为O(log(n))的时间(已完成)
 8. add request identifier and record it in the log
-9. 减少segments及blocks的拷贝次数
+9. 减少segments及blocks的拷贝次数(已完成)
 10. 记录被修改的block，对于文件的修改和写入，只传输被修改的blocks
+11. oflags关联到filehandle中进行后续的判断
 
 
 # yigfs测试说明
