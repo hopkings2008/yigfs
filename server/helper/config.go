@@ -13,6 +13,7 @@ const (
 type Config struct {
 	TidbConfig            TidbConfig          `toml:"tidb_config"`
 	MetaServiceConfig     MetaServiceConfig   `toml:"meta_service_config"`
+	KafkaConfig           KafkaConfig         `toml:"kafka_config"`
 }
 
 type TidbConfig struct {
@@ -26,6 +27,12 @@ type MetaServiceConfig struct {
 	LogLevel          string        `toml:"log_level"`
 	TlsKeyFile        string        `toml:"tls_key_file"`
 	TlsCertFile       string        `toml:"tls_cert_file"`
+}
+
+type KafkaConfig struct {
+	Server string `toml:"kafka_server_list"`
+	Enabled bool `toml:"kafka_enable"`
+	Type int `toml:"msg_bus_type"`
 }
 
 var CONFIG Config
@@ -49,6 +56,7 @@ func MarshalTOMLConfig() error {
 	// setup CONFIG with defaults
 	CONFIG.TidbConfig = c.TidbConfig
 	CONFIG.MetaServiceConfig = c.MetaServiceConfig
+	CONFIG.KafkaConfig = c.KafkaConfig
 
 	return nil
 }

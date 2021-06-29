@@ -201,7 +201,7 @@ func(t *TidbClient) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.G
 	return
 }
 
-func(t *TidbClient) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error) {
+func(t *TidbClient) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int) (err error) {
 	start := time.Now().UTC().UnixNano()
 	var stmt *sql.Stmt
 	sqltext := DeleteSegmentInfoSql()
@@ -243,6 +243,6 @@ func(t *TidbClient) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq
 	}
 
 	end := time.Now().UTC().UnixNano()
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment blocks, blocksNum: %v, cost: %v", len(segs), end - start))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment info, blocksNum: %v, cost: %v", len(segs), end - start))
 	return
 }

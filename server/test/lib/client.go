@@ -38,6 +38,7 @@ const (
 	Machine2 = "172.20.13.156"
 	Capacity = 64 * 1024 * 1024
 	LatestedOffset = 256
+	NewFileName = "test.txt2"
 )
 
 func SendHttpToYigFs(method string, newServer string, client *http.Client, reqStr []byte) (result io.ReadCloser, err error) {

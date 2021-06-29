@@ -17,10 +17,26 @@ func CheckSegHasBlocksSql() (sqltext string) {
 	return sqltext
 }
 
-func DeleteSegBlocksSql() (sqltext string) {
-	sqltext = "update segment_blocks join (select seg_id0 as segId0, seg_id1 as segId1, seg_start_addr as startAddr from file_blocks where region=? and bucket_name=?" + 
-		" and ino=? and generation=? and is_deleted=?) b set is_deleted=? where seg_id0=b.segId0 and seg_id1=b.segId1 and seg_start_addr=b.startAddr;"
+func deleteSegBlocksSql(blocksNum int) (sqltext string) {
+	for i := 0; i < blocksNum; i++ {
+		if i == 0 {
+			sqltext = "update segment_blocks set is_deleted=? where seg_id0=? and seg_id1=? and seg_start_addr in (?"
+		} else {
+			sqltext += ",?"
+		}
+	}
+	sqltext += ");"
+
 	return sqltext
+}
+
+func getDeleteAllSegBlocksArgs(segId0, segId1 uint64, startAddrs []int) (args []interface{}) {
+	args = []interface{}{types.Deleted, segId0, segId1}
+	for _, startAddr := range startAddrs {
+		args = append(args, startAddr)
+	}
+	
+	return args
 }
 
 func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegmentReq, segs map[interface{}][]*types.BlockInfo) (resp *types.GetSegmentResp, err error) {
@@ -71,20 +87,54 @@ func (t *TidbClient) GetSegsBlockInfo(ctx context.Context, seg *types.GetSegment
 	return
 }
 
-func(t *TidbClient) DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error) {
+func(t *TidbClient) DeleteSegBlocks(ctx context.Context, segs map[interface{}][]int) (err error) {
 	start := time.Now().UTC().UnixNano()
-	sqltext := DeleteSegBlocksSql()
-	_, err = t.Client.Exec(sqltext, file.Region, file.BucketName, file.Ino, file.Generation, types.NotDeleted, types.Deleted)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete seg blocks for the file, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
-			file.Region, file.BucketName, file.Ino, file.Generation, err))
-		err = ErrYIgFsInternalErr
-		return
+	var sqltext string
+	var num int
+	for seg, startAddrs := range segs {
+		num = 0
+		segId := seg.([2]uint64)
+		blocksNum := len(startAddrs)
+		args := []interface{}{types.Deleted, segId[0], segId[1]}
+		if blocksNum > types.MaxDeleteBlocksNum {
+			for _, startAddr := range startAddrs {
+				num ++
+				args = append(args, startAddr)
+				if num == types.MaxDeleteBlocksNum {
+					sqltext = deleteSegBlocksSql(types.MaxDeleteBlocksNum)
+					_, err = t.Client.Exec(sqltext, args...)
+					if err != nil {
+						helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete seg blocks, segId0: %v, segId1: %v, err: %v", segId[0], segId[1], err))
+						return
+					} else {
+						num = 0
+						args = args[:3]
+					}
+				}
+			}
+
+			remainBlocksNum := len(args) - 3
+			if remainBlocksNum > 0 {
+				sqltext = deleteSegBlocksSql(remainBlocksNum)
+				_, err = t.Client.Exec(sqltext, args...)
+				if err != nil {
+					helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete remain seg blocks, segId0: %v, segId1: %v, err: %v", segId[0], segId[1], err))
+					return
+				}
+			}
+		} else {
+			sqltext = deleteSegBlocksSql(blocksNum)
+			getArgs := getDeleteAllSegBlocksArgs(segId[0], segId[1], startAddrs)
+			_, err = t.Client.Exec(sqltext, getArgs...)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete seg blocks, segId0: %v, segId1: %v, err: %v", segId[0], segId[1], err))
+				return
+			}
+		}
 	}
 	
 	end := time.Now().UTC().UnixNano()
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete seg blocks for the file, region: %v, bucket: %v, ino: %v, generation: %v, cost: %v", 
-		file.Region, file.BucketName, file.Ino, file.Generation, end-start))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete seg blocks, segsNum: %v, cost: %v", len(segs), end - start))
 	return
 }
 

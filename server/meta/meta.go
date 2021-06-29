@@ -6,6 +6,9 @@ import (
 	"github.com/hopkings2008/yigfs/server/meta/client"
 )
 
+
+var TidbMeta *Meta
+
 type Meta struct {
 	Client client.Client
 }
@@ -17,5 +20,6 @@ func New() *Meta {
 	} else {
 		panic("unsupport metastore")
 	}
+	TidbMeta = &meta
 	return &meta
 }

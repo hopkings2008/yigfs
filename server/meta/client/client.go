@@ -53,23 +53,24 @@ type Client interface {
 	// check whether the file has segments or not
 	IsFileHasSegments(ctx context.Context, seg *types.GetSegmentReq) (isExisted bool, err error)
 	// get segments info for the file
-	GetAllExistedFileSegs(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}]struct{}, err error)
+	GetAllExistedFileSegs(ctx context.Context, file *types.DeleteFileReq) (segs map[interface{}][]int, offsets []int64, err error)
 	// delete blocks in file_blocks table
-	DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq) (err error) 
+	DeleteFileBlocks(ctx context.Context, file *types.DeleteFileReq, offsets []int64) (err error)
 	// delete the targe file
 	DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error)
 	// delete segment blocks
-	DeleteSegBlocks(ctx context.Context, file *types.DeleteFileReq) (err error)
+	DeleteSegBlocks(ctx context.Context, segs map[interface{}][]int) (err error)
 	// delete segments info
-	DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error)
+	DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int) (err error)
 	// insert or update blocks in file_blocks and seg_blocks table
 	InsertOrUpdateFileAndSegBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, isUpdateInfo bool, blocksNum int) (err error)
 	// update size and blocks number for the file
 	UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq, blocksNum uint32, size uint64) (err error)
 	// check segments machine
 	CheckSegsmachine(ctx context.Context, zone *types.GetSegLeaderReq, segs []*types.CreateBlocksInfo) (isValid bool, err error)
-	// remove segments in seg_blocks table.
-	RemoveSegBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum int) (err error)
+	// update file size and blocks number
 	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error)
+	// delete segment blocks
+	RemoveSegBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum int) (err error)
 }
 

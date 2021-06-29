@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"sync"
 	"math"
+	"encoding/json"
+	"time"
 
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/types"
+	"github.com/hopkings2008/yigfs/server/message/builder"
 )
 
 var (
@@ -267,24 +270,8 @@ func removeBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum
 	return
 }
 
-func execUpdateBlocks(ctx context.Context, segInfo *types.DescriptBlockInfo, segsReq []*types.CreateBlocksInfo, blocksNum int, 
-	isUpdateInfo bool, action int, yigFs *YigFsStorage) (err error) {
-	if action == types.UpdateSegs {
-		err = uploadBlocks(ctx, segInfo, segsReq, blocksNum, isUpdateInfo, yigFs)
-		if err != nil {
-			return
-		}
-	} else if action == types.RemoveSegs {
-		err = removeBlocks(ctx, segsReq, blocksNum, yigFs)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, 
-	yigFs *YigFsStorage, action int) (allBlocksNum uint32, maxSize uint64, err error) {
+func delUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInfo, segs []*types.CreateBlocksInfo, 
+	yigFs *YigFsStorage) (allBlocksNum uint32, maxSize uint64, err error) {
 	var currentBlocksNum int
 	segsReq := make([]*types.CreateBlocksInfo, 0)
 	var fileSize uint64
@@ -320,7 +307,7 @@ func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInf
 			segReq.Blocks = append(segReq.Blocks, block)
 			currentBlocksNum++
 			if currentBlocksNum == maxUploadNum {
-				err = execUpdateBlocks(ctx, segInfo, segsReq, maxUploadNum, true, action, yigFs)
+				err = uploadBlocks(ctx, segInfo, segsReq, maxUploadNum, true, yigFs)
 				if err != nil {
 					helper.Logger.Error(ctx, fmt.Sprintf("Failed to exec update blocks, segsNum: %v, err: %v", len(segsReq), err))
 					return
@@ -346,14 +333,14 @@ func delRemoveAndUploadSegs(ctx context.Context, segInfo *types.DescriptBlockInf
 		for _, seg := range segsReq {
 			remainBlocksNum += len(seg.Blocks)
 		}
-		err = execUpdateBlocks(ctx, segInfo, segsReq, remainBlocksNum, true, action, yigFs)
+		err = uploadBlocks(ctx, segInfo, segsReq, remainBlocksNum, true, yigFs)
 		if err != nil {
 			return
 		}
 	}
 
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to del blocks, action: %v, region: %s, bucket: %s, ino: %d, generation: %d",
-		action, segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to del blocks, region: %s, bucket: %s, ino: %d, generation: %d",
+		segInfo.Region, segInfo.BucketName, segInfo.Ino, segInfo.Generation))
 	return
 }
 
@@ -367,7 +354,7 @@ func (yigFs *YigFsStorage) UpdateFileSegments(ctx context.Context, segs *types.U
 	}
 
 	if len(segs.Segments) > 0 {
-		allBlocksNum, maxSize, err = delRemoveAndUploadSegs(ctx, segInfo, segs.Segments, yigFs, types.UpdateSegs)
+		allBlocksNum, maxSize, err = delUploadSegs(ctx, segInfo, segs.Segments, yigFs)
 		if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to upload segments, region: %s, bucket: %s, ino: %d, generation: %d,",
 				segs.Region, segs.BucketName, segs.Ino, segs.Generation))
@@ -377,14 +364,25 @@ func (yigFs *YigFsStorage) UpdateFileSegments(ctx context.Context, segs *types.U
 
 	removeSegsNum := len(segs.RemoveSegments)
 	if removeSegsNum > 0 {
-		helper.Logger.Info(ctx, fmt.Sprintf("Begin to remove segments, region: %s, bucket: %s, ino: %d, generation: %d, removeSegsNum: %v",
-			segs.Region, segs.BucketName, segs.Ino, segs.Generation, removeSegsNum))
-		_, _, err = delRemoveAndUploadSegs(ctx, segInfo, segs.RemoveSegments, yigFs, types.RemoveSegs)
+		// put delete file param to kafka.
+		start := time.Now().UTC().UnixNano()
+		var value []byte
+		value, err = json.Marshal(segs.RemoveSegments)
 		if err != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to remove segments, region: %s, bucket: %s, ino: %d, generation: %d,",
-				segs.Region, segs.BucketName, segs.Ino, segs.Generation))
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to make fileReq to json, err: %v", err))
 			return 0, 0, err
 		}
+
+		err = builder.SendMessage(types.DeleteBlocksTopic, types.DeleteBlocks, value)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to send delete blocks msg, err: %v", err))
+			return
+		}
+		end := time.Now().UTC().UnixNano()
+		helper.Logger.Info(ctx, fmt.Sprintf("put delete blocks to kafka cost: %v", end - start))
+
+		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to put remove segments to kafka, region: %s, bucket: %s, ino: %d, generation: %d, removeSegsNum: %v",
+			segs.Region, segs.BucketName, segs.Ino, segs.Generation, removeSegsNum))
 	}
 
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file segments, region: %s, bucket: %s, ino: %d, generation: %d,",

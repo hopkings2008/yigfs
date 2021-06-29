@@ -23,6 +23,6 @@ func(m *Meta) GetTheSlowestGrowingSeg(ctx context.Context, segReq *types.GetSegm
 	return m.Client.GetTheSlowestGrowingSeg(ctx, segReq, segIds)
 }
 
-func(m *Meta) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}]struct{}) (err error) {
+func(m *Meta) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq, segs map[interface{}][]int) (err error) {
 	return m.Client.DeleteSegInfo(ctx, file, segs) 
 }

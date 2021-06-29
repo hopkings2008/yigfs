@@ -3,10 +3,13 @@ package storage
 import (
 	"context"
 	"fmt"
+	"encoding/json"
+	"time"
 
 	"github.com/hopkings2008/yigfs/server/types"
 	. "github.com/hopkings2008/yigfs/server/error"
 	"github.com/hopkings2008/yigfs/server/helper"
+	"github.com/hopkings2008/yigfs/server/message/builder"
 )
 
 
@@ -150,38 +153,21 @@ func(yigFs *YigFsStorage) SetFileAttr(ctx context.Context, file *types.SetFileAt
 }
 
 func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (err error) {
-	segs, err := yigFs.MetaStorage.Client.GetAllExistedFileSegs(ctx, file)
-	if err != nil && err != ErrYigFsNoVaildSegments {
-		return err
-	} else if err == ErrYigFsNoVaildSegments || len(segs) == 0 {
-		helper.Logger.Warn(ctx, fmt.Sprintf("The file does not have segments to deleted, region: %s, bucket: %s, ino: %d, generation: %v",
-			file.Region, file.BucketName, file.Ino, file.Generation))
+	// put delete file param to kafka.
+	start := time.Now().UTC().UnixNano()
+	value, err := json.Marshal(file)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to make fileReq to json, err: %v", err))
 		return
 	}
 
-	// delete seg blocks
-	err = yigFs.MetaStorage.Client.DeleteSegBlocks(ctx, file)
+	err = builder.SendMessage(types.DeleteBlocksTopic, types.DeleteFile, value)
 	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
-			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to send delete file msg, err: %v", err))
 		return
 	}
-
-	// delete seg info
-	err = yigFs.MetaStorage.Client.DeleteSegInfo(ctx, file, segs)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted seg info, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
-			file.Region, file.BucketName, file.Ino, file.Generation, err))
-		return
-	}
-
-	// delete file blocks.
-	err = yigFs.MetaStorage.Client.DeleteFileBlocks(ctx, file)
-	if err != nil {
-		helper.Logger.Error(ctx, fmt.Sprintf("Failed to deleted file and seg blocks, region: %s, bucket: %s, ino: %d, generation: %v, err: %v",
-			file.Region, file.BucketName, file.Ino, file.Generation, err))
-		return
-	}
+	end := time.Now().UTC().UnixNano()
+	helper.Logger.Info(ctx, fmt.Sprintf("put delete file to kafka cost: %v", end - start))
 
 	// delete file info.
 	err = yigFs.MetaStorage.Client.DeleteFile(ctx, file)
@@ -189,6 +175,8 @@ func(yigFs *YigFsStorage) DeleteFile(ctx context.Context, file *types.DeleteFile
 		return
 	}
 
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete file, region: %s, bucket: %s, ino: %d, generation: %v", 
+		file.Region, file.BucketName, file.Ino, file.Generation))
 	return
 }
 
