@@ -199,7 +199,7 @@ impl Leader for LeaderLocal {
         let mut id1 = last_segment[1];
         let mut seg_max_size = last_segment[2];
         let mut seg_size = last_segment[3];
-        let mut need_sync = last_segment[4];
+        let need_sync = last_segment[4];
         let mut direct_io = false;
         if need_sync == 1 {
             direct_io = true;
