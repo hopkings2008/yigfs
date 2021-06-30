@@ -8,9 +8,13 @@ import (
 	"syscall"
 
 	"github.com/hopkings2008/yigfs/server/api"
+	"github.com/hopkings2008/yigfs/server/asynctasks"
 	"github.com/hopkings2008/yigfs/server/helper"
 	"github.com/hopkings2008/yigfs/server/log"
+	"github.com/hopkings2008/yigfs/server/message/builder"
+	_ "github.com/hopkings2008/yigfs/server/message/kafka/producer"
 	"github.com/hopkings2008/yigfs/server/storage"
+	"github.com/hopkings2008/yigfs/server/types"
 	"github.com/kataras/iris"
 )
 
@@ -76,6 +80,25 @@ func main() {
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	isHTTP2 := false
     
+	// create topic and producer
+	err := builder.CreateTopics(types.DeleteBlocksTopic, 1)
+	if err != nil {
+		helper.Logger.Error(nil, fmt.Sprintf("Failed to create DeleteBlocksTopic, err: %v", err))
+		panic("failed to create DeleteBlocksTopic")
+	}
+	
+	producer, err := builder.GetMessageSender()
+	if err != nil {
+		helper.Logger.Error(nil, fmt.Sprintf("Failed to create producer, err: %v", err))
+		panic("failed to create producer")
+	} else if producer == nil {
+		helper.Logger.Error(nil, "Failed to create producer, the producer is nil")
+		panic("failed to create producer, the producer is nil")
+	}
+
+	// run async task
+	go asynctasks.RunTasks()
+
 	go func() {
 		var err error
 		if isHTTP2 {

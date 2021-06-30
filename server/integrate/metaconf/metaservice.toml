@@ -9,3 +9,7 @@ log_level = "info"
 tls_key_file = "/etc/yigfsmeta/serverkey.pem"
 tls_cert_file = "/etc/yigfsmeta/servercert.pem"
 
+[kafka_config]
+kafka_enable = true
+msg_bus_type = 1
+kafka_server_list = "172.27.143.244:9092,172.27.143.245:9092,172.27.143.246:9092"

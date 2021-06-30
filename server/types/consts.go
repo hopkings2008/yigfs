@@ -45,6 +45,17 @@ const (
 )
 
 const (
-	UpdateSegs = iota
-	RemoveSegs
+	DeleteBlocks = "delete_blocks"
+	DeleteFile = "delete_file"
+)
+
+const (
+	MaxDeleteBlocksNum = 3000
+	MaxDeleteFileBlocksNum = 50000
+	MaxDeleteSegBlocks = 3000
+)
+
+const (
+	DeleteBlocksGroup = "deleteGroup"
+	DeleteBlocksTopic = "deleteBlocksTopic"
 )

@@ -43,6 +43,9 @@ const (
 	ErrYigFsNoVaildSegments
 	ErrYigFsMachineNotMatchFileLeader
 	ErrYigFsLeaderStatusIsInvalid
+	ErrYigFsFailedCreateMessageProducer
+	ErrYigFsFailedCreateMessageConsumer
+	ErrYigFsFailedToSendMessage
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -135,6 +138,21 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsLeaderStatusIsInvalid",
 		Description:    "The leader's status is not up.",
 		HttpStatusCode: 40016,
+	},
+	ErrYigFsFailedCreateMessageProducer: {
+		AwsErrorCode:   "ErrYigFsFailedCreateMessageProducer",
+		Description:    "Failed to get message producer.",
+		HttpStatusCode: 40017,
+	},
+	ErrYigFsFailedCreateMessageConsumer: {
+		AwsErrorCode:   "ErrYigFsFailedCreateMessageConsumer",
+		Description:    "Failed to get message consumer.",
+		HttpStatusCode: 40018,
+	},
+	ErrYigFsFailedToSendMessage: {
+		AwsErrorCode:   "ErrYigFsFailedToSendMessage",
+		Description:    "Failed to send message to kafka.",
+		HttpStatusCode: 40019,
 	},
 }
 
