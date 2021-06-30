@@ -538,22 +538,6 @@ func Test_UpdateNewFileSegments(t *testing.T) {
 	t.Logf("Succeed to upload block, resp: %s, Test_UpdateNewFileSegments: %v", updateSegsInfo, updateSegmentsReq.Segments)
 }
 
-func Test_HeartBeat(t *testing.T) {
-	r := require.New(t)
- 	// get incomplete upload segs
-	segReq := &types.GetIncompleteUploadSegsReq {
-		ZoneId: ZoneId,
-		Region: Region,
-		BucketName: BucketName,
-		Machine: Machine,
-	}
-
-	heartBeatResp, heartBeatInfo, err := HeartBeat(segReq)
-	r.Nil(err)
-	r.Equal(heartBeatResp.Result.ErrCode, 0)
-	t.Logf("Succeed to test heart beat, resp: %s", heartBeatInfo)
-}
-
 func Test_DeleteFile(t *testing.T) {
 	r := require.New(t)
 	// get target dir file attr
@@ -601,4 +585,20 @@ func Test_DeleteFile(t *testing.T) {
 	t.Logf("Succeed to get the non existed file, getFileAttrResp: %s", getFileAttrInfo)
 
 	t.Logf("Succeed to delete file, resp: %s", deleteFileRespInfo)
+}
+
+func Test_HeartBeat(t *testing.T) {
+	r := require.New(t)
+ 	// get incomplete upload segs
+	segReq := &types.GetIncompleteUploadSegsReq {
+		ZoneId: ZoneId,
+		Region: Region,
+		BucketName: BucketName,
+		Machine: Machine,
+	}
+
+	heartBeatResp, heartBeatInfo, err := HeartBeat(segReq)
+	r.Nil(err)
+	r.Equal(heartBeatResp.Result.ErrCode, 0)
+	t.Logf("Succeed to test heart beat, resp: %s", heartBeatInfo)
 }

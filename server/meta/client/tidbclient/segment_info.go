@@ -205,18 +205,18 @@ func(t *TidbClient) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq
 	start := time.Now().UTC().UnixNano()
 	var stmt *sql.Stmt
 	sqltext := DeleteSegmentInfoSql()
+	deleteZoneSql := DeleteSegmentZoneSql()
 	checkSql := CheckSegHasBlocksSql()
 	stmt, err = t.Client.Prepare(sqltext)
 	if err != nil {
 		helper.Logger.Error(ctx, fmt.Sprintf("Failed to prepare delete segment info, err: %v", err))
-		err = ErrYIgFsInternalErr
-		return
+		return ErrYIgFsInternalErr
 	}
 
 	defer func() {
 		closeErr := stmt.Close()
 		if closeErr != nil {
-			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close delete segment info stmt, err: %v", err))
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to close delete segment info stmt, closeErr: %v, err: %v", closeErr, err))
 			err = ErrYIgFsInternalErr
 		}
 	}()
@@ -229,20 +229,25 @@ func(t *TidbClient) DeleteSegInfo(ctx context.Context, file *types.DeleteFileReq
 			&r,
 		)
 		if err == sql.ErrNoRows {
+			// delete segment info
 			_, err = stmt.Exec(types.Deleted, file.Region, file.BucketName, segmentId[0], segmentId[1], types.NotDeleted)
 			if err != nil {
 				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the segment info, seg_id0: %v, seg_id1: %v, err: %v", segmentId[0], segmentId[1], err))
-				err = ErrYIgFsInternalErr
-				return
+				return ErrYIgFsInternalErr
+			}
+			// delete segment zone
+			_, err = t.Client.Exec(deleteZoneSql, types.Deleted, file.Region, file.BucketName, segmentId[0], segmentId[1], types.NotDeleted)
+			if err != nil {
+				helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the segment zone, seg_id0: %v, seg_id1: %v, err: %v", segmentId[0], segmentId[1], err))
+				return ErrYIgFsInternalErr
 			}
 		} else if err != nil {
 			helper.Logger.Error(ctx, fmt.Sprintf("Failed to get incomplete segs by leader, err: %v", err))
-			err = ErrYIgFsInternalErr
-			return
+			return ErrYIgFsInternalErr
 		}
 	}
 
 	end := time.Now().UTC().UnixNano()
-	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment info, blocksNum: %v, cost: %v", len(segs), end - start))
+	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to deleted segment info and zone, blocksNum: %v, cost: %v", len(segs), end - start))
 	return
 }

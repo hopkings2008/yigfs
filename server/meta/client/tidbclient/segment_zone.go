@@ -11,7 +11,7 @@ import (
 )
 
 func GetSegmentLeaderSql() (sqltext string) {
-	sqltext = "select leader from segment_zone where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?"
+	sqltext = "select leader from segment_zone where zone_id=? and region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?;"
 	return sqltext
 }
 
@@ -22,7 +22,12 @@ func CreateSegmentZoneSql() (sqltext string) {
 }
 
 func GetSegmentsByLeaderSql() (sqltext string) {
-	sqltext = "select seg_id0, seg_id1 from segment_zone where zone_id=? and region=? and bucket_name=? and leader=?"
+	sqltext = "select seg_id0, seg_id1 from segment_zone where zone_id=? and region=? and bucket_name=? and leader=? and is_deleted=?;"
+	return sqltext
+}
+
+func DeleteSegmentZoneSql() (sqltext string) {
+	sqltext = "update segment_zone set is_deleted=? where region=? and bucket_name=? and seg_id0=? and seg_id1=? and is_deleted=?;"
 	return sqltext
 }
 
@@ -63,7 +68,7 @@ func (t *TidbClient) GetSegmentLeader(ctx context.Context, segment *types.GetSeg
 
 func(t *TidbClient) GetSegsByLeader(ctx context.Context, seg *types.GetIncompleteUploadSegsReq) (segsResp []*types.IncompleteUploadSegInfo, err error) {
 	sqltext := GetSegmentsByLeaderSql()
-	rows, err := t.Client.Query(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Machine)
+	rows, err := t.Client.Query(sqltext, seg.ZoneId, seg.Region, seg.BucketName, seg.Machine, types.NotDeleted)
 	if err == sql.ErrNoRows {
 		err = ErrYigFsNoTargetSegment
 		return
