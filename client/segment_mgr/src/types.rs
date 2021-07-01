@@ -192,10 +192,14 @@ impl FileHandle {
 
     pub fn get_garbage_blocks(&self) -> Vec<Segment> {
         let mut segs: Vec<Segment> = Vec::new();
-        for s in self.garbage_blocks.values(){
-            segs.push(s.copy());
+        for s in &self.segments {
+            if let Some(g) = 
+            self.garbage_blocks.get(&NumberOp::to_u128(s.seg_id0, s.seg_id1)){
+                let mut seg = g.copy();
+                seg.leader = s.leader.clone();
+                segs.push(seg);
+            }
         }
-
         return segs;
     }
 }
