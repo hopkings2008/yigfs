@@ -94,9 +94,9 @@ impl FileHandle {
             ino: self.ino,
             leader: self.leader.clone(),
             segments: Vec::new(),
-            garbage_blocks: HashMap::new(),
+            garbage_blocks: self.garbage_blocks.clone(),
             block_tree: self.block_tree.clone(),
-            seg_status: HashMap::new(),
+            seg_status: self.seg_status.clone(),
             is_dirty: self.is_dirty,
             reference: self.reference,
         };
