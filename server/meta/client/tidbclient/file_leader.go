@@ -13,7 +13,12 @@ import (
 
 func CreateOrUpdateFileLeaderSql() (sqltext string) {
 	sqltext = "insert into file_leader(zone_id, region, bucket_name, ino, generation, leader, is_deleted) values(?,?,?,?,?,?,?)" +
-		" on duplicate key update leader=values(leader), is_deleted=values(is_deleted)"
+		" on duplicate key update leader=values(leader), is_deleted=values(is_deleted);"
+	return sqltext
+}
+
+func DeleteFileLeaderSql() (sqltext string) {
+	sqltext = "delete from file_leader where zone_id=? and region=? and bucket_name=? and ino=? and generation=?;"
 	return sqltext
 }
 
@@ -22,7 +27,7 @@ func (t *TidbClient) GetFileLeaderInfo(ctx context.Context, leader *types.GetLea
 		LeaderInfo: &types.LeaderInfo{},
 	}
 
-	sqltext := "select leader from file_leader where zone_id=? and region=? and bucket_name=? and ino=? and generation=?"
+	sqltext := "select leader from file_leader where zone_id=? and region=? and bucket_name=? and ino=? and generation=?;"
 	row := t.Client.QueryRow(sqltext, leader.ZoneId, leader.Region, leader.BucketName, leader.Ino, leader.Generation)
 	err = row.Scan (
 		&resp.LeaderInfo.Leader,
