@@ -83,7 +83,6 @@ func Test_CreateFiles(t *testing.T) {
 		ParentIno:  FileParentIno,
 		FileName:   FileName,
 		Size:       CreateFileSize,
-		Type:       types.COMMON_FILE,
 		Perm:       types.FILE_PERM,
 		Nlink:      Nlink,
 		Machine:    Machine,
@@ -156,6 +155,40 @@ func Test_CreateFiles(t *testing.T) {
 	r.Equal(getDirFilesResp.Result.ErrCode, 0)
 	t.Logf("Succeed to get dir files, offset: %d, resp: %s", getDirFilesReq.Offset, getDirFilesInfo)
 	r.Equal(len(getDirFilesResp.Files), 2)
+}
+
+func Test_CreateDirs(t *testing.T) {
+	r := require.New(t)
+	createFileReq := &types.CreateFileReq{
+		ZoneId:     ZoneId,
+		Region:     Region,
+		BucketName: BucketName,
+		ParentIno:  FileParentIno,
+		FileName:   DirName,
+		Size:       CreateFileSize,
+		Type:       types.DIR_FILE,
+		Perm:       types.DIR_PERM,
+		Machine:    Machine,
+	}
+
+	createDirResp, createDirInfo, err := PutFile(createFileReq)
+	r.Nil(err)
+	r.Equal(createDirResp.Result.ErrCode, 0)
+	t.Logf("Succeed to create new file, resp: %s", createDirInfo)
+
+	// get dir files
+	getDirFilesReq := &types.GetDirFilesReq {
+		Region: Region,
+		BucketName: BucketName,
+		ParentIno: FileParentIno,
+		Offset: Offset,
+	}
+
+	getDirFilesResp, getDirFilesInfo, err := GetDirFiles(getDirFilesReq)
+	r.Nil(err)
+	r.Equal(getDirFilesResp.Result.ErrCode, 0)
+	t.Logf("Succeed to get dir files, resp: %s", getDirFilesInfo)
+	r.Equal(len(getDirFilesResp.Files), 5)
 }
 
 func Test_WriteFile(t *testing.T) {

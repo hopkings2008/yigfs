@@ -28,7 +28,7 @@ type GetDirFileInfo struct {
 	Ctx context.Context `json:"-"`
 	Ino uint64 `json:"ino"`
 	FileName string `json:"file_name"`
-	Type uint32 `json:"type"`
+	Type uint `json:"type"`
 }
 
 type GetDirFileInfoReq struct {
@@ -64,7 +64,7 @@ type CreateFileReq struct {
 	ParentIno uint64 `json:"parent_ino"`
 	FileName string `json:"file_name"`
 	Size uint64 `json:"size"`
-	Type uint32 `json:"type"`
+	Type uint `json:"type"`
 	Ctime *int64 `json:"ctime"`
 	Mtime int64 `json:"mtime"`
 	Atime *int64 `json:"atime"`
@@ -129,7 +129,7 @@ type FileInfo struct {
 	ParentIno uint64 `json:"parent_ino"`
 	FileName string `json:"file_name"`
 	Size uint64 `json:"size"`
-	Type uint32 `json:"type"`
+	Type uint `json:"type"`
 	Ctime int64 `json:"ctime"`
 	Mtime int64 `json:"mtime"`
 	Atime int64 `json:"atime"`

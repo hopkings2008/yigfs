@@ -39,6 +39,7 @@ const (
 	Capacity = 64 * 1024 * 1024
 	LatestedOffset = 256
 	NewFileName = "test.txt2"
+	DirName = "testDir"
 )
 
 func SendHttpToYigFs(method string, newServer string, client *http.Client, reqStr []byte) (result io.ReadCloser, err error) {
