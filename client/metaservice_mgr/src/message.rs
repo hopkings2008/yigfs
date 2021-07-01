@@ -148,6 +148,8 @@ pub struct ReqFileCreate {
     pub uid: u32,
     pub gid: u32, 
     pub perm: u32,
+    #[serde(rename(serialize = "type", deserialize = "type"))]
+    pub file_type: u8,
 }
 
 

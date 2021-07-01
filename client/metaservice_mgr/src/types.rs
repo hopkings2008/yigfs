@@ -29,6 +29,25 @@ impl From<u8> for FileType {
     }
 }
 
+impl FileType {
+    pub fn to(&self) -> u8 {
+        match *self {
+            FileType::FILE => {
+                1
+            }
+            FileType::DIR => {
+                2
+            }
+            FileType::LINK => {
+                3
+            }
+            FileType::UNKNOWN => {
+                0
+            }
+        }
+    }
+}
+
 #[derive (Debug)]
 pub struct DirEntry{
     pub ino: u64,

@@ -6,9 +6,9 @@ use std::ffi::OsStr;
 use std::sync::Arc;
 use libc::{ENOENT, c_int};
 use time::Timespec;
-use fuse::{FileType, FileAttr, Filesystem, Request, 
+use fuse::{FileAttr, Filesystem, Request, 
     ReplyData, ReplyEntry, ReplyAttr, ReplyDirectory, ReplyCreate, ReplyOpen, ReplyWrite, ReplyEmpty};
-use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr}};
+use metaservice_mgr::{mgr::MetaServiceMgr, types::{FileLeader, NewFileInfo, SetFileAttr, FileType}};
 use segment_mgr::leader_mgr::LeaderMgr;
 use common::uuid;
 use crate::handle::{FileHandleInfo, FileHandleInfoMgr};
@@ -186,7 +186,8 @@ impl Filesystem for Yigfs {
         info!("mkdir: uid: {}, gid: {}, parent: {}, name: {}, mode: {}",
         uid, gid, parent, name_str, mode);
         let file_info: NewFileInfo;
-        let ret = self.meta_service_mgr.new_ino_leader(parent, &name_str, uid, gid, mode);
+        let ret = self.meta_service_mgr.new_ino_leader(
+            parent, &name_str, uid, gid, mode, FileType::DIR.to());
         match ret {
             Ok(ret) => {
                 file_info = ret;
@@ -247,7 +248,8 @@ impl Filesystem for Yigfs {
         info!("create: uid: {}, gid: {}, parent: {}, name: {}, mod: {}, flags: {}",
         req.uid(), req.gid(), parent, name, mode, flags);
         let file_info: NewFileInfo;
-        let ret = self.meta_service_mgr.new_ino_leader(parent, &name, req.uid(), req.gid(), mode);
+        let ret = self.meta_service_mgr.new_ino_leader(
+            parent, &name, req.uid(), req.gid(), mode, FileType::FILE.to());
         match ret {
             Ok(ret ) => {
                 file_info = ret;
@@ -440,16 +442,16 @@ impl Yigfs{
         }
     }
     
-    fn ft_to_fuse_ft(&self, ft: &metaservice_mgr::types::FileType) ->FileType {
+    fn ft_to_fuse_ft(&self, ft: &metaservice_mgr::types::FileType) ->fuse::FileType {
         match ft{
             metaservice_mgr::types::FileType::DIR => {
-                FileType::Directory
+                fuse::FileType::Directory
             }
             metaservice_mgr::types::FileType::LINK => {
-                FileType::Symlink
+                fuse::FileType::Symlink
             }
             _ => {
-                FileType::RegularFile
+                fuse::FileType::RegularFile
             }
         }
     }
