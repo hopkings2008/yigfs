@@ -170,6 +170,37 @@ impl Filesystem for Yigfs {
         }
     }
 
+    /// Create a directory.
+    fn mkdir(&mut self, req: &Request, parent: u64, name: &OsStr, mode: u32, reply: ReplyEntry) {
+        let uid = req.uid();
+        let gid = req.gid();
+        let name_str: String;
+        if let Some(n) = name.to_str() {
+            name_str = n.to_string();
+        } else {
+            error!("mkdir: uid: {}, gid: {}, parent: {}, mode: {}, input invalid name",
+            uid, gid, parent, mode);
+            reply.error(libc::EBADMSG);
+            return;
+        }
+        info!("mkdir: uid: {}, gid: {}, parent: {}, name: {}, mode: {}",
+        uid, gid, parent, name_str, mode);
+        let file_info: NewFileInfo;
+        let ret = self.meta_service_mgr.new_ino_leader(parent, &name_str, uid, gid, mode);
+        match ret {
+            Ok(ret) => {
+                file_info = ret;
+            }
+            Err(err) => {
+                error!("mkdir: uid: {}, gid: {}, parent: {}, name: {}, mode: {}, failed to create, err: {:?}",
+                uid, gid, parent, name_str, mode, err);
+                reply.error(libc::EIO);
+                return;
+            }
+        }
+        reply.entry(&TTL, &self.to_usefs_attr(&file_info.attr), file_info.attr.generation);
+    }
+
     fn readdir(&mut self, _req: &Request, ino: u64, _fh: u64, offset: i64, mut reply: ReplyDirectory) {
         // must authorize the request here by checking _req.
         info!("readdir: ino: {}, offset: {}", ino, offset);
