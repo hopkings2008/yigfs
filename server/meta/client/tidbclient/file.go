@@ -420,6 +420,14 @@ func(t *TidbClient) DeleteFile(ctx context.Context, file *types.DeleteFileReq) (
 		err = ErrYIgFsInternalErr
 		return
 	}
+
+	sqltext = DeleteFileLeaderSql()
+	_, err = t.Client.Exec(sqltext, file.ZoneId, file.Region, file.BucketName, file.Ino, file.Generation)
+	if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to delete the file leader, err: %v", err))
+		err = ErrYIgFsInternalErr
+		return
+	}
 	
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to delete the file, region: %v, bucket: %v, ino: %v, generation: %v", 
 		file.Region, file.BucketName, file.Ino, file.Generation))
