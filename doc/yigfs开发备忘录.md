@@ -6,6 +6,7 @@
 4. 新建一个文件，返回给client一个未满的segment（需要返回增长速度最慢的segment，目前返回的是剩余空间最大的segment）
 5. heartBeat更新server状态
 6. 更新文件segments信息接口需要将其做成一个大的事务
+7. 目前目录大小未进行更新
 
 ## client端：
 1. 枚举目录下的segment文件
