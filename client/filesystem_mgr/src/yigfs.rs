@@ -434,8 +434,8 @@ impl Filesystem for Yigfs {
             reply.error(libc::EBADMSG);
             return;
         }
-        info!("rename: parent: {}, name: {}, new parent: {}, new name: {}", 
-        parent, origin_name, newparent, new_name);
+        info!("rename: uid: {}, gid: {}, parent: {}, name: {}, new parent: {}, new name: {}", 
+        uid, gid, parent, origin_name, newparent, new_name);
         let ret = self.meta_service_mgr.rename(parent, &origin_name, newparent, &new_name);
         if ret.is_success() {
             reply.ok();
