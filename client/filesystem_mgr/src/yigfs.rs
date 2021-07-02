@@ -443,7 +443,7 @@ impl Filesystem for Yigfs {
         }
         error!("rename: failed to rename({}, {}) to ({}, {}), err: {:?}",
         parent, origin_name, newparent, new_name, ret);
-        reply.error(libc::EBADRPC);
+        reply.error(libc::EIO);
     }
 }
 
