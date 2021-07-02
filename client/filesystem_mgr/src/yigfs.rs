@@ -4,7 +4,6 @@ extern crate time;
 
 use std::ffi::OsStr;
 use std::sync::Arc;
-use libc::EBADMSG;
 use libc::{ENOENT, c_int};
 use time::Timespec;
 use fuse::{FileAttr, Filesystem, Request, 
