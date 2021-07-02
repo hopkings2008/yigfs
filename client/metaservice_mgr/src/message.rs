@@ -329,3 +329,22 @@ pub struct ReqDeleteFile {
 pub struct RespDeleteFile {
     pub result: RespResult,
 }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ReqFileRename{
+    pub zone: String,
+    pub machine: String,
+    pub region: String,
+    pub bucket: String,
+    pub parent: u64,
+    pub ino: u64,
+    pub generation: u64,
+    pub name: String,
+    pub new_parent: u64,
+    pub new_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct RespFileRename{
+    pub result: RespResult,
+}

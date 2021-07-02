@@ -4,6 +4,7 @@ extern crate time;
 
 use std::ffi::OsStr;
 use std::sync::Arc;
+use libc::EBADMSG;
 use libc::{ENOENT, c_int};
 use time::Timespec;
 use fuse::{FileAttr, Filesystem, Request, 
@@ -411,6 +412,38 @@ impl Filesystem for Yigfs {
             return;
         }
         reply.ok();
+    }
+
+    /// Rename a file.
+    fn rename(&mut self, req: &Request, parent: u64, name: &OsStr, newparent: u64, newname: &OsStr, reply: ReplyEmpty) {
+        let uid = req.uid();
+        let gid = req.gid();
+        let origin_name: String;
+        let new_name: String;
+        if let Some(n) = name.to_str() {
+            origin_name = n.to_string();
+        } else {
+            error!("rename: got invalid name for parent: {}", parent);
+            reply.error(libc::EBADMSG);
+            return;
+        }
+        if let Some(n) = newname.to_str() {
+            new_name = n.to_string();
+        } else {
+            error!("rename: got invalid new name for parent: {}", parent);
+            reply.error(libc::EBADMSG);
+            return;
+        }
+        info!("rename: parent: {}, name: {}, new parent: {}, new name: {}", 
+        parent, origin_name, newparent, new_name);
+        let ret = self.meta_service_mgr.rename(parent, &origin_name, newparent, &new_name);
+        if ret.is_success() {
+            reply.ok();
+            return;
+        }
+        error!("rename: failed to rename({}, {}) to ({}, {}), err: {:?}",
+        parent, origin_name, newparent, new_name, ret);
+        reply.error(libc::EBADRPC);
     }
 }
 

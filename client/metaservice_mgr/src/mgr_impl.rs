@@ -1,6 +1,4 @@
 extern crate tokio;
-#[path="./message.rs"]
-mod message;
 
 use std::{sync::Arc, time::Instant};
 use crate::{mgr, types::{Block, FileLeader, NewFileInfo, Segment, SetFileAttr}};
@@ -14,11 +12,12 @@ use common::json;
 use common::error::Errno;
 use common::http_client::HttpMethod;
 use common::runtime::Executor;
-use message::{MsgFileAttr, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, 
+use crate::message::{MsgFileAttr, MsgSetFileAttr, ReqAddBlock, ReqDirFileAttr, ReqFileAttr, ReqFileCreate, ReqFileLeader, 
     ReqGetSegments, ReqMount, ReqReadDir, ReqSetFileAttr, ReqUploadSegment, RespAddBock, RespDirFileAttr, RespFileAttr, RespFileCreate, 
-    RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment, ReqDeleteFile, RespDeleteFile};
+    RespFileLeader, RespGetSegments, RespHeartbeat, RespReadDir, RespSetFileAttr, RespUploadSegment, ReqDeleteFile, RespDeleteFile,
+    RespFileRename};
 
-use self::message::{MsgSegmentOffset, ReqHeartbeat, ReqUpdateSegments, RespUpdateSegments};
+use crate::message::{MsgSegmentOffset, ReqFileRename, ReqHeartbeat, ReqUpdateSegments, RespUpdateSegments};
 use log::{info, error};
 
 
@@ -729,6 +728,85 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
 
         if resp.result.err_code != 0 {
             error!("delete_file: failed to delete the file: {}, err: {}", req_body, resp.result.err_msg);
+            return Errno::Eintr;
+        }
+
+        return Errno::Esucc;
+    }
+
+    fn rename(&self, parent: u64, name: &String, new_parent: u64, new_name: &String) -> Errno{
+        let ino: u64;
+        let generation: u64;
+        let ret = self.read_dir_file_attr(parent, name);
+        match ret {
+            Ok(ret) => {
+                ino = ret.ino;
+                generation = ret.generation;
+            }
+            Err(err) => {
+                error!("MetaServiceMgrImpl::rename: failed to get file attr for parent: {}, name: {}, err: {}",
+                parent, name, err);
+                return Errno::Enoent;
+            }
+        }
+
+        let req = ReqFileRename{
+            zone: self.zone.clone(),
+            machine: self.machine.clone(),
+            region: self.region.clone(),
+            bucket: self.bucket.clone(),
+            parent: parent,
+            ino: ino,
+            generation: generation,
+            name: name.clone(),
+            new_parent: new_parent,
+            new_name: new_name.clone(),
+        };
+        let req_body: String;
+        let ret = json::encode_to_str::<ReqFileRename>(&req);
+        match ret {
+            Ok(ret) => {
+                req_body = ret;
+            }
+            Err(err) => {
+                error!("MetaServiceMgrImpl::rename: failed to get file attr for parent: {}, name: {}, err: {}",
+                parent, name, err);
+                return Errno::Eintr;
+            }
+        }
+        let url = format!("{}/v1/file/name", self.meta_server_url);
+        let resp_body: String;
+        let ret = self.exec.get_runtime().block_on(self.http_client.request(&url, &req_body.as_bytes(), &HttpMethod::Put, false));
+        match ret {
+            Ok(text) => {
+                if text.status >= 300 {
+                    error!("MetaServiceMgrImpl::rename: failed to rename: parent: {}, name: {} to new_parent: {}, new_name: {}, err status: {}, resp: {}", 
+                    parent, name, new_parent, new_name, text.status, text.body);
+                    return Errno::Eintr;
+                }
+                resp_body = text.body;
+            }
+            Err(error) => {
+                error!("delete_file: failed to send req to {} with body: {}, err: {}", url, req_body, error);
+                return Errno::Eintr;
+            }
+        }
+        let resp: RespFileRename;
+        let ret = json::decode_from_str::<RespFileRename>(&resp_body);
+        match ret {
+            Ok(ret) => {
+                resp = ret;
+            }
+            Err(err) => {
+                error!("MetaServiceMgrImpl::rename: failed to rename: parent: {}, name: {} to new_parent: {}, new_name: {}, err: {}", 
+                parent, name, new_parent, new_name, err);
+                return Errno::Eintr;
+            }
+        }
+
+        if resp.result.err_code != 0 {
+            error!("MetaServiceMgrImpl::rename: failed to rename: parent: {}, name: {} to new_parent: {}, new_name: {}, err: {}", 
+                parent, name, new_parent, new_name, resp.result.err_msg);
             return Errno::Eintr;
         }
 

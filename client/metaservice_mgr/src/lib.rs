@@ -6,6 +6,7 @@ pub mod meta_op;
 mod meta_thread;
 mod meta_worker;
 mod meta_thread_pool;
+mod message;
 
 use std::sync::Arc;
 use common::config::Config;
