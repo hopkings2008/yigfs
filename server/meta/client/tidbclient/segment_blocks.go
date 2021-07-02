@@ -146,7 +146,7 @@ func getInsertOrUpdateSegBlocksSql(ctx context.Context, maxNum int) (sqltext str
 			sqltext += ",(?,?,?,?,?)"
 		}
 	}
-	sqltext += " on duplicate key update size=values(size), is_deleted=values(is_deleted);"
+	sqltext += " on duplicate key update is_deleted=values(is_deleted);"
 	return
 }
 
