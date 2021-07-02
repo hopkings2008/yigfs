@@ -195,3 +195,11 @@ func(yigFs *YigFsStorage) UpdateFileSizeAndBlocksNumByCheck(ctx context.Context,
 	}
 	return
 }
+
+func(yigFs *YigFsStorage) RenameFile(ctx context.Context, file *types.RenameFileReq) (err error) {
+	err = yigFs.MetaStorage.Client.RenameFile(ctx, file)
+	if err != nil {
+		return
+	}
+	return
+}

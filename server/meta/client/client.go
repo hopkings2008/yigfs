@@ -72,5 +72,7 @@ type Client interface {
 	UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error)
 	// delete segment blocks
 	RemoveSegBlocks(ctx context.Context, segs []*types.CreateBlocksInfo, blocksNum int) (err error)
+	// rename the file
+	RenameFile(ctx context.Context, file *types.RenameFileReq) (err error)
 }
 

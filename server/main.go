@@ -76,6 +76,8 @@ func main() {
 	app.Get("/v1/machine/heartbeat", apiHandlers.HeartBeatHandler)
 	// DeleteFile
 	app.Post("/v1/file/remove", apiHandlers.DeleteFileHandler)
+	// RenameFile
+	app.Put("/v1/file/name", apiHandlers.RenameFileHandler)
 
 	port := ":" + helper.CONFIG.MetaServiceConfig.Port
 	isHTTP2 := false

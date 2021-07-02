@@ -322,6 +322,74 @@ func Test_GetSegmentsForNewFile(t *testing.T) {
 	t.Logf("Succeed to Test_GetSegmentsForNewFile, result: %s", getSegInfo)
 }
 
+func Test_GetRenameFile(t *testing.T) {
+	r := require.New(t)
+	
+	// get target file
+	file := &types.GetDirFileInfoReq{
+		Region: Region,
+		BucketName: BucketName,
+		ParentIno: FileParentIno,
+		FileName: "test.txt4",
+	}
+
+	t.Logf("GetDirFileInfoReq is %v", file)
+	getDirFileResp, getDirFileInfo, err := GetDirFileAttr(file)
+	r.Nil(err)
+	r.Equal(getDirFileResp.Result.ErrCode, 0)
+	t.Logf("Test_GetSegmentsForNewFile Succeed to get dir file attr, resp: %s", getDirFileInfo)
+
+	// rename file.
+	parentIno := uint64(2)
+	newParentIno := uint64(3)
+	ino := getDirFileResp.File.Ino
+	renameReq := &types.RenameFileReq {
+		ZoneId: ZoneId,
+		Machine: Machine2,
+		Region: Region,
+		BucketName: BucketName,
+		Ino: &ino,
+		Generation: Generation,
+		FileName: "test.txt4",
+		ParentIno: &parentIno,
+		NewParentIno: &newParentIno,
+		NewFileName: "rename",
+	}
+	
+	for i := 0; i < 2; i ++ {
+		renameFileResp, renameFileInfo, err := RenameFile(renameReq)
+		r.Nil(err)
+		if i == 1 {
+			r.Equal(renameFileResp.Result.ErrCode, 40020)
+			t.Logf("Test_GetRenameFile Succeed to rename already renamed file, resp: %s", renameFileInfo)
+		} else {
+			r.Equal(renameFileResp.Result.ErrCode, 0)
+			t.Logf("Test_GetRenameFile Succeed to rename file, resp: %s", renameFileInfo)
+		}
+	}
+	
+	// get target file
+	file = &types.GetDirFileInfoReq{
+		Region: Region,
+		BucketName: BucketName,
+		ParentIno: FileParentIno,
+		FileName: "test.txt3",
+	}
+
+	getDirFileResp, getDirFileInfo, err = GetDirFileAttr(file)
+	r.Nil(err)
+	r.Equal(getDirFileResp.Result.ErrCode, 0)
+	t.Logf("Test_GetSegmentsForNewFile Succeed to get dir file attr, resp: %s", getDirFileInfo)
+
+	renameReq.Ino = &getDirFileResp.File.Ino
+	renameReq.FileName = "test.txt3"
+
+	renameFileResp, renameFileInfo, err := RenameFile(renameReq)
+	r.Nil(err)
+	r.Equal(renameFileResp.Result.ErrCode, 40011)
+	t.Logf("Test_GetRenameFile Succeed to rename already existed file, resp: %s", renameFileInfo)
+}
+
 func Test_UpdateSegBlockInfo(t *testing.T) {
 	r := require.New(t)
 
