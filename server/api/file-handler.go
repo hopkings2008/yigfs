@@ -327,7 +327,15 @@ func(yigFs MetaAPIHandlers) DeleteFileHandler(ctx iris.Context) {
 	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
 
 	// check whether the machine is the file leader or not.
-	err := yigFs.YigFsAPI.CheckFileLeader(reqContext, fileReq)
+	leaderReq := &types.GetLeaderReq {
+		ZoneId: fileReq.ZoneId,
+		Region: fileReq.Region,
+		BucketName: fileReq.BucketName,
+		Ino: fileReq.Ino,
+		Generation: fileReq.Generation,
+		Machine: fileReq.Machine,
+	}
+	err := yigFs.YigFsAPI.CheckFileLeader(reqContext, leaderReq)
 	if err != nil {
 		resp.Result = GetErrInfo(err)
 		ctx.JSON(resp)
@@ -342,6 +350,64 @@ func(yigFs MetaAPIHandlers) DeleteFileHandler(ctx iris.Context) {
 		resp.Result = GetErrInfo(NoYigFsErr)
 	}
 	
+	ctx.JSON(resp)
+	return
+}
+
+func (yigFs MetaAPIHandlers) RenameFileHandler(ctx iris.Context) {
+	resp := &types.NonBodyResp{
+		Result: types.YigFsMetaError{},
+	}
+	defer GetSpendTime("RenameFileHandler")()
+
+	r := ctx.Request()
+	reqContext := r.Context()
+
+	// get req
+	fileReq := &types.RenameFileReq{}
+	if err := ctx.ReadJSON(&fileReq); err != nil {
+		helper.Logger.Error(reqContext, fmt.Sprintf("Failed to read RenameFileReq from body, err: %v", err))
+		resp.Result = GetErrInfo(ErrYigFsInvaildParams)
+		ctx.JSON(resp)
+		return
+	}
+
+	uuidStr := uuid.New()
+	fileReq.Ctx = context.WithValue(reqContext, types.CTX_REQ_ID, uuidStr)
+
+	// check request params
+	err := CheckRenameParams(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	// check whether the machine is the file leader or not.
+	leaderReq := &types.GetLeaderReq {
+		ZoneId: fileReq.ZoneId,
+		Region: fileReq.Region,
+		BucketName: fileReq.BucketName,
+		Ino: *fileReq.Ino,
+		Generation: fileReq.Generation,
+		Machine: fileReq.Machine,
+	}
+	err = yigFs.YigFsAPI.CheckFileLeader(reqContext, leaderReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	// rename the file.
+	err = yigFs.YigFsAPI.RenameFile(reqContext, fileReq)
+	if err != nil {
+		resp.Result = GetErrInfo(err)
+		ctx.JSON(resp)
+		return
+	}
+
+	resp.Result = GetErrInfo(NoYigFsErr)
 	ctx.JSON(resp)
 	return
 }

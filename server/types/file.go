@@ -149,3 +149,17 @@ type DeleteFileReq struct {
 	ZoneId string `json:"zone"`
 	Machine string `json:"machine"`
 }
+
+type RenameFileReq struct {
+	Ctx context.Context `json:"-"`
+	ZoneId string `json:"zone"`
+	Machine string `json:"machine"`
+	Region string `json:"region"`
+	BucketName string `json:"bucket"`
+	Ino *uint64 `json:"ino"`
+	Generation uint64 `json:"generation"`
+	ParentIno *uint64 `json:"parent"`
+	FileName string `json:"name"`
+	NewParentIno *uint64 `json:"new_parent"`
+	NewFileName string `json:"new_name"`
+}

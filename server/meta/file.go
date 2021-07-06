@@ -42,3 +42,7 @@ func(m *Meta) UpdateSizeAndBlocksNum(ctx context.Context, file *types.GetFileInf
 func(m *Meta) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.GetFileInfoReq) (err error) {
 	return m.Client.UpdateFileSizeAndBlocksNum(ctx, file)
 }
+
+func(m *Meta) RenameFile(ctx context.Context, file *types.RenameFileReq) (err error) {
+	return m.Client.RenameFile(ctx, file)
+}

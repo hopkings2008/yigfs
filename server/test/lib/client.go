@@ -19,12 +19,12 @@ const (
 	Endpoint = "https://yigfs.test.com:9088"
 	Region = "cn-bj-1"
 	BucketName = "test_bucket"
-	Generation = 0
+	Generation uint64 = 0
 	ZoneId = "cd77df31-08c1-407c-a561-4c0341c77fa4"
 	ZoneIdNew = "cd77df31-08c1-407c-a561-4c0341c77fa5"
 	Machine = "172.20.13.155"
 	ParentIno = 1
-	FileParentIno = 2
+	FileParentIno uint64 = 2
 	FileName = "test.txt"
 	Size = 128
 	CreateFileSize = 0

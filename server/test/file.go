@@ -167,3 +167,28 @@ func DeleteFile(deleteFileReq *types.DeleteFileReq) (deleteFileResp *types.NonBo
 
 	return deleteFileResp, string(deleteFileRespInfo), nil
 }
+
+func RenameFile(renameFileReq *types.RenameFileReq) (renameFileResp *types.NonBodyResp, result string, err error) {
+	renameFileResp = &types.NonBodyResp{}
+	sc := NewClient()
+	newServer := Endpoint + "/v1/file/name"
+
+	reqStr, err := json.Marshal(renameFileReq)
+	if err != nil {
+		return renameFileResp, "", err
+	}
+
+	resp, err := SendHttpToYigFs("PUT", newServer, sc, reqStr)
+	if err != nil {
+		return renameFileResp, "", err
+	}
+	defer resp.Close()
+
+	renameFileInfo, _ := ioutil.ReadAll(resp)
+
+	if err = json.Unmarshal(renameFileInfo, &renameFileResp); err != nil {
+		return renameFileResp, "", err
+	}
+
+	return renameFileResp, string(renameFileInfo), nil
+}

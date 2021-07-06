@@ -53,3 +53,16 @@ func CheckSetFileAttrParams(ctx context.Context, file *types.SetFileAttrReq) (er
 	return nil
 }
 
+func CheckRenameParams(ctx context.Context, fileReq *types.RenameFileReq) (err error) {
+	if fileReq.ZoneId == "" || fileReq.BucketName == "" || fileReq.Machine == "" || fileReq.FileName == "" || 
+		fileReq.NewFileName == "" || fileReq.NewParentIno == nil || fileReq.ParentIno == nil || fileReq.Ino == nil {
+		helper.Logger.Error(ctx, "Some RenameFileReq required parameters are missing.")
+		return ErrYigFsMissingRequiredParams
+	}
+
+	if fileReq.Region == "" {
+		fileReq.Region = "cn-bj-1"
+	}
+
+	return nil
+}

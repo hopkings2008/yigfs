@@ -45,8 +45,18 @@ func UpdateFileSizeAndBlocksSql() (sqltext string) {
 	return sqltext
 }
 
+func SelectFileParentSql() (sqltext string) {
+	sqltext = "select parent_ino, file_name from file where region=? and bucket_name=? and ino=? and generation=?;"
+	return sqltext
+}
+
 func DeleteFileSql() (sqltext string) {
 	sqltext = "delete from file where region=? and bucket_name=? and ino=? and generation=?;"
+	return sqltext
+}
+
+func checkFileExistedSql() (sqltext string) {
+	sqltext = "select 1 from file where region=? and bucket_name=? and parent_ino=? and file_name=?;"
 	return sqltext
 }
 
@@ -462,4 +472,68 @@ func(t *TidbClient) UpdateFileSizeAndBlocksNum(ctx context.Context, file *types.
 	end := time.Now().UTC().UnixNano()
 	helper.Logger.Info(ctx, fmt.Sprintf("Succeed to update file size and blocks number, ino: %v, cost: %v", file.Ino, end - start))
 	return
+}
+
+func(t *TidbClient) RenameFile(ctx context.Context, file *types.RenameFileReq) (err error) {
+	// get the file's parentIno and name, check them.
+	getSql := SelectFileParentSql()
+	row := t.Client.QueryRow(getSql, file.Region, file.BucketName, file.Ino, file.Generation)
+	var parentIno uint64
+	var name string
+	err = row.Scan(
+		&parentIno,
+		&name,
+	)
+	if err == sql.ErrNoRows {
+		helper.Logger.Error(ctx, fmt.Sprintf("The file is not existed, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		return ErrYigFsNoSuchFile
+	} else if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the file's parentIno and name, region: %v, bucket: %v, ino: %v, generation: %v, err: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		return ErrYIgFsInternalErr
+	}
+	
+	if file.FileName != name || *file.ParentIno != parentIno {
+		helper.Logger.Error(ctx, fmt.Sprintf("The file already renamed, region: %v, bucket: %v, ino: %v, generation: %v, err: %v", 
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		return ErrYigFsTheFileAlreadyRenamed
+	}
+
+	// check new file name already existed or not.
+	checkSql := checkFileExistedSql()
+	row = t.Client.QueryRow(checkSql, file.Region, file.BucketName, file.NewParentIno, file.NewFileName)
+	var r int
+	err = row.Scan(
+		&r,
+	)
+
+	if err == sql.ErrNoRows {
+		// rename for the target file.
+		sqltext := "update file set parent_ino=?, file_name=? where region=? and bucket_name=? and ino=? and generation=? and parent_ino=? and file_name=?;"
+		result, err := t.Client.Exec(sqltext, file.NewParentIno, file.NewFileName, file.Region, file.BucketName, 
+			file.Ino, file.Generation, file.ParentIno, file.FileName)
+		if err != nil {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to rename the file name, fileReq: %+v, ino: %v, parentIno: %v, newParentIno: %v, err: %v", 
+				file, *file.Ino, file.Generation, *file.ParentIno, *file.NewParentIno))
+			return ErrYIgFsInternalErr
+		}
+
+		affectRows, _ := result.RowsAffected()
+		if affectRows != 1 {
+			helper.Logger.Error(ctx, fmt.Sprintf("Failed to renamed, fileReq: %+v, ino: %v, parentIno: %v, newParentIno: %v, err: %v", 
+				file, *file.Ino, file.Generation, *file.ParentIno, *file.NewParentIno))
+			return ErrYigFsTheFileAlreadyRenamed
+		}
+
+		helper.Logger.Info(ctx, fmt.Sprintf("Succeed to rename the file name, fileReq: %+v, ino: %v, generation: %v, parentIno: %v, newParentIno: %v", 
+			file, *file.Ino, file.Generation, *file.ParentIno, *file.NewParentIno))
+		return nil
+	} else if err != nil {
+		helper.Logger.Error(ctx, fmt.Sprintf("Failed to get the file's parentIno and name, region: %v, bucket: %v, ino: %v, generation: %v, err: %v",
+			file.Region, file.BucketName, file.Ino, file.Generation, err))
+		return ErrYIgFsInternalErr
+	}
+
+	return ErrYigFsFileAlreadyExist
 }

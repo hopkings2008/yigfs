@@ -46,6 +46,7 @@ const (
 	ErrYigFsFailedCreateMessageProducer
 	ErrYigFsFailedCreateMessageConsumer
 	ErrYigFsFailedToSendMessage
+	ErrYigFsTheFileAlreadyRenamed
 )
 
 var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
@@ -153,6 +154,11 @@ var ErrorCodeResponse = map[ApiErrorCode]ApiErrorStruct{
 		AwsErrorCode:   "ErrYigFsFailedToSendMessage",
 		Description:    "Failed to send message to kafka.",
 		HttpStatusCode: 40019,
+	},
+	ErrYigFsTheFileAlreadyRenamed: {
+		AwsErrorCode:   "ErrYigFsTheFileAlreadyRenamed",
+		Description:    "The file already renamed.",
+		HttpStatusCode: 40020,
 	},
 }
 
