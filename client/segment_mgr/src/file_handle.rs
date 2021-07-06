@@ -449,6 +449,9 @@ impl HandleMgr {
     fn add_segment(&mut self, msg: &MsgAddSegment) {
         if let Some(h) = self.handles.get_mut(&msg.ino) {
            h.segments.push(msg.seg.copy());
+           let idx = h.segments.len() - 1;
+           let id = NumberOp::to_u128(msg.seg.seg_id0, msg.seg.seg_id1);
+           h.segments_index.insert(id, idx);
            h.mark_dirty();
            return;
         }
