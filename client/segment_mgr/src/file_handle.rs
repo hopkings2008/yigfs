@@ -8,8 +8,12 @@ use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
 use metaservice_mgr::types::{Segment, Block};
+use crate::types::MsgClearChangedSegments;
 use crate::types::MsgGetBlocks;
+use crate::types::MsgGetChangedSegments;
+use crate::types::MsgOpenHandle;
 use crate::types::MsgSetSegStatus;
+use crate::types::RespChangedSegments;
 use crate::types::SegStatus;
 use crate::types::{FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle};
 use log::{warn, error};
@@ -204,9 +208,9 @@ impl FileHandleMgr {
         }
     }
 
-    pub fn get_and_lock(&self, ino: u64) -> Result<FileHandle, Errno>{
-        let (tx, rx) = bounded::<Option<FileHandle>>(1);
-        let query = MsgQueryHandle{
+    pub fn open_handle(&self, ino: u64) -> Result<String, Errno>{
+        let (tx, rx) = bounded::<String>(1);
+        let query = MsgOpenHandle{
             ino: ino,
             tx: tx,
         };
@@ -214,21 +218,14 @@ impl FileHandleMgr {
             let rxc = rx.clone();
             drop(rxc);
         };
-        let msg = MsgFileHandleOp::GetAndLock(query);
+        let msg = MsgFileHandleOp::OpenHandle(query);
         let ret = self.handle_op_tx.send(msg);
         match ret {
             Ok(_) => {
                 let ret = rx.recv();
                 match ret {
                     Ok(ret) => {
-                        match ret {
-                            Some(h) => {
-                                return Ok(h);
-                            }
-                            None => {
-                                return Err(Errno::Enoent);
-                            }
-                        }
+                        return Ok(ret);
                     }
                     Err(err) => {
                         error!("get: failed to get handle for ino: {}, recv failed with err: {}", ino, err);
@@ -313,6 +310,48 @@ impl FileHandleMgr {
             }
         }
     }
+
+    pub fn get_changed_segments(&self, ino: u64) -> Result<RespChangedSegments, Errno> {
+        let (tx, rx) = bounded::<RespChangedSegments>(1);
+        let msg = MsgFileHandleOp::GetChangedSegments(MsgGetChangedSegments{
+            ino: ino,
+            tx: tx,
+        });
+        let ret = self.handle_op_tx.send(msg);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("get_changed_segments: failed to send msg for ino: {}, err: {}", ino, err);
+                return Err(Errno::Eintr);
+            }
+        }
+        let ret = rx.recv();
+        match ret {
+            Ok(ret) => {
+                return Ok(ret);
+            }
+            Err(err) => {
+                error!("get_changed_segments: failed to get resp for ino: {}, err: {}", ino, err);
+                return Err(Errno::Eintr);
+            }
+        }
+    }
+
+    pub fn clear_changed_segments(&self, ino: u64, version: usize) {
+        let msg = MsgFileHandleOp::ClearChangedSegments(MsgClearChangedSegments{
+            ino: ino,
+            version: version,
+        });
+        let ret = self.handle_op_tx.send(msg);
+        match ret {
+            Ok(_) => {
+            }
+            Err(err) => {
+                error!("clear_changed_segments: failed to send msg for ino: {}, version: {}, err: {}",
+            ino, version, err);
+            }
+        }
+    }
 }
 
 struct HandleMgr {
@@ -355,8 +394,8 @@ impl HandleMgr {
                         MsgFileHandleOp::Get(m) => {
                             self.get(m);
                         }
-                        MsgFileHandleOp::GetAndLock(m) => {
-                            self.get_and_lock(m);
+                        MsgFileHandleOp::OpenHandle(m) => {
+                            self.open_handle(m);
                         }
                         MsgFileHandleOp::GetBlocks(m) => {
                             // query the blocks
@@ -367,6 +406,12 @@ impl HandleMgr {
                         }
                         MsgFileHandleOp::SetSegStatus(m) => {
                             self.set_seg_status(m);
+                        }
+                        MsgFileHandleOp::GetChangedSegments(m) => {
+                            self.get_changed_segments(m);
+                        }
+                        MsgFileHandleOp::ClearChangedSegments(m) => {
+                            self.clear_changed_segments(m);
                         }
                     }
                 },
@@ -416,6 +461,8 @@ impl HandleMgr {
             if last_node.borrow().is_nil() {
                 // no block yet. just insert this new one.
                 h.block_tree.insert_node(start, end, msg.block.clone());
+                // add to changed blocks.
+                h.add_changed_block(&msg.block);
                 h.mark_dirty();
                 return;
             }
@@ -428,7 +475,8 @@ impl HandleMgr {
                 let mut new_block = last_block.clone();
                 new_block.size += msg.block.size;
                 h.block_tree.delete(&last_node);
-                h.block_tree.insert_node(new_block.offset, new_block.offset+new_block.size as u64, new_block);
+                h.block_tree.insert_node(new_block.offset, new_block.offset+new_block.size as u64, new_block.clone());
+                h.add_changed_block(&new_block);
                 h.mark_dirty();
                 return;
             }
@@ -438,6 +486,7 @@ impl HandleMgr {
             if nodes.is_empty() {
                 // no overlap, just insert the new nodes.
                 h.block_tree.insert_node(start, end, msg.block.clone());
+                h.add_changed_block(&msg.block);
                 h.mark_dirty();
                 return;
             }
@@ -482,6 +531,7 @@ impl HandleMgr {
             // insert the merged blocks.
             for b in &blocks {
                 h.block_tree.insert_node(b.offset, b.offset+b.size as u64, b.clone());
+                h.add_changed_block(b);
             }
             h.mark_dirty();
         }
@@ -564,17 +614,19 @@ impl HandleMgr {
         }
     }
 
-    fn get_and_lock(&mut self, msg: MsgQueryHandle){
-        let mut handle: Option<FileHandle> = None;
+    fn open_handle(&mut self, msg: MsgOpenHandle){
+        let leader: String;
         let tx = msg.tx.clone();
         defer!{
             drop(tx);
         };
         if let Some(h) = self.handles.get_mut(&msg.ino) {
             h.reference += 1;
-            handle = Some(h.copy());
+            leader = h.leader.clone();
+        } else {
+            leader = String::from("");
         }
-        let ret = msg.tx.send(handle);
+        let ret = msg.tx.send(leader);
         match ret {
             Ok(_) => {}
             Err(err) => {
@@ -616,6 +668,35 @@ impl HandleMgr {
                 id1: m.id1,
                 need_sync: m.need_sync,
             });
+        }
+    }
+
+    fn get_changed_segments(&mut self, m: MsgGetChangedSegments) {
+        let mut resp = RespChangedSegments{
+            version: 0,
+            segs: Vec::new(),
+            garbages: Vec::new(),
+        };
+        if let Some(h) = self.handles.get_mut(&m.ino){
+            let (version, segs, garbages) = h.fresh_changed_blocks();
+            resp.version = version;
+            resp.segs = segs;
+            resp.garbages = garbages;
+            h.fresh_change_version();
+        }
+
+        let ret = m.tx.send(resp);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("get_changed_segments: failed to send changed segs resp for ino: {}", m.ino);
+            }
+        }
+    }
+
+    fn clear_changed_segments(&mut self, m: MsgClearChangedSegments){
+        if let Some(h) = self.handles.get_mut(&m.ino) {
+            h.clear_changed_blocks(m.version);
         }
     }
 }

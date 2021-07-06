@@ -1,8 +1,7 @@
-use std::collections::HashMap;
+
 use metaservice_mgr::types::{Segment, Block};
 use segment_mgr::file_handle::FileHandleMgr;
 use segment_mgr::types::FileHandle;
-use interval_tree::tree::IntervalTree;
 
 #[test]
 fn test_file_handle_mgr_start()->Result<(), String> {
@@ -25,16 +24,7 @@ fn test_file_handle_mgr_start()->Result<(), String> {
 #[test]
 fn test_file_handle_mgr_add() -> Result<(), String>{
     let mut mgr = FileHandleMgr::create();
-    let h1 = FileHandle{
-        ino: 1,
-        leader: String::from(""),
-        segments: Vec::new(),
-        garbage_blocks: HashMap::new(),
-        block_tree: IntervalTree::new(Block::default()),
-        seg_status: HashMap::new(),
-        is_dirty: 0,
-        reference: 1,
-    };
+    let h1 = FileHandle::new(1);
     let ret = mgr.add(&h1);
     if !ret.is_success(){
         mgr.stop();
@@ -62,16 +52,7 @@ fn test_file_handle_mgr_add() -> Result<(), String>{
 fn test_file_handle_mgr_del() -> Result<(), String>{
     let ino: u64 = 1;
     let mut mgr = FileHandleMgr::create();
-    let h1 = FileHandle{
-        ino: ino,
-        leader: String::from(""),
-        segments: Vec::new(),
-        garbage_blocks: HashMap::new(),
-        block_tree: IntervalTree::new(Block::default()),
-        seg_status: HashMap::new(),
-        is_dirty: 0,
-        reference: 1,
-    };
+    let h1 = FileHandle::new(ino);
     let ret = mgr.add(&h1);
     if !ret.is_success(){
         mgr.stop();
@@ -118,16 +99,7 @@ fn test_file_handle_mgr_del() -> Result<(), String>{
 fn test_file_handle_get_last_segment() -> Result<(), String>{
     let ino: u64 = 1;
     let mut mgr = FileHandleMgr::create();
-    let h1 = FileHandle{
-        ino: ino,
-        leader: String::from(""),
-        segments: Vec::new(),
-        garbage_blocks: HashMap::new(),
-        block_tree: IntervalTree::new(Block::default()),
-        seg_status: HashMap::new(),
-        is_dirty: 0,
-        reference: 1,
-    };
+    let h1 = FileHandle::new(ino);
     let ret = mgr.add(&h1);
     if !ret.is_success(){
         mgr.stop();
@@ -235,16 +207,7 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
 fn test_file_handle_add_block() -> Result<(), String>{
     let ino: u64 = 1;
     let mut mgr = FileHandleMgr::create();
-    let h1 = FileHandle{
-        ino: ino,
-        leader: String::from(""),
-        segments: Vec::new(),
-        garbage_blocks: HashMap::new(),
-        block_tree: IntervalTree::new(Block::default()),
-        seg_status: HashMap::new(),
-        is_dirty: 0,
-        reference: 1,
-    };
+    let h1 = FileHandle::new(ino);
     let ret = mgr.add(&h1);
     if !ret.is_success(){
         mgr.stop();

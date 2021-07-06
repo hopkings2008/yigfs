@@ -47,11 +47,13 @@ pub struct FileHandle {
     // note: segments only contains meta, it doesn't contain blocks.
     // all the blocks are in block_tree.
     pub segments:  Vec<Segment>,
-    pub garbage_blocks: HashMap<u128, Segment>,
+    pub changed_blocks: Vec<HashMap<u128, Segment>>,
+    pub garbage_blocks: Vec<HashMap<u128, Segment>>,
     pub block_tree: IntervalTree<Block>,
     pub seg_status: HashMap<u128, SegStatus>,
     pub is_dirty: u8,
     pub reference: i64,
+    pub change_version: usize,
 }
 
 impl FileHandle {
@@ -60,12 +62,18 @@ impl FileHandle {
             ino: ino,
             leader: leader,
             segments: Vec::new(),
-            garbage_blocks: HashMap::new(),
+            changed_blocks: Vec::new(),
+            garbage_blocks: Vec::new(),
             block_tree: IntervalTree::new(Block::default()),
             seg_status: HashMap::new(),
             is_dirty: 0,
             reference: 1,
+            change_version: 0,
         };
+        h.changed_blocks.push(HashMap::new());
+        h.changed_blocks.push(HashMap::new());
+        h.garbage_blocks.push(HashMap::new());
+        h.garbage_blocks.push(HashMap::new());
 
         for s in segments {
             h.segments.push(Segment{
@@ -94,11 +102,13 @@ impl FileHandle {
             ino: self.ino,
             leader: self.leader.clone(),
             segments: Vec::new(),
+            changed_blocks: self.changed_blocks.clone(),
             garbage_blocks: self.garbage_blocks.clone(),
             block_tree: self.block_tree.clone(),
             seg_status: self.seg_status.clone(),
             is_dirty: self.is_dirty,
             reference: self.reference,
+            change_version: self.change_version,
         };
         for s in &self.segments {
             handle.segments.push(s.copy());
@@ -107,16 +117,23 @@ impl FileHandle {
     }
     
     pub fn new(ino: u64)->Self{
-        FileHandle{
+        let mut h = FileHandle{
             ino: ino,
             leader: String::from(""),
             segments: Vec::new(),
-            garbage_blocks: HashMap::new(),
+            changed_blocks: Vec::new(),
+            garbage_blocks: Vec::new(),
             block_tree: IntervalTree::new(Block::default()),
             seg_status: HashMap::new(),
             is_dirty: 0,
             reference: 1,
-        }
+            change_version: 0,
+        };
+        h.changed_blocks.push(HashMap::new());
+        h.changed_blocks.push(HashMap::new());
+        h.garbage_blocks.push(HashMap::new());
+        h.garbage_blocks.push(HashMap::new());
+        return h;
     }
 
     pub fn mark_dirty(&mut self){
@@ -155,6 +172,43 @@ impl FileHandle {
         return segments;
     }
 
+    pub fn fresh_changed_blocks(&mut self) -> (usize, Vec<Segment>, Vec<Segment>) {
+        let mut segs: Vec<Segment> = Vec::new();
+        let mut garbages: Vec<Segment> = Vec::new();
+        let current = self.change_version;
+        let new_version = (self.change_version + 1) % 2;
+        // if new_version's blocks is not empty, they must be former changed blocks
+        // must return them firstly and don't switch the version.
+        if !self.changed_blocks[new_version].is_empty() || !self.garbage_blocks[new_version].is_empty() {
+            for (_, s) in &self.changed_blocks[new_version] {
+                segs.push(s.clone());
+            }
+            for (_, s) in &self.garbage_blocks[new_version] {
+                garbages.push(s.clone());
+            }
+            return (new_version, segs, garbages);
+        }
+        // first switch the version.
+        self.change_version = new_version;
+        // return the blocks in original version.
+        for (_, s) in &self.changed_blocks[current] {
+            segs.push(s.clone());
+        }
+        for (_, s) in &self.garbage_blocks[current] {
+            garbages.push(s.clone());
+        }
+        (current, segs, garbages)
+    }
+
+    pub fn clear_changed_blocks(&mut self, version: usize) {
+        if version >= self.changed_blocks.len() || version >= self.garbage_blocks.len(){
+            // invalid version number.
+            return;
+        }
+        self.changed_blocks[version].clear();
+        self.garbage_blocks[version].clear();
+    }
+
     pub fn add_block(&mut self, b: Block){
         if b.ino != self.ino {
             panic!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
@@ -163,13 +217,21 @@ impl FileHandle {
         self.block_tree.insert_node(b.offset, b.offset + b.size as u64, b);
     }
 
-    pub fn add_garbage_block(&mut self, b: Block){
+    pub fn get_current_change_version(&self) -> usize {
+        self.change_version
+    }
+
+    pub fn fresh_change_version(&mut self) {
+        self.change_version = (self.change_version + 1) % 2;
+    }
+
+    pub fn add_changed_block(&mut self, b: &Block){
         if b.ino != self.ino {
-            panic!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            panic!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
             b.ino, b.offset, b.size, self.ino);
         }
         let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
-        if let Some(s) = self.garbage_blocks.get_mut(&id) {
+        if let Some(s) = self.changed_blocks[self.change_version].get_mut(&id){
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
             return;
         }
@@ -183,24 +245,34 @@ impl FileHandle {
             blocks: Vec::new(),
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
-        self.garbage_blocks.insert(id, s);
+        self.changed_blocks[self.change_version].insert(id, s);
+    }
+
+    pub fn add_garbage_block(&mut self, b: Block){
+        if b.ino != self.ino {
+            panic!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            b.ino, b.offset, b.size, self.ino);
+        }
+        let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
+        if let Some(s) = self.garbage_blocks[self.change_version].get_mut(&id) {
+            s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+            return;
+        }
+        let mut s = Segment{
+            seg_id0: b.seg_id0,
+            seg_id1: b.seg_id1,
+            capacity: 0,
+            size: 0,
+            backend_size: 0,
+            leader: String::from(""),
+            blocks: Vec::new(),
+        };
+        s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+        self.garbage_blocks[self.change_version].insert(id, s);
     }
 
     pub fn has_garbage_blocks(&self) -> bool {
-        self.garbage_blocks.is_empty()
-    }
-
-    pub fn get_garbage_blocks(&self) -> Vec<Segment> {
-        let mut segs: Vec<Segment> = Vec::new();
-        for s in &self.segments {
-            if let Some(g) = 
-            self.garbage_blocks.get(&NumberOp::to_u128(s.seg_id0, s.seg_id1)){
-                let mut seg = g.copy();
-                seg.leader = s.leader.clone();
-                segs.push(seg);
-            }
-        }
-        return segs;
+        self.garbage_blocks[0].is_empty() && self.garbage_blocks[1].is_empty()
     }
 }
 
@@ -261,16 +333,41 @@ pub struct MsgSetSegStatus{
 }
 
 #[derive(Debug)]
+pub struct MsgOpenHandle{
+    pub ino: u64,
+    pub tx: Sender<String>,
+}
+#[derive(Debug)]
+pub struct RespChangedSegments{
+    pub version: usize,
+    pub segs: Vec<Segment>,
+    pub garbages: Vec<Segment>,
+}
+#[derive(Debug)]
+pub struct MsgGetChangedSegments{
+    pub ino: u64,
+    pub tx: Sender<RespChangedSegments>,
+}
+
+#[derive(Debug)]
+pub struct MsgClearChangedSegments{
+    pub ino: u64,
+    pub version: usize,
+}
+
+#[derive(Debug)]
 pub enum MsgFileHandleOp{
     Add(FileHandle),
     AddBlock(MsgAddBlock),
     Del(u64),
     Get(MsgQueryHandle),
-    GetAndLock(MsgQueryHandle),
+    OpenHandle(MsgOpenHandle),
     GetBlocks(MsgGetBlocks),
     GetLastSegment(MsgGetLastSegment),
     AddSegment(MsgAddSegment),
     SetSegStatus(MsgSetSegStatus),
+    GetChangedSegments(MsgGetChangedSegments),
+    ClearChangedSegments(MsgClearChangedSegments),
 }
 
 #[derive(Debug)]
