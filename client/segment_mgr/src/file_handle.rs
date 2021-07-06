@@ -225,7 +225,10 @@ impl FileHandleMgr {
                 let ret = rx.recv();
                 match ret {
                     Ok(ret) => {
-                        return Ok(ret);
+                        if !ret.is_empty(){
+                            return Ok(ret);
+                        }
+                        return Err(Errno::Enoent);
                     }
                     Err(err) => {
                         error!("get: failed to get handle for ino: {}, recv failed with err: {}", ino, err);
