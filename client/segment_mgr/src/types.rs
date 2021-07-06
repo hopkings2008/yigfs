@@ -47,6 +47,7 @@ pub struct FileHandle {
     // note: segments only contains meta, it doesn't contain blocks.
     // all the blocks are in block_tree.
     pub segments:  Vec<Segment>,
+    pub segments_index: HashMap<u128, usize>,
     pub changed_blocks: Vec<HashMap<u128, Segment>>,
     pub garbage_blocks: Vec<HashMap<u128, Segment>>,
     pub block_tree: IntervalTree<Block>,
@@ -62,6 +63,7 @@ impl FileHandle {
             ino: ino,
             leader: leader,
             segments: Vec::new(),
+            segments_index: HashMap::new(),
             changed_blocks: Vec::new(),
             garbage_blocks: Vec::new(),
             block_tree: IntervalTree::new(Block::default()),
@@ -75,6 +77,7 @@ impl FileHandle {
         h.garbage_blocks.push(HashMap::new());
         h.garbage_blocks.push(HashMap::new());
 
+        let mut idx = 0;
         for s in segments {
             h.segments.push(Segment{
                 seg_id0: s.seg_id0,
@@ -85,6 +88,9 @@ impl FileHandle {
                 leader: s.leader.clone(),
                 blocks: Vec::new(),
             });
+            let id = NumberOp::to_u128(s.seg_id0, s.seg_id1);
+            h.segments_index.insert(id, idx);
+            idx += 1;
             for b in s.blocks {
                 let mut block = b.clone();
                 block.ino = ino;
@@ -102,6 +108,7 @@ impl FileHandle {
             ino: self.ino,
             leader: self.leader.clone(),
             segments: Vec::new(),
+            segments_index: HashMap::new(),
             changed_blocks: self.changed_blocks.clone(),
             garbage_blocks: self.garbage_blocks.clone(),
             block_tree: self.block_tree.clone(),
@@ -110,8 +117,11 @@ impl FileHandle {
             reference: self.reference,
             change_version: self.change_version,
         };
+        let mut idx = 0;
         for s in &self.segments {
             handle.segments.push(s.copy());
+            handle.segments_index.insert(NumberOp::to_u128(s.seg_id0, s.seg_id1), idx);
+            idx += 1;
         }
         return handle;
     }
@@ -121,6 +131,7 @@ impl FileHandle {
             ino: ino,
             leader: String::from(""),
             segments: Vec::new(),
+            segments_index: HashMap::new(),
             changed_blocks: Vec::new(),
             garbage_blocks: Vec::new(),
             block_tree: IntervalTree::new(Block::default()),
@@ -235,13 +246,20 @@ impl FileHandle {
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
             return;
         }
+        let leader: String;
+        if let Some(idx) = self.segments_index.get(&id){
+            leader = self.segments[*idx].leader.clone();
+        } else {
+            panic!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            b.seg_id0, b.seg_id1, b);
+        }
         let mut s = Segment{
             seg_id0: b.seg_id0,
             seg_id1: b.seg_id1,
             capacity: 0,
             size: 0,
             backend_size: 0,
-            leader: String::from(""),
+            leader: leader,
             blocks: Vec::new(),
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
@@ -258,13 +276,20 @@ impl FileHandle {
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
             return;
         }
+        let leader: String;
+        if let Some(idx) = self.segments_index.get(&id){
+            leader = self.segments[*idx].leader.clone();
+        } else {
+            panic!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            b.seg_id0, b.seg_id1, b);
+        }
         let mut s = Segment{
             seg_id0: b.seg_id0,
             seg_id1: b.seg_id1,
             capacity: 0,
             size: 0,
             backend_size: 0,
-            leader: String::from(""),
+            leader: leader,
             blocks: Vec::new(),
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);

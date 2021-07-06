@@ -530,13 +530,13 @@ impl mgr::MetaServiceMgr for MetaServiceMgrImpl{
                 resp = ret;
             }
             Err(err) => {
-                error!("update_file_segments: failed to decode body: {}, err: {}", resp_text.body, err);
+                error!("update_file_segments: failed to decode body for ino: {}, err: {}", ino, err);
                 return Errno::Eintr;
             }
         }
 
         if resp.result.err_code != 0 {
-            error!("update_file_segments: failed to add file block for {}, err: {}", body, resp.result.err_msg);
+            error!("update_file_segments: failed to add file block for ino: {}, err: {}", ino, resp.result.err_msg);
             return Errno::Eintr;
         }
 
