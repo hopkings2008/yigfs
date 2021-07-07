@@ -247,8 +247,14 @@ impl FileHandle {
             return;
         }
         let leader: String;
+        let capacity: u64;
+        let size: u64;
+        let backend_size: u64;
         if let Some(idx) = self.segments_index.get(&id){
             leader = self.segments[*idx].leader.clone();
+            capacity = self.segments[*idx].capacity;
+            size = self.segments[*idx].size;
+            backend_size = self.segments[*idx].backend_size;
         } else {
             panic!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
             b.seg_id0, b.seg_id1, b);
@@ -256,9 +262,9 @@ impl FileHandle {
         let mut s = Segment{
             seg_id0: b.seg_id0,
             seg_id1: b.seg_id1,
-            capacity: 0,
-            size: 0,
-            backend_size: 0,
+            capacity: capacity,
+            size: size,
+            backend_size: backend_size,
             leader: leader,
             blocks: Vec::new(),
         };
