@@ -9,12 +9,10 @@ use common::error::Errno;
 use common::defer;
 use metaservice_mgr::types::{Segment, Block};
 use crate::types::ChangedSegments;
-use crate::types::MsgClearChangedSegments;
 use crate::types::MsgGetBlocks;
-use crate::types::MsgGetChangedSegments;
+use crate::types::MsgGetFileSegments;
 use crate::types::MsgOpenHandle;
 use crate::types::MsgSetSegStatus;
-use crate::types::RespChangedSegments;
 use crate::types::SegStatus;
 use crate::types::{FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle};
 use log::{warn, error};
@@ -329,17 +327,17 @@ impl FileHandleMgr {
         }
     }
 
-    pub fn get_changed_segments(&self, ino: u64) -> Result<RespChangedSegments, Errno> {
-        let (tx, rx) = bounded::<RespChangedSegments>(1);
-        let msg = MsgFileHandleOp::GetChangedSegments(MsgGetChangedSegments{
+    pub fn get_file_segments(&self, ino: u64) -> Result<Vec<Segment>, Errno>{
+        let (tx, rx) = bounded::<Vec<Segment>>(1);
+        let msg = MsgFileHandleOp::GetFileSegments(MsgGetFileSegments{
             ino: ino,
             tx: tx,
         });
         let ret = self.handle_op_tx.send(msg);
-        match ret {
+        match ret{
             Ok(_) => {}
             Err(err) => {
-                error!("get_changed_segments: failed to send msg for ino: {}, err: {}", ino, err);
+                error!("get_file_segments: failed to send query for ino: {}, err: {}", ino, err);
                 return Err(Errno::Eintr);
             }
         }
@@ -349,24 +347,8 @@ impl FileHandleMgr {
                 return Ok(ret);
             }
             Err(err) => {
-                error!("get_changed_segments: failed to get resp for ino: {}, err: {}", ino, err);
+                error!("get_file_segments: failed to get file segments for ino: {}, err: {}", ino, err);
                 return Err(Errno::Eintr);
-            }
-        }
-    }
-
-    pub fn clear_changed_segments(&self, ino: u64, version: usize) {
-        let msg = MsgFileHandleOp::ClearChangedSegments(MsgClearChangedSegments{
-            ino: ino,
-            version: version,
-        });
-        let ret = self.handle_op_tx.send(msg);
-        match ret {
-            Ok(_) => {
-            }
-            Err(err) => {
-                error!("clear_changed_segments: failed to send msg for ino: {}, version: {}, err: {}",
-            ino, version, err);
             }
         }
     }
@@ -425,11 +407,8 @@ impl HandleMgr {
                         MsgFileHandleOp::SetSegStatus(m) => {
                             self.set_seg_status(m);
                         }
-                        MsgFileHandleOp::GetChangedSegments(m) => {
-                            self.get_changed_segments(m);
-                        }
-                        MsgFileHandleOp::ClearChangedSegments(m) => {
-                            self.clear_changed_segments(m);
+                        MsgFileHandleOp::GetFileSegments(m) => {
+                            self.get_file_segments(m);
                         }
                     }
                 },
@@ -700,32 +679,19 @@ impl HandleMgr {
         }
     }
 
-    fn get_changed_segments(&mut self, m: MsgGetChangedSegments) {
-        let mut resp = RespChangedSegments{
-            version: 0,
-            segs: Vec::new(),
-            garbages: Vec::new(),
-        };
-        if let Some(h) = self.handles.get_mut(&m.ino){
-            let (version, segs, garbages) = h.fresh_changed_blocks();
-            resp.version = version;
-            resp.segs = segs;
-            resp.garbages = garbages;
-            h.fresh_change_version();
+    fn get_file_segments(&self, m: MsgGetFileSegments){
+        let segs: Vec<Segment>;
+        if let Some(h) = self.handles.get(&m.ino) {
+            segs = h.segments.clone();
+        } else {
+            segs = Vec::new();
         }
-
-        let ret = m.tx.send(resp);
-        match ret {
+        let ret = m.tx.send(segs);
+        match ret{
             Ok(_) => {}
             Err(err) => {
-                error!("get_changed_segments: failed to send changed segs resp for ino: {}, err: {}", m.ino, err);
+                error!("get_file_segments: failed to send segments resp for ino: {}, err: {}", m.ino, err);
             }
-        }
-    }
-
-    fn clear_changed_segments(&mut self, m: MsgClearChangedSegments){
-        if let Some(h) = self.handles.get_mut(&m.ino) {
-            h.clear_changed_blocks(m.version);
         }
     }
 }

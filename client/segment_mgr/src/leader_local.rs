@@ -6,7 +6,6 @@ use metaservice_mgr::types::{Segment, Block};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
 use log::{info, warn, error};
-use crate::types::RespChangedSegments;
 use crate::{leader::Leader, segment_sync::SegSyncer};
 use crate::file_handle::FileHandleMgr;
 use crate::types::{FileHandle, BlockIo};
@@ -310,42 +309,30 @@ impl Leader for LeaderLocal {
         // first we should update the segments into meta server.
         // second we should close all the file handles for the ino.
         // update the segments into meta server.
-        loop {
-            let changed_segs: RespChangedSegments;
-            let ret = self.handle_mgr.get_changed_segments(ino);
-            match ret{
-                Ok(ret) => {
-                    changed_segs = ret;
-                }
-                Err(err) => {
-                    error!("LeadLocal close: failed to get changed segments for ino: {}, err: {:?}", ino, err);
-                    return err;
-                }
+        let segs: Vec<Segment>;
+        let ret = self.handle_mgr.get_file_segments(ino);
+        match ret{
+            Ok(ret) => {
+                segs = ret;
             }
-            if changed_segs.segs.is_empty() && changed_segs.garbages.is_empty() {
-                break;
+            Err(err) => {
+                error!("cllose: failed to get file segments for ino: {}, err: {:?}", ino, err);
+                return err;
             }
-            
-            let ret = self.segment_mgr.update_segments(ino, &changed_segs.segs, &changed_segs.garbages);
-            if !ret.is_success(){
-                error!("LeadLocal close: failed to update segments for ino: {}, err: {:?}", ino, ret);
-                return ret;
+        }
+        // close the segments file handles.
+        for s in &segs {
+            /*for b in &s.blocks {
+                info!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
+                ino, s.seg_id0, s.seg_id1, b.offset, b.size);
+            }*/
+            //close the segment.
+            let ret = self.cache_store.close(s.seg_id0, s.seg_id1);
+            if ret.is_success(){
+                continue;
             }
-            // close the segments file handles.
-            for s in &changed_segs.segs {
-                /*for b in &s.blocks {
-                    info!("ino: {}, seg: {}, {}, block: offset: {}, size: {}",
-                    ino, s.seg_id0, s.seg_id1, b.offset, b.size);
-                }*/
-                //close the segment.
-                let ret = self.cache_store.close(s.seg_id0, s.seg_id1);
-                if ret.is_success(){
-                    continue;
-                }
-                error!("LeadLocal: close: failed to close seg: (id0: {}, id1: {}), err: {:?}",
-                s.seg_id0, s.seg_id1, ret);
-            }
-            self.handle_mgr.clear_changed_segments(ino, changed_segs.version);
+            error!("LeadLocal: close: failed to close seg: (id0: {}, id1: {}), err: {:?}",
+            s.seg_id0, s.seg_id1, ret);
         }
 
         let err = self.handle_mgr.del(ino);
