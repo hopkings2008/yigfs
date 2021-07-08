@@ -43,7 +43,8 @@ impl MetaStore{
             vgarbages.push(s.copy());
         }
 
-        let thr = self.meta_pool.get_meta_thread_roundrobin();
+        //let thr = self.meta_pool.get_meta_thread_roundrobin();
+        let thr = self.meta_pool.get_meta_thread_for_seg(ino, 0);
         let ret = thr.update_changed_segments(ino, vsegs, vgarbages);
         if !ret.is_success(){
             error!("update_changed_segments: failed to upload changed segments for ino: {}, err: {:?}", ino, ret);
