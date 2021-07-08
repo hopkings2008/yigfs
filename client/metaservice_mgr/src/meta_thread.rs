@@ -66,23 +66,25 @@ impl MetaThread {
     }
 
     pub fn update_changed_segments(&self, ino: u64, segs: Vec<Segment>, garbages: Vec<Segment>) -> Errno {
-        let (tx, rx) = crossbeam_channel::bounded::<Errno>(1);
+        //let (tx, rx) = crossbeam_channel::bounded::<Errno>(1);
         let op = MetaOpUpdateSegs {
             ino: ino,
             segs: segs,
             garbages: garbages,
-            tx: tx,
+            tx: None,
         };
         let ret = self.op_tx.send(MetaOp::OpUpdateChangedSegs(op));
         match ret {
-            Ok(_) => {}
+            Ok(_) => {
+                return Errno::Esucc;
+            }
             Err(err) => {
                 error!("update_changed_segments: failed to send op for ino: {}, err: {}", ino, err);
                 return Errno::Eintr;
             }
         }
 
-        let ret = rx.recv();
+        /*let ret = rx.recv();
         match ret {
             Ok(ret) => {
                 ret
@@ -91,6 +93,6 @@ impl MetaThread {
                 error!("update_changed_segments: failed to got response for ino: {}, err: {}", ino, err);
                 Errno::Eintr
             }
-        }
+        }*/
     }
 }

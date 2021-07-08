@@ -86,11 +86,13 @@ impl MetaWorker {
             error!("do_update_changed_segs: failed to upload changes segs for ino: {}, err: {:?}", op.ino, ret);
         }
 
-        let cret = op.tx.send(ret);
-        match cret {
-            Ok(_) => {}
-            Err(err) => {
-                error!("do_update_changed_segs: failed to send response for ino: {}, err: {}", op.ino, err);
+        if let Some(tx) = op.tx {
+            let cret = tx.send(ret);
+            match cret {
+                Ok(_) => {}
+                Err(err) => {
+                    error!("do_update_changed_segs: failed to send response for ino: {}, err: {}", op.ino, err);
+                }
             }
         }
     }

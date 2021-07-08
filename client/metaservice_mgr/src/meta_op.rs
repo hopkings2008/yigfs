@@ -46,7 +46,7 @@ pub struct MetaOpUpdateSegs{
     pub ino: u64,
     pub segs: Vec<Segment>,
     pub garbages: Vec<Segment>,
-    pub tx: Sender<Errno>,
+    pub tx: Option<Sender<Errno>>,
 }
 
 pub enum MetaOp{
