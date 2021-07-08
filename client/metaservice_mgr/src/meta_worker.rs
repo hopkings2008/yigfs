@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, select};
 
-use crate::{meta_op::{MetaOpUploadSeg, MetaOpUploadSegResp, MetaOpResp}, mgr::MetaServiceMgr};
+use crate::{meta_op::{MetaOpResp, MetaOpUpdateSegs, MetaOpUploadSeg, MetaOpUploadSegResp}, mgr::MetaServiceMgr};
 use crate::meta_op::MetaOp;
 use log::{warn, error};
 
@@ -56,6 +56,9 @@ impl MetaWorker {
             MetaOp::OpUploadSeg(msg) => {
                 self.do_upload_seg(msg);
             }
+            MetaOp::OpUpdateChangedSegs(msg) => {
+                self.do_upload_changed_segs(msg);
+            }
         }
     }
 
@@ -74,6 +77,21 @@ impl MetaWorker {
         if !ret.is_success(){
             error!("do_upload_seg: failed to send resp for id0: {}, id1: {}, offset: {}, err: {:?}",
             op.id0, op.id1, op.offset, ret);
+        }
+    }
+
+    fn do_upload_changed_segs(&self, op: MetaOpUpdateSegs){
+        let ret = self.meta_mgr.update_file_segments(op.ino, &op.segs, &op.garbages);
+        if !ret.is_success() {
+            error!("do_update_changed_segs: failed to upload changes segs for ino: {}, err: {:?}", op.ino, ret);
+        }
+
+        let cret = op.tx.send(ret);
+        match cret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("do_update_changed_segs: failed to send response for ino: {}, err: {}", op.ino, err);
+            }
         }
     }
 }

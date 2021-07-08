@@ -217,6 +217,21 @@ impl Leader for LeaderLocal {
                 // write to backend store directly.
                 let ret = self.backend_store.write(id0, id1, seg_size, data);
                 if ret.err.is_success() {
+                    // write block success.
+                    let b = Block {
+                        ino: ino,
+                        generation: 0,
+                        offset: offset,
+                        seg_id0: id0,
+                        seg_id1: id1,
+                        seg_start_addr: ret.offset,
+                        size: ret.nwrite as i64,
+                    };
+                    let err = self.add_block(ino, id0, id1, &b);
+                    if !err.is_success() {
+                        error!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
+                        return Err(err);
+                    }
                     return Ok(BlockIo{
                         id0: id0,
                         id1: id1,
@@ -241,7 +256,7 @@ impl Leader for LeaderLocal {
                         seg_start_addr: r.offset,
                         size: r.nwrite as i64,
                     };
-                    let ret = self.handle_mgr.add_block(ino, id0, id1, &b);
+                    let ret = self.add_block(ino, id0, id1, &b);
                     if !ret.is_success() {
                         error!("write: failed to add_block{:?} for ino: {} with offset: {}, err: {:?}", b, ino, offset, ret);
                         return Err(ret);
@@ -338,6 +353,7 @@ impl Leader for LeaderLocal {
     }
 
     fn release(&mut self) {
+        // TODO upload changed segments meta to server.
         self.handle_mgr.stop();
     }
 }
@@ -355,5 +371,19 @@ impl LeaderLocal {
             segment_mgr: mgr,
             handle_mgr: FileHandleMgr::create(),
         }
+    }
+
+    fn add_block(&self, ino: u64, id0: u64, id1: u64, b: &Block)->Errno{
+        let (segs, garbages, ret) = self.handle_mgr.add_block(ino, id0, id1, &b);
+        if !ret.is_success() {
+            error!("LeaderLocal::add_block: failed to add_block{:?} for ino: {}  err: {:?}", b, ino, ret);
+            return ret;
+        }
+        let ret = self.sync_mgr.update_changed_segments(ino, segs, garbages);
+        if !ret.is_success(){
+            error!("LeaderLocal::add_block: failed to update changed segments for ino: {}, err: {:?}", ino, ret);
+            return ret;
+        }
+        return Errno::Esucc;
     }
 }

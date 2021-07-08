@@ -154,7 +154,7 @@ fn test_file_handle_get_last_segment() -> Result<(), String>{
         seg_start_addr: 0,
         size: 5,
     };
-    let ret = mgr.add_block(ino, id0, id1, &b1);
+    let (segs, garbages, ret) = mgr.add_block(ino, id0, id1, &b1);
     if !ret.is_success(){
         mgr.stop();
         return Err(format!("failed to add block"));
@@ -232,7 +232,7 @@ fn test_file_handle_add_block() -> Result<(), String>{
         seg_start_addr: 0,
         size: 5,
     };
-    let ret = mgr.add_block(ino, id0, id1, &b1);
+    let (segs, garbages,ret) = mgr.add_block(ino, id0, id1, &b1);
     if !ret.is_success(){
         mgr.stop();
         return Err(format!("failed to add block"));

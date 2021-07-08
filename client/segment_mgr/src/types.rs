@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use crossbeam_channel::{Sender};
 use common::numbers::NumberOp;
+use common::error::Errno;
 use metaservice_mgr::types::{Segment, Block};
 use interval_tree::tree::IntervalTree;
 
@@ -236,13 +237,13 @@ impl FileHandle {
         self.change_version = (self.change_version + 1) % 2;
     }
 
-    pub fn add_changed_block(&mut self, b: &Block){
+    pub fn add_changed_block(&mut self, segs: &mut HashMap<u128, Segment>, b: &Block){
         if b.ino != self.ino {
             panic!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
             b.ino, b.offset, b.size, self.ino);
         }
         let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
-        if let Some(s) = self.changed_blocks[self.change_version].get_mut(&id){
+        if let Some(s) = segs.get_mut(&id){
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
             return;
         }
@@ -269,16 +270,16 @@ impl FileHandle {
             blocks: Vec::new(),
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
-        self.changed_blocks[self.change_version].insert(id, s);
+        segs.insert(id, s);
     }
 
-    pub fn add_garbage_block(&mut self, b: Block){
+    pub fn add_garbage_block(&mut self, segs: &mut HashMap<u128, Segment>, b: Block){
         if b.ino != self.ino {
             panic!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
             b.ino, b.offset, b.size, self.ino);
         }
         let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
-        if let Some(s) = self.garbage_blocks[self.change_version].get_mut(&id) {
+        if let Some(s) = segs.get_mut(&id) {
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
             return;
         }
@@ -299,7 +300,7 @@ impl FileHandle {
             blocks: Vec::new(),
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
-        self.garbage_blocks[self.change_version].insert(id, s);
+        segs.insert(id, s);
     }
 
     pub fn has_garbage_blocks(&self) -> bool {
@@ -328,11 +329,32 @@ pub struct MsgQueryHandle{
 }
 
 #[derive(Debug)]
+pub struct ChangedSegments{
+    pub segments: HashMap<u128, Segment>,
+    pub garbages: HashMap<u128, Segment>,
+}
+
+#[derive(Debug)]
 pub struct MsgAddBlock{
     pub ino: u64,
     pub id0: u64,
     pub id1: u64,
     pub block: Block,
+    pub tx: Sender<ChangedSegments>,
+}
+
+impl MsgAddBlock{
+    pub fn response(&self, segs: ChangedSegments)->Errno{
+        let ret = self.tx.send(segs);
+        match ret{
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                return Errno::Eintr;
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -417,8 +439,16 @@ pub struct SegDownload{
     pub capacity: u64,
     pub offset: u64, // from where to download.
 }
+
+#[derive(Debug)]
+pub struct ChangedSegsUpdate{
+    pub ino: u64,
+    pub segs: HashMap<u128, Segment>,
+    pub garbages: HashMap<u128, Segment>,
+}
 #[derive(Debug)]
 pub enum SegSyncOp{
     OpUpload(SegUpload),
     OpDownload(SegDownload),
+    OpUpdateChangedSegs(ChangedSegsUpdate),
 }

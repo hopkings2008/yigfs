@@ -159,6 +159,14 @@ impl SegSyncHandler{
                     op.id0, op.id1, op.dir, ret);
                 }
             }
+
+            SegSyncOp::OpUpdateChangedSegs(op) => {
+                let ret = self.meta_store.update_changed_segments(op.ino, &op.segs, &op.garbages);
+                if !ret.is_success(){
+                    error!("SegSyncOp::OpUpdateChangedSegs: failed to update changed segments for ino: {}, err: {:?}",
+                    op.ino, ret);
+                }
+            }
         }
     }
 

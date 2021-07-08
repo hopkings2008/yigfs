@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use common::numbers::NumberOp;
 
 use crate::{meta_thread::MetaThread, mgr::MetaServiceMgr};
@@ -7,12 +8,14 @@ use crate::{meta_thread::MetaThread, mgr::MetaServiceMgr};
 
 pub struct MetaThreadPool{
     pool: Vec<MetaThread>,
+    idx: AtomicUsize,
 }
 
 impl MetaThreadPool {
     pub fn new(num: u32, prefix: &String, mgr: Arc<dyn MetaServiceMgr>) -> Self {
         let mut mp = MetaThreadPool{
             pool: Vec::new(),
+            idx: AtomicUsize::new(0),
         };
         for i in 0..num {
             let name = format!("{}_{}", prefix, i);
@@ -39,5 +42,23 @@ impl MetaThreadPool {
         let size = self.num();
         let idx = (id % size as u128) as usize;
         &self.pool[idx]
+    }
+
+    pub fn get_meta_thread_roundrobin(&self) -> &MetaThread{
+        let total = self.pool.len();
+        let mut id = self.idx.load(Ordering::Relaxed);
+        let mut idx = (id + 1) % total;
+        loop {
+            let ret = self.idx.compare_exchange(id, idx, Ordering::Acquire, Ordering::Relaxed);
+            match ret {
+                Ok(ret) => {
+                    return &self.pool[ret];
+                }
+                Err(ret) => {
+                    id = ret;
+                    idx = (id + 1) % total;
+                }
+            }
+        }
     }
 }

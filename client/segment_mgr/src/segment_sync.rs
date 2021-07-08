@@ -1,12 +1,15 @@
 
 use std::sync::Arc;
+use std::collections::HashMap;
 use common::thread::Thread;
 use common::error::Errno;
 use crossbeam_channel::{Sender, unbounded, bounded};
 use io_engine::cache_store::CacheStore;
 use io_engine::backend_storage::BackendStore;
 use metaservice_mgr::meta_store::MetaStore;
+use metaservice_mgr::types::Segment;
 
+use crate::types::ChangedSegsUpdate;
 use crate::{segment_sync_handler::SegSyncHandler, types::{SegDownload, SegSyncOp, SegUpload}};
 use log::error;
 
@@ -72,6 +75,25 @@ impl SegSyncer {
             Err(err) => {
                 error!("sync_segment: failed to perform download segment for id0: {}, id1: {}, offset: {}, err: {}",
             id0, id1, offset, err);
+                return Errno::Eintr;
+            }
+        }
+    }
+
+    pub fn update_changed_segments(&self, ino: u64, segs: HashMap<u128, Segment>, garbages: HashMap<u128, Segment>) -> Errno{
+        let op = ChangedSegsUpdate{
+            ino: ino,
+            segs: segs,
+            garbages: garbages,
+        };
+        let ret = self.op_tx.send(SegSyncOp::OpUpdateChangedSegs(op));
+        match ret{
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                error!("update_changed_segments: failed to send req of changed segments for ino: {}, err: {}",
+            ino, err);
                 return Errno::Eintr;
             }
         }

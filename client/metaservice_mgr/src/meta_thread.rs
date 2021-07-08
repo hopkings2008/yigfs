@@ -3,9 +3,11 @@ use common::thread::Thread;
 use common::error::Errno;
 use crossbeam_channel::Sender;
 
+use crate::meta_op::MetaOpUpdateSegs;
 use crate::meta_op::{MetaOp, MetaOpResp, MetaOpUploadSeg};
 use crate::mgr::MetaServiceMgr;
 use crate::meta_worker::MetaWorker;
+use crate::types::Segment;
 use log::error;
 
 
@@ -59,6 +61,35 @@ impl MetaThread {
                 error!("upload_segment: failed to send op for id0: {}, id1: {}, offset: {}, err: {}",
                 id0, id1, offset, err);
                 return Errno::Eintr;
+            }
+        }
+    }
+
+    pub fn update_changed_segments(&self, ino: u64, segs: Vec<Segment>, garbages: Vec<Segment>) -> Errno {
+        let (tx, rx) = crossbeam_channel::bounded::<Errno>(1);
+        let op = MetaOpUpdateSegs {
+            ino: ino,
+            segs: segs,
+            garbages: garbages,
+            tx: tx,
+        };
+        let ret = self.op_tx.send(MetaOp::OpUpdateChangedSegs(op));
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("update_changed_segments: failed to send op for ino: {}, err: {}", ino, err);
+                return Errno::Eintr;
+            }
+        }
+
+        let ret = rx.recv();
+        match ret {
+            Ok(ret) => {
+                ret
+            }
+            Err(err) => {
+                error!("update_changed_segments: failed to got response for ino: {}, err: {}", ino, err);
+                Errno::Eintr
             }
         }
     }
