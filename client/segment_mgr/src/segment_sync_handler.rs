@@ -1,4 +1,5 @@
 
+use crate::types::MetaSyncOp;
 use crate::{segment_state::SegStateMachine, types::SegSyncOp};
 use crate::segment_state::SegState;
 use common::numbers::NumberOp;
@@ -23,6 +24,7 @@ pub struct SegSyncHandler{
     meta_op_tx: Sender<MetaOpResp>,
     meta_op_rx: Receiver<MetaOpResp>,
     op_rx: Receiver<SegSyncOp>,
+    meta_sync_rx: Receiver<MetaSyncOp>,
     stop_rx: Receiver<u8>,
     seg_state_machines: HashMap<u128, SegStateMachine>,
 }
@@ -32,6 +34,7 @@ impl SegSyncHandler{
         backend_store: Arc<dyn BackendStore>, 
         meta_store: Arc<MetaStore>,
         op_rx: Receiver<SegSyncOp>,
+        meta_sync_rx: Receiver<MetaSyncOp>,
         stop_rx: Receiver<u8>) -> Self{
         let (cache_op_tx, cache_op_rx) = unbounded::<MsgFileOpResp>();
         let (backend_op_tx, backend_op_rx) = unbounded::<MsgFileOpResp>();
@@ -47,6 +50,7 @@ impl SegSyncHandler{
             meta_op_tx: meta_op_tx,
             meta_op_rx: meta_op_rx,
             op_rx: op_rx,
+            meta_sync_rx: meta_sync_rx,
             stop_rx: stop_rx,
             seg_state_machines: HashMap::new(),
         }
@@ -62,6 +66,16 @@ impl SegSyncHandler{
                         }
                         Err(err) => {
                             error!("SegSyncHandler::start: failed to recv op, err: {}", err);
+                        }
+                    }
+                }
+                recv(self.meta_sync_rx) -> ret => {
+                    match ret {
+                        Ok(msg) => {
+                            self.do_meta_sync_op(msg);
+                        }
+                        Err(err) => {
+                            error!("SegSyncHandler::start: failed to recv meta_sync_op, err: {}", err);
                         }
                     }
                 }
@@ -159,12 +173,16 @@ impl SegSyncHandler{
                     op.id0, op.id1, op.dir, ret);
                 }
             }
+        }
+    }
 
-            SegSyncOp::OpUpdateChangedSegs(op) => {
-                let ret = self.meta_store.update_changed_segments(op.ino, &op.segs, &op.garbages);
+    fn do_meta_sync_op(&self, op: MetaSyncOp){
+        match op{
+            MetaSyncOp::OpUpdateChangedSegs(msg) => {
+                let ret = self.meta_store.update_changed_segments(msg.ino, &msg.segs, &msg.garbages);
                 if !ret.is_success(){
                     error!("SegSyncOp::OpUpdateChangedSegs: failed to update changed segments for ino: {}, err: {:?}",
-                    op.ino, ret);
+                    msg.ino, ret);
                 }
             }
         }

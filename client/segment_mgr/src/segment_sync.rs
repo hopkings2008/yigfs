@@ -10,11 +10,13 @@ use metaservice_mgr::meta_store::MetaStore;
 use metaservice_mgr::types::Segment;
 
 use crate::types::ChangedSegsUpdate;
+use crate::types::MetaSyncOp;
 use crate::{segment_sync_handler::SegSyncHandler, types::{SegDownload, SegSyncOp, SegUpload}};
 use log::error;
 
 pub struct SegSyncer{
     op_tx: Sender<SegSyncOp>,
+    meta_sync_tx: Sender<MetaSyncOp>,
     stop_tx: Sender<u8>,
     thr: Thread,
 }
@@ -22,15 +24,18 @@ pub struct SegSyncer{
 impl SegSyncer {
     pub fn new(cache_store: Arc<dyn CacheStore>, backend_store: Arc<dyn BackendStore>, meta_store: Arc<MetaStore>) -> Self{
         let (op_tx, op_rx) = unbounded::<SegSyncOp>();
+        let (meta_sync_tx, meta_sync_rx) = unbounded::<MetaSyncOp>();
         let (stop_tx, stop_rx) = bounded::<u8>(1);
         let mut seg_sync_handler = SegSyncHandler::new(cache_store.clone(),
         backend_store.clone(),
         meta_store.clone(),
         op_rx,
+        meta_sync_rx,
         stop_rx);
         let mut syncer = SegSyncer{
             thr: Thread::create(&format!("seg_syncer")),
             op_tx: op_tx,
+            meta_sync_tx: meta_sync_tx,
             stop_tx: stop_tx,
         };
         syncer.thr.run(move || {
@@ -86,7 +91,7 @@ impl SegSyncer {
             segs: segs,
             garbages: garbages,
         };
-        let ret = self.op_tx.send(SegSyncOp::OpUpdateChangedSegs(op));
+        let ret = self.meta_sync_tx.send(MetaSyncOp::OpUpdateChangedSegs(op));
         match ret{
             Ok(_) => {
                 return Errno::Esucc;

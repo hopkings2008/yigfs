@@ -369,5 +369,10 @@ pub struct ChangedSegsUpdate{
 pub enum SegSyncOp{
     OpUpload(SegUpload),
     OpDownload(SegDownload),
+}
+
+
+#[derive(Debug)]
+pub enum MetaSyncOp{
     OpUpdateChangedSegs(ChangedSegsUpdate),
 }
