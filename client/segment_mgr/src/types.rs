@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use crossbeam_channel::{Sender};
 use common::numbers::NumberOp;
 use common::error::Errno;
+use log::{error};
 use metaservice_mgr::types::{Segment, Block};
 use interval_tree::tree::IntervalTree;
 
@@ -48,7 +49,9 @@ pub struct FileHandle {
     // note: segments only contains meta, it doesn't contain blocks.
     // all the blocks are in block_tree.
     pub segments:  Vec<Segment>,
+    // segments_index contains the index of the segments according to the segment ids.
     pub segments_index: HashMap<u128, usize>,
+    pub garbages: HashMap<u64, HashMap<u128, Segment>>,
     pub block_tree: IntervalTree<Block>,
     pub seg_status: HashMap<u128, SegStatus>,
     pub is_dirty: u8,
@@ -62,6 +65,7 @@ impl FileHandle {
             leader: leader,
             segments: Vec::new(),
             segments_index: HashMap::new(),
+            garbages: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             seg_status: HashMap::new(),
             is_dirty: 0,
@@ -91,15 +95,20 @@ impl FileHandle {
                 h.add_block(block);
             }
         }
+
+        // future changed version starts from 1.
+        h.block_tree.set_version(1);
         
         return h;
     }
+
     pub fn copy(&self)->Self {
         let mut handle = FileHandle{
             ino: self.ino,
             leader: self.leader.clone(),
             segments: Vec::new(),
             segments_index: HashMap::new(),
+            garbages: self.garbages.clone(),
             block_tree: self.block_tree.clone(),
             seg_status: self.seg_status.clone(),
             is_dirty: self.is_dirty,
@@ -120,6 +129,7 @@ impl FileHandle {
             leader: String::from(""),
             segments: Vec::new(),
             segments_index: HashMap::new(),
+            garbages: HashMap::new(),
             block_tree: IntervalTree::new(Block::default()),
             seg_status: HashMap::new(),
             is_dirty: 0,
@@ -164,23 +174,55 @@ impl FileHandle {
         return segments;
     }
 
-    pub fn add_block(&mut self, b: Block){
-        if b.ino != self.ino {
-            panic!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
-            b.ino, b.offset, b.size, self.ino);
+    pub fn visitor<F>(&mut self, visitor: F) -> (HashMap<u128, Segment>, u64, Errno) where
+    F: Fn(u64) -> bool {
+        let mut segments: HashMap<u128, Segment> = HashMap::new();
+        let version = self.block_tree.get_version();
+        let blocks = self.block_tree.visitor(visitor);
+        for b in blocks {
+            let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
+            if let Some(s) = segments.get_mut(&id){
+                s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+                continue;
+            }
+            let e = self.segments_index.get(&id);
+            match e {
+                Some(idx) => {
+                    let mut s = self.segments[*idx].clone();
+                    s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+                    segments.insert(id, s);
+                }
+                None => {
+                    error!("got invalid block whose segment doesn't exists, id0: {}, id1: {}", 
+                b.seg_id0, b.seg_id1);
+                    return (segments, version, Errno::Eintr);
+                }
+            }
         }
-        self.block_tree.insert_node(b.offset, b.offset + b.size as u64, b);
+        self.block_tree.set_version(version+1);
+        return (segments, version, Errno::Esucc);
     }
 
-    pub fn add_changed_block(&mut self, segs: &mut HashMap<u128, Segment>, b: &Block){
+    pub fn add_block(&mut self, b: Block)->Errno{
         if b.ino != self.ino {
-            panic!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            error!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
             b.ino, b.offset, b.size, self.ino);
+            return Errno::Eintr;
+        }
+        self.block_tree.insert_node(b.offset, b.offset + b.size as u64, b);
+        return Errno::Esucc;
+    }
+
+    pub fn add_changed_block(&mut self, segs: &mut HashMap<u128, Segment>, b: &Block)->Errno{
+        if b.ino != self.ino {
+            error!("add_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            b.ino, b.offset, b.size, self.ino);
+            return Errno::Eintr;
         }
         let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
         if let Some(s) = segs.get_mut(&id){
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
-            return;
+            return Errno::Esucc;
         }
         let leader: String;
         let capacity: u64;
@@ -192,8 +234,9 @@ impl FileHandle {
             size = self.segments[*idx].size;
             backend_size = self.segments[*idx].backend_size;
         } else {
-            panic!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            error!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
             b.seg_id0, b.seg_id1, b);
+            return Errno::Eintr;
         }
         let mut s = Segment{
             seg_id0: b.seg_id0,
@@ -206,36 +249,82 @@ impl FileHandle {
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
         segs.insert(id, s);
+        return Errno::Esucc;
     }
 
-    pub fn add_garbage_block(&mut self, segs: &mut HashMap<u128, Segment>, b: Block){
+    pub fn track_garbage_block(&mut self, b: Block) -> Errno {
         if b.ino != self.ino {
-            panic!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            error!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
             b.ino, b.offset, b.size, self.ino);
+            return Errno::Eintr;
+        }
+        let current_version = self.block_tree.get_version();
+        let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
+        if let Some(seg_map) = self.garbages.get_mut(&current_version) {
+            if let Some(s) = seg_map.get_mut(&id){
+                s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+                return Errno::Esucc;
+            }
+            if let Some(idx) = self.segments_index.get(&id) {
+                let mut s = self.segments[*idx].clone();
+                s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+                seg_map.insert(id, s);
+                return Errno::Esucc;
+            }
+            error!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            b.seg_id0, b.seg_id1, b);
+            return Errno::Eintr;
+        }
+        let mut seg_map: HashMap<u128, Segment> = HashMap::new();
+        if let Some(idx) = self.segments_index.get(&id) {
+            let mut s = self.segments[*idx].clone();
+            s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
+            seg_map.insert(id, s);
+            self.garbages.insert(current_version, seg_map);
+            return Errno::Esucc;
+        }
+        error!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            b.seg_id0, b.seg_id1, b);
+        return Errno::Eintr
+    }
+
+    pub fn add_garbage_block(&mut self, segs: &mut HashMap<u128, Segment>, b: Block)->Errno{
+        if b.ino != self.ino {
+            error!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            b.ino, b.offset, b.size, self.ino);
+            return Errno::Eintr;
         }
         let id = NumberOp::to_u128(b.seg_id0, b.seg_id1);
         if let Some(s) = segs.get_mut(&id) {
             s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
-            return;
+            return Errno::Esucc;
         }
         let leader: String;
+        let capacity: u64;
+        let size: u64;
+        let backend_size: u64;
         if let Some(idx) = self.segments_index.get(&id){
             leader = self.segments[*idx].leader.clone();
+            capacity = self.segments[*idx].capacity;
+            size = self.segments[*idx].size;
+            backend_size = self.segments[*idx].backend_size;
         } else {
-            panic!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            error!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
             b.seg_id0, b.seg_id1, b);
+            return Errno::Eintr;
         }
         let mut s = Segment{
             seg_id0: b.seg_id0,
             seg_id1: b.seg_id1,
-            capacity: 0,
-            size: 0,
-            backend_size: 0,
+            capacity: capacity,
+            size: size,
+            backend_size: backend_size,
             leader: leader,
             blocks: Vec::new(),
         };
         s.add_block(b.ino, b.offset, b.seg_start_addr, b.size);
         segs.insert(id, s);
+        return Errno::Esucc;
     }
 }
 
@@ -261,6 +350,7 @@ pub struct MsgQueryHandle{
 
 #[derive(Debug)]
 pub struct ChangedSegments{
+    pub ret: Errno,
     pub segments: HashMap<u128, Segment>,
     pub garbages: HashMap<u128, Segment>,
 }
@@ -271,20 +361,23 @@ pub struct MsgAddBlock{
     pub id0: u64,
     pub id1: u64,
     pub block: Block,
-    pub tx: Sender<ChangedSegments>,
+    pub tx: Option<Sender<ChangedSegments>>,
 }
 
 impl MsgAddBlock{
     pub fn response(&self, segs: ChangedSegments)->Errno{
-        let ret = self.tx.send(segs);
-        match ret{
-            Ok(_) => {
-                return Errno::Esucc;
-            }
-            Err(err) => {
-                return Errno::Eintr;
+        if let Some(s) = &self.tx {
+            let ret = s.send(segs);
+            match ret{
+                Ok(_) => {
+                    return Errno::Esucc;
+                }
+                Err(err) => {
+                    return Errno::Eintr;
+                }
             }
         }
+        return Errno::Esucc;
     }
 }
 
@@ -328,6 +421,18 @@ pub struct MsgGetFileSegments{
     pub tx: Sender<Vec<Segment>>,
 }
 
+pub struct RespChangedBlocks{
+    pub segs: HashMap<u128, Segment>,
+    pub garbages: HashMap<u128, Segment>,
+    pub version: u64,
+}
+#[derive(Debug)]
+pub struct MsgGetChangedBlocks{
+    pub ino: u64,
+    pub version: u64,
+    pub tx: Sender<RespChangedBlocks>,
+}
+
 #[derive(Debug)]
 pub enum MsgFileHandleOp{
     Add(FileHandle),
@@ -340,6 +445,7 @@ pub enum MsgFileHandleOp{
     AddSegment(MsgAddSegment),
     SetSegStatus(MsgSetSegStatus),
     GetFileSegments(MsgGetFileSegments),
+    GetChangedBlocks(MsgGetChangedBlocks),
 }
 
 #[derive(Debug)]

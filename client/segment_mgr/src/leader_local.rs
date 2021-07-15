@@ -361,16 +361,12 @@ impl LeaderLocal {
     }
 
     fn add_block(&self, ino: u64, id0: u64, id1: u64, b: &Block)->Errno{
-        let (segs, garbages, ret) = self.handle_mgr.add_block(ino, id0, id1, &b);
+        let ret = self.handle_mgr.add_block(ino, id0, id1, &b,None);
         if !ret.is_success() {
             error!("LeaderLocal::add_block: failed to add_block{:?} for ino: {}  err: {:?}", b, ino, ret);
             return ret;
         }
-        let ret = self.sync_mgr.update_changed_segments(ino, segs, garbages);
-        if !ret.is_success(){
-            error!("LeaderLocal::add_block: failed to update changed segments for ino: {}, err: {:?}", ino, ret);
-            return ret;
-        }
+        
         return Errno::Esucc;
     }
 }

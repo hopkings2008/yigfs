@@ -6,6 +6,9 @@ use crate::tnode::TNode;
 pub struct IntervalTree<T: Clone>{
     root: Option<Rc<RefCell<TNode<T>>>>,
     nil: Rc<RefCell<TNode<T>>>,
+    // version controls the verson of the to-update nodes.
+    // the nodes will be changed with this version.
+    version: u64,
 }
 
 impl <T: Clone> Clone for IntervalTree<T>{
@@ -13,6 +16,7 @@ impl <T: Clone> Clone for IntervalTree<T>{
         IntervalTree{
             root: self.root.clone(),
             nil: self.nil.clone(),
+            version: 0,
         }
     }
 }
@@ -24,11 +28,21 @@ impl<T: Clone> IntervalTree<T>{
         IntervalTree{
             root: Some(nil.clone()),
             nil: nil.clone(),
+            version: 0,
         }
     }
 
+    pub fn get_version(&self) -> u64{
+        self.version
+    }
+
+    pub fn set_version(&mut self, version: u64) {
+        self.version = version;
+    }
+
     pub fn new_node(&self, start: u64, end: u64, val: T) -> Rc<RefCell<TNode<T>>>{
-        let n = TNode::new(start, end, val, &self.nil);
+        let mut n = TNode::new(start, end, val, &self.nil);
+        n.set_version(self.version);
         return Rc::new(RefCell::new(n));
     }
 
@@ -202,6 +216,38 @@ impl<T: Clone> IntervalTree<T>{
         // try to traverse the tree in mid sequence order.
         while n.as_ref().unwrap().borrow().is_not_nil() {
             values.push(n.as_ref().unwrap().borrow().get_value());
+            if n.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().borrow().is_not_nil() {
+                n = self.tree_node_minum(&n.clone().as_ref().unwrap().borrow().get_rchild());
+                continue;
+            }
+            // free the node if it doesn't have children.
+            let mut p = n.as_ref().unwrap().borrow().get_parent().clone();
+            loop {
+                if p.as_ref().unwrap().borrow().is_nil() || n.as_ref().unwrap().as_ptr() == p.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().as_ptr() {
+                    n = p.clone();
+                    if p.as_ref().unwrap().borrow().is_not_nil(){
+                        p = p.clone().as_ref().unwrap().borrow().get_parent().clone();
+                        continue;
+                    }
+                    break;
+                }
+                n = p;
+                break;
+            }
+        }
+        return values;
+    }
+
+    pub fn visitor<F>(&self, visit: F) -> Vec<T> where 
+        F: Fn(u64) -> bool{
+        let mut values: Vec<T> = Vec::new();
+        let mut n = self.tree_node_minum(&self.root);
+        // note: when access n, means that n's left children have already been accessed.
+        // try to traverse the tree in mid sequence order.
+        while n.as_ref().unwrap().borrow().is_not_nil() {
+            if visit(n.as_ref().unwrap().borrow().get_version()) {
+                values.push(n.as_ref().unwrap().borrow().get_value());
+            }
             if n.as_ref().unwrap().borrow().get_rchild().as_ref().unwrap().borrow().is_not_nil() {
                 n = self.tree_node_minum(&n.clone().as_ref().unwrap().borrow().get_rchild());
                 continue;

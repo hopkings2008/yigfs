@@ -70,6 +70,8 @@ pub struct TNode<T: Clone>{
     intr: Interval,
     intr_end: u64,
     val: T,
+    // version for the node, starts from 0.
+    ver: u64,
 }
 
 impl<T:Clone> TNode<T>{
@@ -85,6 +87,7 @@ impl<T:Clone> TNode<T>{
             intr: Interval::new(start, end),
             intr_end: end,
             val: val,
+            ver: 0,
         }
     }
 
@@ -99,6 +102,7 @@ impl<T:Clone> TNode<T>{
             intr: Interval::new(0,0),
             intr_end: 0,
             val: val,
+            ver: 0,
         }));
         return n;
     }
@@ -236,5 +240,13 @@ impl<T:Clone> TNode<T>{
 
     pub fn get_value(&self) -> T {
         self.val.clone()
+    }
+
+    pub fn set_version(&mut self, ver: u64) {
+        self.ver = ver;
+    }
+
+    pub fn get_version(&self) -> u64{
+        self.ver
     }
 }

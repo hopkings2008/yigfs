@@ -14,7 +14,9 @@ use crate::types::MsgGetFileSegments;
 use crate::types::MsgOpenHandle;
 use crate::types::MsgSetSegStatus;
 use crate::types::SegStatus;
-use crate::types::{FileHandle, MsgAddBlock, MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, MsgQueryHandle};
+use crate::types::{FileHandle, MsgAddBlock, 
+    MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, 
+    MsgQueryHandle, MsgGetChangedBlocks, RespChangedBlocks};
 use log::{warn, error};
 
 pub struct FileHandleMgr {
@@ -101,10 +103,7 @@ impl FileHandleMgr {
         }
     }
 
-    pub fn add_block(&self, ino: u64, id0: u64, id1: u64, b: &Block) -> (HashMap<u128, Segment>, HashMap<u128, Segment>, Errno) {
-        let segs: HashMap<u128, Segment> = HashMap::new();
-        let garbages: HashMap<u128, Segment> = HashMap::new();
-        let (tx, rx) = bounded::<ChangedSegments>(1);
+    pub fn add_block(&self, ino: u64, id0: u64, id1: u64, b: &Block, tx: Option<Sender<ChangedSegments>>) -> Errno {
         let msg_add_block = MsgAddBlock{
             ino: ino,
             id0: id0,
@@ -115,23 +114,13 @@ impl FileHandleMgr {
         let msg = MsgFileHandleOp::AddBlock(msg_add_block);
         let ret = self.handle_op_tx.send(msg);
         match ret {
-            Ok(_) => {}
+            Ok(_) => {
+                return Errno::Esucc;
+            }
             Err(err) => {
                 error!("add_block: failed to add_block for ino: {}, seg_id0: {}, seg_id1: {}, err: {}",
                 ino, id0, id1, err);
-                return (segs, garbages, Errno::Eintr);
-            }
-        }
-
-        let ret = rx.recv();
-        match ret {
-            Ok(ret) => {
-                return (ret.segments, ret.garbages, Errno::Esucc);
-            }
-            Err(err) => {
-                error!("add_block: failed to get changed blocks for ino: {}, seg({}, {}), err: {}",
-            ino, id0, id1, err);
-                return (segs, garbages, Errno::Eintr);
+                return Errno::Eintr;
             }
         }
     }
@@ -410,6 +399,9 @@ impl HandleMgr {
                         MsgFileHandleOp::GetFileSegments(m) => {
                             self.get_file_segments(m);
                         }
+                        MsgFileHandleOp::GetChangedBlocks(m) => {
+                            self.get_changed_blocks(m);
+                        }
                     }
                 },
                 recv(self.stop_rx) -> msg => {
@@ -453,9 +445,14 @@ impl HandleMgr {
 
     fn add_block(&mut self, msg: &MsgAddBlock) {
         let mut changed_segs = ChangedSegments{
+            ret: Errno::Esucc,
             segments: HashMap::new(),
             garbages: HashMap::new(),
         };
+        let mut need_track = true;
+        if msg.tx.is_some() {
+            need_track = false;
+        }
         if let Some(h) = self.handles.get_mut(&msg.ino) {
             let start = msg.block.offset;
             let end = msg.block.offset + msg.block.size as u64;
@@ -466,7 +463,11 @@ impl HandleMgr {
                 // no block yet. just insert this new one.
                 h.block_tree.insert_node(start, end, msg.block.clone());
                 // add to changed blocks.
-                h.add_changed_block(&mut changed_segs.segments, &msg.block);
+                let err = h.add_changed_block(&mut changed_segs.segments, &msg.block);
+                if !err.is_success() {
+                    error!("HandleMgr::add_block: failed to add changed block {:?}, err: {:?}", msg.block, err);
+                    changed_segs.ret = err;
+                }
                 h.mark_dirty();
                 msg.response(changed_segs);
                 return;
@@ -481,7 +482,11 @@ impl HandleMgr {
                 new_block.size += msg.block.size;
                 h.block_tree.delete(&last_node);
                 h.block_tree.insert_node(new_block.offset, new_block.offset+new_block.size as u64, new_block.clone());
-                h.add_changed_block(&mut changed_segs.segments, &new_block);
+                let ret = h.add_changed_block(&mut changed_segs.segments, &new_block);
+                if !ret.is_success(){
+                    error!("HandleMgr::add_block: failed to add changed block {:?}, err: {:?}", msg.block, ret);
+                    changed_segs.ret = ret;
+                }
                 h.mark_dirty();
                 msg.response(changed_segs);
                 return;
@@ -492,7 +497,11 @@ impl HandleMgr {
             if nodes.is_empty() {
                 // no overlap, just insert the new nodes.
                 h.block_tree.insert_node(start, end, msg.block.clone());
-                h.add_changed_block(&mut changed_segs.segments, &msg.block);
+                let ret = h.add_changed_block(&mut changed_segs.segments, &msg.block);
+                if !ret.is_success() {
+                    error!("HandleMgr::add_block: failed to add changed block for {:?}, err: {:?}", msg.block, ret);
+                    changed_segs.ret = ret;
+                }
                 h.mark_dirty();
                 msg.response(changed_segs);
                 return;
@@ -506,7 +515,22 @@ impl HandleMgr {
                     // [b.offset, b.offset+b.size) is the subset of [start, end)
                     if (b.offset + b.size as u64) <= end {
                         // just skip this block, add it to garbage
-                        h.add_garbage_block(&mut changed_segs.garbages, b);
+                        let ret = h.add_garbage_block(&mut changed_segs.garbages, b.clone());
+                        if !ret.is_success() {
+                            error!("HandleMgr::add_block: failed to add garbage block: {:?}, err: {:?}", b, ret);
+                            changed_segs.ret = ret;
+                            msg.response(changed_segs);
+                            return;
+                        }
+                        if need_track {
+                            let ret = h.track_garbage_block(b.clone());
+                            if !ret.is_success() {
+                                error!("HandleMgr::add_block: failed to track garbage block: {:?}, err: {:?}", b, ret);
+                                changed_segs.ret = ret;
+                                msg.response(changed_segs);
+                                return;
+                            }
+                        }
                         continue;
                     }
                     let size = end - start;
@@ -526,7 +550,22 @@ impl HandleMgr {
                 // [start, [b.offset, b.offset+b.size), end)
                 // add to garbage
                 if (b.offset + b.size as u64) <= end {
-                    h.add_garbage_block(&mut changed_segs.garbages, b);
+                    if need_track{
+                        let ret = h.track_garbage_block(b.clone());
+                        if !ret.is_success(){
+                            error!("HandleMgr::add_block: failed to track garbage block: {:?}, err: {:?}", b, ret);
+                            changed_segs.ret = ret;
+                            msg.response(changed_segs);
+                            return;
+                        }
+                    } 
+                    let ret = h.add_garbage_block(&mut changed_segs.garbages, b.clone());
+                    if !ret.is_success(){
+                        error!("HandleMgr::add_block: failed to add garbage block: {:?}, err: {:?}", b, ret);
+                        changed_segs.ret = ret;
+                        msg.response(changed_segs);
+                        return;
+                    }
                     continue;
                 }
                 let size = end - b.offset;
@@ -538,7 +577,13 @@ impl HandleMgr {
             // insert the merged blocks.
             for b in &blocks {
                 h.block_tree.insert_node(b.offset, b.offset+b.size as u64, b.clone());
-                h.add_changed_block(&mut changed_segs.segments, b);
+                let ret = h.add_changed_block(&mut changed_segs.segments, b);
+                if !ret.is_success() {
+                    error!("HandleMgr::add_block: failed to add changed block: {:?}, err: {:?}", b, ret);
+                    changed_segs.ret = ret;
+                    msg.response(changed_segs);
+                    return;
+                }
             }
             h.mark_dirty();
             msg.response(changed_segs);
@@ -563,6 +608,7 @@ impl HandleMgr {
         let mut id1: u64 = 0;
         let mut max_size: u64 = 0;
         let mut size: u64 = 0;
+        // store the status whether the local segment should be synced from yig.
         let mut need_sync = 0;
         let tx = msg.tx.clone();
         defer! {
@@ -691,6 +737,57 @@ impl HandleMgr {
             Ok(_) => {}
             Err(err) => {
                 error!("get_file_segments: failed to send segments resp for ino: {}, err: {}", m.ino, err);
+            }
+        }
+    }
+
+    fn get_changed_blocks(&mut self, m: MsgGetChangedBlocks)-> Errno{
+        let segs: HashMap<u128, Segment>;
+        let garbages: HashMap<u128, Segment>;
+        let version: u64;
+        if let Some(h) = self.handles.get_mut(&m.ino){
+            let visit = |version: u64| -> bool {
+                if version >= m.version {
+                    return true;
+                }
+                return false;
+            };
+            let (ss, ver, ret) = h.visitor(visit);
+            if !ret.is_success(){
+                error!("get_changed_blocks: failed to get changed blocks for ino: {}, version: {}, err: {:?}",
+                m.ino, m.version, ret);
+                return ret;
+            }
+            segs = ss;
+            version = ver;
+            if let Some(g) = h.garbages.get(&m.version){
+                garbages = g.clone();
+                if m.version > 0 {
+                    let remove_ver = m.version - 1;
+                    h.garbages.remove(&remove_ver);
+                }
+            } else {
+                garbages = HashMap::new();
+            }
+        } else {
+            segs = HashMap::new();
+            garbages = HashMap::new();
+            version = 0;
+        }
+
+        let ret = m.tx.send(RespChangedBlocks{
+            segs: segs,
+            garbages: garbages,
+            version: version,
+        });
+        match ret{
+            Ok(_) => {
+                return Errno::Esucc;
+            }
+            Err(err) => {
+                error!("get_changed_blocks: failed to send changed segments for ino: {}, err: {}",
+                m.ino, err);
+                return Errno::Eintr;
             }
         }
     }
