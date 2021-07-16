@@ -254,7 +254,7 @@ impl FileHandle {
 
     pub fn track_garbage_block(&mut self, b: Block) -> Errno {
         if b.ino != self.ino {
-            error!("add_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
+            error!("track_garbage_block: got invalid ino: {} for block: offset: {}, size: {}, expect: ino: {}",
             b.ino, b.offset, b.size, self.ino);
             return Errno::Eintr;
         }
@@ -271,7 +271,7 @@ impl FileHandle {
                 seg_map.insert(id, s);
                 return Errno::Esucc;
             }
-            error!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+            error!("track_garbage_block: cannot find segment[{}, {}] for block: {:?}",
             b.seg_id0, b.seg_id1, b);
             return Errno::Eintr;
         }
@@ -283,7 +283,7 @@ impl FileHandle {
             self.garbages.insert(current_version, seg_map);
             return Errno::Esucc;
         }
-        error!("add_changed_block: cannot find segment[{}, {}] for block: {:?}",
+        error!("track_garbage_block: cannot find segment[{}, {}] for block: {:?}",
             b.seg_id0, b.seg_id1, b);
         return Errno::Eintr
     }
@@ -421,6 +421,7 @@ pub struct MsgGetFileSegments{
     pub tx: Sender<Vec<Segment>>,
 }
 
+#[derive(Debug)]
 pub struct RespChangedBlocks{
     pub segs: HashMap<u128, Segment>,
     pub garbages: HashMap<u128, Segment>,
@@ -429,8 +430,33 @@ pub struct RespChangedBlocks{
 #[derive(Debug)]
 pub struct MsgGetChangedBlocks{
     pub ino: u64,
+    // the current largest changed version in block tree.
     pub version: u64,
     pub tx: Sender<RespChangedBlocks>,
+}
+
+#[derive(Debug)]
+pub struct RespIntervalChangedBlocks{
+    pub err: Errno,
+    pub segs: HashMap<u64, RespChangedBlocks>,
+}
+#[derive(Debug)]
+pub struct MsgGetIntervalChangedBlocks{
+    pub start: u64,
+    pub end: u64,
+    pub tx: Sender<RespIntervalChangedBlocks>,
+}
+
+impl MsgGetIntervalChangedBlocks{
+    pub fn response(&self, resp: RespIntervalChangedBlocks){
+        let ret = self.tx.send(resp);
+        match ret {
+            Ok(_) => {}
+            Err(err) => {
+                error!("failed to send response for interval changed blocks, err: {}", err);
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -446,6 +472,7 @@ pub enum MsgFileHandleOp{
     SetSegStatus(MsgSetSegStatus),
     GetFileSegments(MsgGetFileSegments),
     GetChangedBlocks(MsgGetChangedBlocks),
+    GetIntervalChangedBlocks(MsgGetIntervalChangedBlocks),
 }
 
 #[derive(Debug)]
@@ -493,15 +520,18 @@ pub struct FileMetaTracker{
     pub end: u64,
     // interval: interval = end-start, that is [start, end)
     pub interval: u64,
+    // version for the changed blocks.
+    pub version: u64,
 }
 
 impl FileMetaTracker {
-    pub fn new(ino: u64, start: u64, interval: u64) -> Self {
+    pub fn new(ino: u64, start: u64, interval: u64, ver: u64) -> Self {
         FileMetaTracker{
             ino: ino,
             start: start,
             end: start+interval,
             interval: interval,
+            version: ver,
         }
     }
 

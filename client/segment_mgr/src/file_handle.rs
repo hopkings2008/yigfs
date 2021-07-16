@@ -13,8 +13,10 @@ use crate::file_meta_mgr::FileMetaMgr;
 use crate::types::ChangedSegments;
 use crate::types::MsgGetBlocks;
 use crate::types::MsgGetFileSegments;
+use crate::types::MsgGetIntervalChangedBlocks;
 use crate::types::MsgOpenHandle;
 use crate::types::MsgSetSegStatus;
+use crate::types::RespIntervalChangedBlocks;
 use crate::types::SegStatus;
 use crate::types::{FileHandle, MsgAddBlock, 
     MsgAddSegment, MsgFileHandleOp, MsgGetLastSegment, 
@@ -32,14 +34,15 @@ impl FileHandleMgr {
     pub fn create() -> FileHandleMgr {
         let (tx, rx) = bounded::<MsgFileHandleOp>(100);
         let (stop_tx, stop_rx) = bounded::<u32>(1);
-        
+        let clock = Instant::now();
         let mut handle_mgr = HandleMgr{
             handles: HashMap::<u64, FileHandle>::new(),
             handle_op_rx: rx,
             stop_rx: stop_rx,
             // default interval is 5s.
             file_meta_mgr: FileMetaMgr::new(5),
-            sys_clock: Instant::now(),
+            sys_clock: clock,
+            file_meta_last_sync_time: clock.elapsed().as_secs(),
         };
 
         let mgr = FileHandleMgr{
@@ -355,6 +358,7 @@ struct HandleMgr {
     stop_rx: Receiver<u32>,
     file_meta_mgr: FileMetaMgr,
     sys_clock: Instant,
+    file_meta_last_sync_time: u64,
 }
 
 unsafe impl Send for HandleMgr {}
@@ -408,6 +412,9 @@ impl HandleMgr {
                         }
                         MsgFileHandleOp::GetChangedBlocks(m) => {
                             self.get_changed_blocks(m);
+                        }
+                        MsgFileHandleOp::GetIntervalChangedBlocks(m) => {
+                            self.get_interval_changed_blocks(m);
                         }
                     }
                 },
@@ -813,9 +820,76 @@ impl HandleMgr {
         }
     }
 
+    fn query_file_changed_blocks(&mut self, ino: u64, ver: u64)-> Result<RespChangedBlocks, Errno> {
+        let segs: HashMap<u128, Segment>;
+        let garbages: HashMap<u128, Segment>;
+        let version: u64;
+        if let Some(h) = self.handles.get_mut(&ino){
+            let visit = |version: u64| -> bool {
+                if version >= ver {
+                    return true;
+                }
+                return false;
+            };
+            let (ss, ver, ret) = h.visitor(visit);
+            if !ret.is_success(){
+                error!("query_file_changed_blocks: failed to get changed blocks for ino: {}, version: {}, err: {:?}",
+                ino, ver, ret);
+                return Err(ret);
+            }
+            segs = ss;
+            version = ver;
+            if let Some(g) = h.garbages.get(&ver){
+                garbages = g.clone();
+                if ver > 0 {
+                    let remove_ver = ver - 1;
+                    h.garbages.remove(&remove_ver);
+                }
+            } else {
+                garbages = HashMap::new();
+            }
+        } else {
+            segs = HashMap::new();
+            garbages = HashMap::new();
+            version = 0;
+        }
+
+        let resp = RespChangedBlocks{
+            segs: segs,
+            garbages: garbages,
+            version: version,
+        };
+        return Ok(resp);
+    }
+
     fn update_file_meta_sync_time(&mut self, ino: u64){
         //use system time for the cached file meta sync time since it is in memory.
         let start = self.sys_clock.elapsed().as_secs();
         self.file_meta_mgr.update(ino, start);
+    }
+
+    fn get_interval_changed_blocks(&mut self, m: MsgGetIntervalChangedBlocks){
+        let now = self.sys_clock.elapsed().as_secs();
+        let mut resp = RespIntervalChangedBlocks{
+            err: Errno::Eintr,
+            segs: HashMap::new(),
+        };
+        let trackers = self.file_meta_mgr.get_range(self.file_meta_last_sync_time);
+        for t in trackers{
+            let ret = self.query_file_changed_blocks(t.ino, t.version);
+            match ret{
+                Ok(changed_blocks) => {
+                    resp.segs.insert(t.ino, changed_blocks);
+                }
+                Err(err)=> {
+                    error!("get_interval_changed_blocks: failed to query changed block for ino: {}, version: {}, err: {:?}",
+                    t.ino, t.version, err);
+                    m.response(resp);
+                    return;
+                }
+            }
+        }
+        m.response(resp);
+        self.file_meta_last_sync_time = now;
     }
 }
