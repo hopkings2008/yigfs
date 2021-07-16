@@ -9,3 +9,4 @@ mod leader_local;
 mod leader_not_support;
 mod segment_sync_handler;
 mod segment_state;
+mod file_meta_mgr;

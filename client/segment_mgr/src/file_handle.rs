@@ -3,11 +3,13 @@ extern crate crossbeam_channel;
 use std::collections::HashMap;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Instant;
 use common::numbers::NumberOp;
 use crossbeam_channel::{Sender, Receiver, bounded, select};
 use common::error::Errno;
 use common::defer;
 use metaservice_mgr::types::{Segment, Block};
+use crate::file_meta_mgr::FileMetaMgr;
 use crate::types::ChangedSegments;
 use crate::types::MsgGetBlocks;
 use crate::types::MsgGetFileSegments;
@@ -35,6 +37,9 @@ impl FileHandleMgr {
             handles: HashMap::<u64, FileHandle>::new(),
             handle_op_rx: rx,
             stop_rx: stop_rx,
+            // default interval is 5s.
+            file_meta_mgr: FileMetaMgr::new(5),
+            sys_clock: Instant::now(),
         };
 
         let mgr = FileHandleMgr{
@@ -348,6 +353,8 @@ struct HandleMgr {
     handles: HashMap<u64, FileHandle>,
     handle_op_rx: Receiver<MsgFileHandleOp>,
     stop_rx: Receiver<u32>,
+    file_meta_mgr: FileMetaMgr,
+    sys_clock: Instant,
 }
 
 unsafe impl Send for HandleMgr {}
@@ -425,11 +432,15 @@ impl HandleMgr {
     }
 
     fn add(&mut self, handle: FileHandle) {
-        if let Some(h) = self.handles.get_mut(&handle.ino) {
+        let ino = handle.ino;
+        if let Some(h) = self.handles.get_mut(&ino) {
             h.reference += 1;
             return;
         }
         self.handles.insert(handle.ino, handle);
+        // use system time here for the opened file handle.
+        let start = self.sys_clock.elapsed().as_secs();
+        self.file_meta_mgr.insert(ino, start);
     }
 
     fn add_segment(&mut self, msg: &MsgAddSegment) {
@@ -470,6 +481,7 @@ impl HandleMgr {
                 }
                 h.mark_dirty();
                 msg.response(changed_segs);
+                self.update_file_meta_sync_time(msg.ino);
                 return;
             }
             // check whether it is the sequence write.
@@ -489,6 +501,7 @@ impl HandleMgr {
                 }
                 h.mark_dirty();
                 msg.response(changed_segs);
+                self.update_file_meta_sync_time(msg.ino);
                 return;
             }
 
@@ -504,6 +517,7 @@ impl HandleMgr {
                 }
                 h.mark_dirty();
                 msg.response(changed_segs);
+                self.update_file_meta_sync_time(msg.ino);
                 return;
             }
             let mut blocks: Vec<Block> = Vec::new();
@@ -520,6 +534,7 @@ impl HandleMgr {
                             error!("HandleMgr::add_block: failed to add garbage block: {:?}, err: {:?}", b, ret);
                             changed_segs.ret = ret;
                             msg.response(changed_segs);
+                            self.update_file_meta_sync_time(msg.ino);
                             return;
                         }
                         if need_track {
@@ -528,6 +543,7 @@ impl HandleMgr {
                                 error!("HandleMgr::add_block: failed to track garbage block: {:?}, err: {:?}", b, ret);
                                 changed_segs.ret = ret;
                                 msg.response(changed_segs);
+                                self.update_file_meta_sync_time(msg.ino);
                                 return;
                             }
                         }
@@ -556,6 +572,7 @@ impl HandleMgr {
                             error!("HandleMgr::add_block: failed to track garbage block: {:?}, err: {:?}", b, ret);
                             changed_segs.ret = ret;
                             msg.response(changed_segs);
+                            self.update_file_meta_sync_time(msg.ino);
                             return;
                         }
                     } 
@@ -564,6 +581,7 @@ impl HandleMgr {
                         error!("HandleMgr::add_block: failed to add garbage block: {:?}, err: {:?}", b, ret);
                         changed_segs.ret = ret;
                         msg.response(changed_segs);
+                        self.update_file_meta_sync_time(msg.ino);
                         return;
                     }
                     continue;
@@ -582,11 +600,13 @@ impl HandleMgr {
                     error!("HandleMgr::add_block: failed to add changed block: {:?}, err: {:?}", b, ret);
                     changed_segs.ret = ret;
                     msg.response(changed_segs);
+                    self.update_file_meta_sync_time(msg.ino);
                     return;
                 }
             }
             h.mark_dirty();
             msg.response(changed_segs);
+            self.update_file_meta_sync_time(msg.ino);
         }
     }
 
@@ -597,6 +617,7 @@ impl HandleMgr {
             if h.reference <=0 {
                 h.block_tree.free();
                 self.handles.remove(&ino);
+                self.file_meta_mgr.remove(ino);
             }
         }
     }
@@ -790,5 +811,11 @@ impl HandleMgr {
                 return Errno::Eintr;
             }
         }
+    }
+
+    fn update_file_meta_sync_time(&mut self, ino: u64){
+        //use system time for the cached file meta sync time since it is in memory.
+        let start = self.sys_clock.elapsed().as_secs();
+        self.file_meta_mgr.update(ino, start);
     }
 }

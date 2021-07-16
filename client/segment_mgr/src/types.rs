@@ -482,3 +482,40 @@ pub enum SegSyncOp{
 pub enum MetaSyncOp{
     OpUpdateChangedSegs(ChangedSegsUpdate),
 }
+
+#[derive(Debug, Clone)]
+pub struct FileMetaTracker{
+    // file ino
+    pub ino: u64,
+    // start time to track
+    pub start: u64,
+    // end time of the interval
+    pub end: u64,
+    // interval: interval = end-start, that is [start, end)
+    pub interval: u64,
+}
+
+impl FileMetaTracker {
+    pub fn new(ino: u64, start: u64, interval: u64) -> Self {
+        FileMetaTracker{
+            ino: ino,
+            start: start,
+            end: start+interval,
+            interval: interval,
+        }
+    }
+
+    pub fn is_in(&self, start: u64) -> bool {
+        self.start <= start && self.end >= start
+    }
+
+    pub fn is_the_file(&self, ino: u64) -> bool {
+        self.ino == ino
+    }
+
+    pub fn update_start(&mut self, start: u64) {
+        // this will update start and end by using self.interval
+        self.start = start;
+        self.end = self.start + self.interval;
+    }
+}

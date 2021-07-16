@@ -71,9 +71,10 @@ impl<T: Clone> IntervalTree<T>{
             if intr.start <= start && start < intr.end {
                 // got the start interval, need to track all the successors for the end.
                 v.push(n.clone());
-                if end <= intr.end {
+                // we should get all the range values.
+                /*if end <= intr.end {
                     break;
-                }
+                }*/
                 // end > intr.end, more than two intervals are needed.
                 let mut curr = n.clone();
                 loop {
